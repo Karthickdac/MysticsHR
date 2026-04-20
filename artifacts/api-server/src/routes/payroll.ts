@@ -759,13 +759,15 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
       const grossEarnings = basic + hra + specialAllowance + travelAllowance + medicalAllowance +
         performanceBonus + shiftAllowance + nightDifferential + otherEarnings;
 
-      // LOP deduction = the salary amount withheld for absent days.
-      // Full monthly earnings at full factor (1) minus the prorated earnings gives the LOP amount.
-      // This makes the deduction explicit on the payslip rather than silently embedded in prorated figures.
+      // LOP amount withheld = difference between full-factor and prorated earnings.
+      // This is a display-only field on payslips — the reduction is already embedded in grossEarnings
+      // (which is prorated by presentDays/workingDays). Do NOT add lopDeduction to totalDeductions
+      // or it will double-count the absence impact.
       const fullGross = workingDays > 0
         ? components.filter(c => c.isEarning).reduce((s, c) => s + Number(c.amount), 0) + overtimePay
         : 0;
       const lopDeduction = Math.round((fullGross - grossEarnings) * 100) / 100;
+
       const { pfEmployee, pfEmployer } = computePF(basic);
       const { esiEmployee, esiEmployer } = computeESI(grossEarnings);
       const professionalTax = computeProfessionalTax(grossEarnings, month);
@@ -783,7 +785,8 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
       );
       const loanDeduction = activeLoan ? Number(activeLoan.monthlyDeduction) : 0;
 
-      const totalDeductionsAmt = pfEmployee + esiEmployee + professionalTax + tds + lopDeduction + loanDeduction;
+      // lopDeduction is display-only (already reflected in prorated grossEarnings); exclude from totalDeductions
+      const totalDeductionsAmt = pfEmployee + esiEmployee + professionalTax + tds + loanDeduction;
       const netPay = Math.max(0, grossEarnings - totalDeductionsAmt);
 
       totalGross += grossEarnings;
