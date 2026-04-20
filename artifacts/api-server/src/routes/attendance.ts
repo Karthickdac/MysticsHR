@@ -11,7 +11,7 @@ import {
   employeesTable,
   hrmsUsersTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, isNull, sql } from "drizzle-orm";
+import { eq, and, gte, lte, isNull, sql, or, SQL, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -19,18 +19,42 @@ const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
 const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
 const ALL_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] as const;
 
+type AttendanceStatus = "Present" | "Absent" | "Half-Day" | "On Leave" | "On Permission" | "Holiday" | "Week Off" | "Regularization Pending";
+type RegularizationStatus = "Pending" | "Approved" | "Rejected";
+
+interface AttendanceSummaryRow {
+  employeeId: number;
+  employeeName: string;
+  employeeCode: string;
+  month: string;
+  totalPresent: number;
+  totalAbsent: number;
+  totalHalfDay: number;
+  totalOnLeave: number;
+  totalWeekOff: number;
+  totalHoliday: number;
+  totalOvertimeMinutes: number;
+  totalMinutesWorked: number;
+}
+
 function computeMinutesWorked(signIn: Date | null, signOut: Date | null, breakMins: number): number | null {
   if (!signIn || !signOut) return null;
   return Math.max(0, Math.round((signOut.getTime() - signIn.getTime()) / 60000) - breakMins);
 }
 
-function computeStatus(minutesWorked: number | null, minWorkingMins: number): string {
+function computeStatus(minutesWorked: number | null, minWorkingMins: number): AttendanceStatus {
   if (minutesWorked === null) return "Absent";
   if (minutesWorked >= minWorkingMins) return "Present";
   if (minutesWorked >= minWorkingMins / 2) return "Half-Day";
   return "Absent";
 }
 
+/**
+ * Resolves the active shift template for a given employee on a given date.
+ * Considers both open-ended assignments (effectiveTo IS NULL) and date-bounded
+ * assignments that overlap the target date (effectiveTo >= date).
+ * Returns the most recently started assignment that covers the date.
+ */
 async function getActiveShiftTemplate(employeeId: number, date: string) {
   const [assignment] = await db
     .select({ shiftTemplateId: shiftAssignmentsTable.shiftTemplateId })
@@ -39,10 +63,13 @@ async function getActiveShiftTemplate(employeeId: number, date: string) {
       and(
         eq(shiftAssignmentsTable.employeeId, employeeId),
         lte(shiftAssignmentsTable.effectiveFrom, date),
-        isNull(shiftAssignmentsTable.effectiveTo),
+        or(
+          isNull(shiftAssignmentsTable.effectiveTo),
+          gte(shiftAssignmentsTable.effectiveTo, date),
+        ),
       )
     )
-    .orderBy(shiftAssignmentsTable.effectiveFrom)
+    .orderBy(desc(shiftAssignmentsTable.effectiveFrom))
     .limit(1);
   if (!assignment) return null;
   const [template] = await db.select().from(shiftTemplatesTable).where(eq(shiftTemplatesTable.id, assignment.shiftTemplateId));
@@ -54,7 +81,7 @@ async function getActiveShiftTemplate(employeeId: number, date: string) {
 router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
   try {
     const { date, month, employeeId, departmentId, status } = req.query;
-    const conditions: any[] = [];
+    const conditions: SQL<unknown>[] = [];
     if (date) conditions.push(eq(attendanceRecordsTable.attendanceDate, date as string));
     if (month && typeof month === "string") {
       const [y, m] = month.split("-").map(Number);
@@ -65,7 +92,12 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
       conditions.push(lte(attendanceRecordsTable.attendanceDate, end));
     }
     if (employeeId) conditions.push(eq(attendanceRecordsTable.employeeId, Number(employeeId)));
-    if (status) conditions.push(eq(attendanceRecordsTable.status, status as any));
+    if (status) {
+      const validStatuses: AttendanceStatus[] = ["Present", "Absent", "Half-Day", "On Leave", "On Permission", "Holiday", "Week Off", "Regularization Pending"];
+      if (validStatuses.includes(status as AttendanceStatus)) {
+        conditions.push(eq(attendanceRecordsTable.status, status as AttendanceStatus));
+      }
+    }
 
     const rows = await db
       .select({
@@ -91,7 +123,6 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(attendanceRecordsTable.attendanceDate, attendanceRecordsTable.employeeId);
 
-    // Apply departmentId filter in memory (join would require extra complexity)
     if (departmentId) {
       const deptEmps = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.departmentId, Number(departmentId)));
       const ids = new Set(deptEmps.map((e) => e.id));
@@ -110,22 +141,21 @@ router.post("/attendance", requireHrmsUser, requireRole(...HR_ROLES), async (req
     const body = req.body;
     const signIn = body.signInTime ? new Date(body.signInTime) : null;
     const signOut = body.signOutTime ? new Date(body.signOutTime) : null;
-    const breakMins = body.breakDurationMinutes ?? 0;
+    const breakMins: number = body.breakDurationMinutes ?? 0;
     const totalMins = computeMinutesWorked(signIn, signOut, breakMins);
 
-    // Get shift for overtime calculation
     const template = await getActiveShiftTemplate(body.employeeId, body.attendanceDate);
     const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
     const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
     const overtimeMins = totalMins !== null && totalMins > minWorkingMins + overtimeThreshold
       ? totalMins - minWorkingMins
       : 0;
-    const computedStatus = body.status ?? computeStatus(totalMins, minWorkingMins);
+    const computedStatus: AttendanceStatus = body.status ?? computeStatus(totalMins, minWorkingMins);
 
     const [existing] = await db.select({ id: attendanceRecordsTable.id }).from(attendanceRecordsTable)
       .where(and(eq(attendanceRecordsTable.employeeId, body.employeeId), eq(attendanceRecordsTable.attendanceDate, body.attendanceDate)));
 
-    let record: any;
+    let record: typeof attendanceRecordsTable.$inferSelect | undefined;
     if (existing) {
       [record] = await db.update(attendanceRecordsTable)
         .set({ signInTime: signIn, signOutTime: signOut, breakDurationMinutes: breakMins, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: computedStatus, notes: body.notes ?? null, updatedAt: new Date() })
@@ -139,15 +169,14 @@ router.post("/attendance", requireHrmsUser, requireRole(...HR_ROLES), async (req
         breakDurationMinutes: breakMins,
         totalMinutesWorked: totalMins,
         overtimeMinutes: overtimeMins,
-        status: computedStatus as any,
+        status: computedStatus,
         notes: body.notes ?? null,
       }).returning();
     }
 
-    // Create overtime record if applicable
     if (overtimeMins > 0 && record) {
       const [existOt] = await db.select({ id: overtimeRecordsTable.id }).from(overtimeRecordsTable)
-        .where(and(eq(overtimeRecordsTable.attendanceRecordId, record.id)));
+        .where(eq(overtimeRecordsTable.attendanceRecordId, record.id));
       if (!existOt) {
         await db.insert(overtimeRecordsTable).values({
           employeeId: body.employeeId,
@@ -160,7 +189,7 @@ router.post("/attendance", requireHrmsUser, requireRole(...HR_ROLES), async (req
       }
     }
 
-    await logAudit({ user: req.hrmsUser, action: existing ? "UPDATE" : "CREATE", module: "Attendance", recordId: record.id, newValue: `${body.employeeId}:${body.attendanceDate}:${computedStatus}`, ipAddress: req.ip });
+    await logAudit({ user: req.hrmsUser, action: existing ? "UPDATE" : "CREATE", module: "Attendance", recordId: record?.id ?? 0, newValue: `${body.employeeId}:${body.attendanceDate}:${computedStatus}`, ipAddress: req.ip });
     res.status(201).json(record);
   } catch (err) {
     console.error(err);
@@ -192,8 +221,7 @@ router.get("/attendance/summary", requireHrmsUser, requireRole(...HR_READ_ROLES)
       .leftJoin(employeesTable, eq(attendanceRecordsTable.employeeId, employeesTable.id))
       .where(and(gte(attendanceRecordsTable.attendanceDate, start), lte(attendanceRecordsTable.attendanceDate, end)));
 
-    // Aggregate per employee
-    const summaryMap = new Map<number, any>();
+    const summaryMap = new Map<number, AttendanceSummaryRow>();
     for (const r of records) {
       if (departmentId && r.deptId !== Number(departmentId)) continue;
       if (!summaryMap.has(r.employeeId)) {
@@ -232,9 +260,23 @@ router.get("/attendance/summary", requireHrmsUser, requireRole(...HR_READ_ROLES)
 router.get("/attendance/regularizations", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const { status, employeeId, month } = req.query;
-    const conditions: any[] = [];
-    if (status) conditions.push(eq(attendanceRegularizationsTable.status, status as any));
-    if (employeeId) conditions.push(eq(attendanceRegularizationsTable.employeeId, Number(employeeId)));
+    const conditions: SQL<unknown>[] = [];
+
+    // Employees can only view their own regularization requests
+    if (req.hrmsUser.role === "employee") {
+      const [userRow] = await db.select({ employeeId: hrmsUsersTable.employeeId }).from(hrmsUsersTable).where(eq(hrmsUsersTable.id, req.hrmsUser.id));
+      if (!userRow?.employeeId) { res.status(400).json({ error: "Employee record not found" }); return; }
+      conditions.push(eq(attendanceRegularizationsTable.employeeId, userRow.employeeId));
+    } else if (employeeId) {
+      conditions.push(eq(attendanceRegularizationsTable.employeeId, Number(employeeId)));
+    }
+
+    if (status) {
+      const validStatuses: RegularizationStatus[] = ["Pending", "Approved", "Rejected"];
+      if (validStatuses.includes(status as RegularizationStatus)) {
+        conditions.push(eq(attendanceRegularizationsTable.status, status as RegularizationStatus));
+      }
+    }
     if (month && typeof month === "string") {
       const [y, mo] = month.split("-").map(Number);
       const start = `${y}-${String(mo).padStart(2, "0")}-01`;
@@ -272,17 +314,15 @@ router.get("/attendance/regularizations", requireHrmsUser, requireRole(...ALL_RO
 router.post("/attendance/regularizations", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const body = req.body;
-    // Find employee record for current user via hrmsUser link
     const [userRow] = await db.select({ employeeId: hrmsUsersTable.employeeId }).from(hrmsUsersTable).where(eq(hrmsUsersTable.id, req.hrmsUser.id));
-    const emp = userRow?.employeeId ? { id: userRow.employeeId } : null;
-    if (!emp) { res.status(400).json({ error: "Employee record not found" }); return; }
+    const empId = userRow?.employeeId ?? null;
+    if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
 
-    // Check for existing attendance record
     const [attRecord] = await db.select({ id: attendanceRecordsTable.id }).from(attendanceRecordsTable)
-      .where(and(eq(attendanceRecordsTable.employeeId, emp.id), eq(attendanceRecordsTable.attendanceDate, body.attendanceDate)));
+      .where(and(eq(attendanceRecordsTable.employeeId, empId), eq(attendanceRecordsTable.attendanceDate, body.attendanceDate)));
 
     const [created] = await db.insert(attendanceRegularizationsTable).values({
-      employeeId: emp.id,
+      employeeId: empId,
       attendanceDate: body.attendanceDate,
       requestedSignIn: body.requestedSignIn ? new Date(body.requestedSignIn) : null,
       requestedSignOut: body.requestedSignOut ? new Date(body.requestedSignOut) : null,
@@ -290,7 +330,6 @@ router.post("/attendance/regularizations", requireHrmsUser, requireRole(...ALL_R
       attendanceRecordId: attRecord?.id ?? null,
     }).returning();
 
-    // Update attendance status to Regularization Pending
     if (attRecord) {
       await db.update(attendanceRecordsTable).set({ status: "Regularization Pending", updatedAt: new Date() }).where(eq(attendanceRecordsTable.id, attRecord.id));
     }
@@ -316,22 +355,19 @@ router.post("/attendance/regularizations/:id/action", requireHrmsUser, requireRo
       .where(eq(attendanceRegularizationsTable.id, regId))
       .returning();
 
-    // Apply attendance override on approval
     if (action === "Approved" && reg.attendanceRecordId) {
       const signIn = reg.requestedSignIn;
       const signOut = reg.requestedSignOut;
-      const breakMins = 0;
-      const totalMins = computeMinutesWorked(signIn, signOut, breakMins);
+      const totalMins = computeMinutesWorked(signIn, signOut, 0);
       const template = await getActiveShiftTemplate(reg.employeeId, reg.attendanceDate);
       const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
       const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
       const overtimeMins = totalMins !== null && totalMins > minWorkingMins + overtimeThreshold ? totalMins - minWorkingMins : 0;
-      const status = computeStatus(totalMins, minWorkingMins);
+      const newStatus: AttendanceStatus = computeStatus(totalMins, minWorkingMins);
       await db.update(attendanceRecordsTable)
-        .set({ signInTime: signIn, signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: status as any, isHrOverride: false, updatedAt: new Date() })
+        .set({ signInTime: signIn, signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, isHrOverride: false, updatedAt: new Date() })
         .where(eq(attendanceRecordsTable.id, reg.attendanceRecordId));
     } else if (action === "Rejected" && reg.attendanceRecordId) {
-      // Revert status from Regularization Pending
       await db.update(attendanceRecordsTable)
         .set({ status: "Absent", updatedAt: new Date() })
         .where(and(eq(attendanceRecordsTable.id, reg.attendanceRecordId), eq(attendanceRecordsTable.status, "Regularization Pending")));
@@ -380,19 +416,20 @@ router.get("/attendance/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), as
 router.patch("/attendance/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const body = req.body;
+    if (!body.overrideReason) { res.status(400).json({ error: "overrideReason is required for HR override" }); return; }
     const id = Number(req.params.id);
     const [existing] = await db.select().from(attendanceRecordsTable).where(eq(attendanceRecordsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Not found" }); return; }
 
     const signIn = body.signInTime ? new Date(body.signInTime) : existing.signInTime;
     const signOut = body.signOutTime ? new Date(body.signOutTime) : existing.signOutTime;
-    const breakMins = body.breakDurationMinutes ?? existing.breakDurationMinutes ?? 0;
+    const breakMins: number = body.breakDurationMinutes ?? existing.breakDurationMinutes ?? 0;
     const totalMins = computeMinutesWorked(signIn, signOut, breakMins);
     const template = await getActiveShiftTemplate(existing.employeeId, existing.attendanceDate);
     const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
     const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
     const overtimeMins = totalMins !== null && totalMins > minWorkingMins + overtimeThreshold ? totalMins - minWorkingMins : 0;
-    const newStatus = body.status ?? computeStatus(totalMins, minWorkingMins);
+    const newStatus: AttendanceStatus = body.status ?? computeStatus(totalMins, minWorkingMins);
 
     const [updated] = await db.update(attendanceRecordsTable)
       .set({
@@ -401,7 +438,7 @@ router.patch("/attendance/:id", requireHrmsUser, requireRole(...HR_ROLES), async
         breakDurationMinutes: breakMins,
         totalMinutesWorked: totalMins,
         overtimeMinutes: overtimeMins,
-        status: newStatus as any,
+        status: newStatus,
         isHrOverride: true,
         overrideReason: body.overrideReason,
         overrideById: req.hrmsUser.id,
@@ -422,13 +459,12 @@ router.patch("/attendance/:id", requireHrmsUser, requireRole(...HR_ROLES), async
 router.get("/employees/:id/attendance", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const empId = Number(req.params.id);
-    // Employees can only view their own
     if (req.hrmsUser.role === "employee") {
-      const [userRow2] = await db.select({ employeeId: hrmsUsersTable.employeeId }).from(hrmsUsersTable).where(eq(hrmsUsersTable.id, req.hrmsUser.id));
-      if (!userRow2?.employeeId || userRow2.employeeId !== empId) { res.status(403).json({ error: "Forbidden" }); return; }
+      const [userRow] = await db.select({ employeeId: hrmsUsersTable.employeeId }).from(hrmsUsersTable).where(eq(hrmsUsersTable.id, req.hrmsUser.id));
+      if (!userRow?.employeeId || userRow.employeeId !== empId) { res.status(403).json({ error: "Forbidden" }); return; }
     }
     const { month } = req.query;
-    const conditions: any[] = [eq(attendanceRecordsTable.employeeId, empId)];
+    const conditions: SQL<unknown>[] = [eq(attendanceRecordsTable.employeeId, empId)];
     if (month && typeof month === "string") {
       const [y, mo] = month.split("-").map(Number);
       const start = `${y}-${String(mo).padStart(2, "0")}-01`;
@@ -449,7 +485,7 @@ router.get("/employees/:id/overtime", requireHrmsUser, requireRole(...HR_READ_RO
   try {
     const empId = Number(req.params.id);
     const { month } = req.query;
-    const conditions: any[] = [eq(overtimeRecordsTable.employeeId, empId)];
+    const conditions: SQL<unknown>[] = [eq(overtimeRecordsTable.employeeId, empId)];
     if (month && typeof month === "string") {
       const [y, mo] = month.split("-").map(Number);
       const start = `${y}-${String(mo).padStart(2, "0")}-01`;

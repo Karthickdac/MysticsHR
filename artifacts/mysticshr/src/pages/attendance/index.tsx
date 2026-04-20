@@ -4,23 +4,24 @@ import {
   usePostAttendance,
   usePatchAttendanceId,
   useListEmployees,
+  useGetEmployeesIdAttendance,
   getGetAttendanceQueryKey,
+  getGetEmployeesIdAttendanceQueryKey,
+  type CreateAttendanceBody,
+  type AttendanceOverrideBody,
 } from "@workspace/api-client-react";
-import type { GetAttendanceQueryResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Calendar, ArrowRight } from "lucide-react";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 import { Link } from "wouter";
-
-type AttRecord = GetAttendanceQueryResult[number];
 
 const ALL_STATUSES = ["Present", "Absent", "Half-Day", "On Leave", "On Permission", "Holiday", "Week Off", "Regularization Pending"] as const;
 
@@ -45,9 +46,10 @@ function fmtMins(mins: number | null | undefined): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
-export default function AttendancePage() {
+// HR view: uses GET /attendance (includes employee name/code from join)
+function HrAttendanceView() {
   const qc = useQueryClient();
-  const { role } = useCurrentUser();
+  const { role } = useCurrentHrmsUser();
   const canManage = ["super_admin", "hr_manager", "hr_executive"].includes(role ?? "");
 
   const today = new Date().toISOString().split("T")[0];
@@ -55,7 +57,7 @@ export default function AttendancePage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [showOverride, setShowOverride] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<AttRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<{ id: number; attendanceDate: string; breakDurationMinutes: number | null; status: string; notes: string | null } | null>(null);
   const [formError, setFormError] = useState("");
 
   const { data: _empResponse } = useListEmployees({});
@@ -68,22 +70,27 @@ export default function AttendancePage() {
   const [form, setForm] = useState({ employeeId: 0, attendanceDate: today, signInTime: "", signOutTime: "", breakDurationMinutes: 0, status: "Present", notes: "" });
   const [overrideForm, setOverrideForm] = useState({ signInTime: "", signOutTime: "", breakDurationMinutes: 0, status: "", overrideReason: "", notes: "" });
 
-  const filtered = filterStatus === "all" ? records : records.filter((r: AttRecord) => r.status === filterStatus);
+  const filtered = filterStatus === "all" ? records : records.filter((r) => r.status === filterStatus);
 
   async function handleCreateAttendance() {
     setFormError("");
     if (!form.employeeId || !form.attendanceDate) { setFormError("Employee and date are required"); return; }
     try {
-      const payload: any = { ...form };
-      if (form.signInTime) payload.signInTime = new Date(`${form.attendanceDate}T${form.signInTime}`).toISOString();
-      else delete payload.signInTime;
-      if (form.signOutTime) payload.signOutTime = new Date(`${form.attendanceDate}T${form.signOutTime}`).toISOString();
-      else delete payload.signOutTime;
+      const payload: CreateAttendanceBody = {
+        employeeId: form.employeeId,
+        attendanceDate: form.attendanceDate,
+        status: form.status,
+        signInTime: form.signInTime ? new Date(`${form.attendanceDate}T${form.signInTime}`).toISOString() : null,
+        signOutTime: form.signOutTime ? new Date(`${form.attendanceDate}T${form.signOutTime}`).toISOString() : null,
+        breakDurationMinutes: form.breakDurationMinutes,
+        notes: form.notes || null,
+      };
       await createAtt.mutateAsync({ data: payload });
       await qc.invalidateQueries({ queryKey: getGetAttendanceQueryKey({ date: filterDate }) });
       setShowForm(false);
-    } catch (e: any) {
-      setFormError(e?.message ?? "Failed to save");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setFormError(err?.message ?? "Failed to save");
     }
   }
 
@@ -91,18 +98,21 @@ export default function AttendancePage() {
     setFormError("");
     if (!editingRecord || !overrideForm.overrideReason) { setFormError("Override reason is required"); return; }
     try {
-      const payload: any = { overrideReason: overrideForm.overrideReason };
-      if (overrideForm.signInTime) payload.signInTime = new Date(`${editingRecord.attendanceDate}T${overrideForm.signInTime}`).toISOString();
-      if (overrideForm.signOutTime) payload.signOutTime = new Date(`${editingRecord.attendanceDate}T${overrideForm.signOutTime}`).toISOString();
-      if (overrideForm.breakDurationMinutes) payload.breakDurationMinutes = overrideForm.breakDurationMinutes;
-      if (overrideForm.status) payload.status = overrideForm.status;
-      if (overrideForm.notes) payload.notes = overrideForm.notes;
+      const payload: AttendanceOverrideBody = {
+        overrideReason: overrideForm.overrideReason,
+        signInTime: overrideForm.signInTime ? new Date(`${editingRecord.attendanceDate}T${overrideForm.signInTime}`).toISOString() : null,
+        signOutTime: overrideForm.signOutTime ? new Date(`${editingRecord.attendanceDate}T${overrideForm.signOutTime}`).toISOString() : null,
+        breakDurationMinutes: overrideForm.breakDurationMinutes || null,
+        status: overrideForm.status || null,
+        notes: overrideForm.notes || null,
+      };
       await overrideAtt.mutateAsync({ id: editingRecord.id, data: payload });
       await qc.invalidateQueries({ queryKey: getGetAttendanceQueryKey({ date: filterDate }) });
       setShowOverride(false);
       setEditingRecord(null);
-    } catch (e: any) {
-      setFormError(e?.message ?? "Failed to override");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setFormError(err?.message ?? "Failed to override");
     }
   }
 
@@ -125,7 +135,6 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-3 items-end flex-wrap">
         <div>
           <Label className="text-xs">Date</Label>
@@ -143,7 +152,6 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Records Table */}
       {isLoading ? <p className="text-muted-foreground">Loading...</p> : (
         <Card>
           <CardContent className="p-0">
@@ -163,11 +171,11 @@ export default function AttendancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r: AttRecord) => (
+                  {filtered.map((r) => (
                     <tr key={r.id} className="border-t hover:bg-muted/30">
                       <td className="px-4 py-2">
-                        <div className="font-medium">{r.employeeName ?? `#${r.employeeId}`}</div>
-                        <div className="text-xs text-muted-foreground">{r.employeeCode}</div>
+                        <div className="font-medium">{(r as { employeeName?: string }).employeeName ?? `#${r.employeeId}`}</div>
+                        <div className="text-xs text-muted-foreground">{(r as { employeeCode?: string }).employeeCode}</div>
                       </td>
                       <td className="px-4 py-2">{r.attendanceDate}</td>
                       <td className="px-4 py-2">{fmt(r.signInTime)}</td>
@@ -175,7 +183,7 @@ export default function AttendancePage() {
                       <td className="px-4 py-2">{fmtMins(r.totalMinutesWorked)}</td>
                       <td className="px-4 py-2">{fmtMins(r.overtimeMinutes)}</td>
                       <td className="px-4 py-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[r.status] ?? ""}`}>{r.status}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[r.status ?? ""] ?? ""}`}>{r.status}</span>
                       </td>
                       <td className="px-4 py-2">
                         {r.isHrOverride && <Badge variant="outline" className="text-xs">HR Override</Badge>}
@@ -183,8 +191,8 @@ export default function AttendancePage() {
                       {canManage && (
                         <td className="px-4 py-2">
                           <Button size="sm" variant="ghost" onClick={() => {
-                            setEditingRecord(r);
-                            setOverrideForm({ signInTime: "", signOutTime: "", breakDurationMinutes: r.breakDurationMinutes ?? 0, status: r.status, overrideReason: "", notes: r.notes ?? "" });
+                            setEditingRecord({ id: r.id, attendanceDate: r.attendanceDate, breakDurationMinutes: r.breakDurationMinutes ?? null, status: r.status ?? "", notes: r.notes ?? null });
+                            setOverrideForm({ signInTime: "", signOutTime: "", breakDurationMinutes: r.breakDurationMinutes ?? 0, status: r.status ?? "", overrideReason: "", notes: r.notes ?? "" });
                             setFormError("");
                             setShowOverride(true);
                           }}>
@@ -204,7 +212,6 @@ export default function AttendancePage() {
         </Card>
       )}
 
-      {/* Record Attendance Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent>
           <DialogHeader><DialogTitle>Record Attendance</DialogTitle></DialogHeader>
@@ -215,7 +222,7 @@ export default function AttendancePage() {
               <Select value={form.employeeId?.toString() ?? ""} onValueChange={v => setForm({ ...form, employeeId: Number(v) })}>
                 <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                 <SelectContent>
-                  {employees.map((e: any) => (
+                  {employees.map((e) => (
                     <SelectItem key={e.id} value={e.id.toString()}>{e.firstName} {e.lastName} ({e.employeeId})</SelectItem>
                   ))}
                 </SelectContent>
@@ -245,7 +252,6 @@ export default function AttendancePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Override Dialog */}
       <Dialog open={showOverride} onOpenChange={setShowOverride}>
         <DialogContent>
           <DialogHeader><DialogTitle>HR Override — {editingRecord?.attendanceDate}</DialogTitle></DialogHeader>
@@ -276,4 +282,105 @@ export default function AttendancePage() {
       </Dialog>
     </div>
   );
+}
+
+// Employee self-service view: uses GET /employees/:id/attendance (own records only)
+function EmployeeAttendanceView({ employeeId }: { employeeId: number }) {
+  const today = new Date().toISOString().split("T")[0];
+  const currentMonth = today.slice(0, 7);
+  const [filterMonth, setFilterMonth] = useState(currentMonth);
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const { data: records = [], isLoading } = useGetEmployeesIdAttendance(employeeId, { month: filterMonth }, {
+    query: {
+      queryKey: getGetEmployeesIdAttendanceQueryKey(employeeId, { month: filterMonth }),
+      enabled: !!employeeId,
+    },
+  });
+
+  const filtered = filterStatus === "all" ? records : records.filter((r) => r.status === filterStatus);
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">My Attendance</h1>
+        <Link href="/attendance/regularization">
+          <Button variant="outline"><ArrowRight className="w-4 h-4 mr-2" />Regularizations</Button>
+        </Link>
+      </div>
+
+      <div className="flex gap-3 items-end flex-wrap">
+        <div>
+          <Label className="text-xs">Month</Label>
+          <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="w-40" />
+        </div>
+        <div>
+          <Label className="text-xs">Status</Label>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {ALL_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {isLoading ? <p className="text-muted-foreground">Loading...</p> : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Date</th>
+                    <th className="px-4 py-2 text-left">Sign In</th>
+                    <th className="px-4 py-2 text-left">Sign Out</th>
+                    <th className="px-4 py-2 text-left">Total</th>
+                    <th className="px-4 py-2 text-left">OT</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-left">Override</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr key={r.id} className="border-t hover:bg-muted/30">
+                      <td className="px-4 py-2">{r.attendanceDate}</td>
+                      <td className="px-4 py-2">{fmt(r.signInTime)}</td>
+                      <td className="px-4 py-2">{fmt(r.signOutTime)}</td>
+                      <td className="px-4 py-2">{fmtMins(r.totalMinutesWorked)}</td>
+                      <td className="px-4 py-2">{fmtMins(r.overtimeMinutes)}</td>
+                      <td className="px-4 py-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[r.status ?? ""] ?? ""}`}>{r.status}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        {r.isHrOverride && <Badge variant="outline" className="text-xs">HR Override</Badge>}
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No attendance records found for this month.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+export default function AttendancePage() {
+  const { role, hrmsUser } = useCurrentHrmsUser();
+
+  if (role === "employee") {
+    const empId = hrmsUser?.employeeId ?? null;
+    if (!empId) {
+      return <div className="p-6 text-muted-foreground">Loading your attendance records...</div>;
+    }
+    return <EmployeeAttendanceView employeeId={empId} />;
+  }
+
+  return <HrAttendanceView />;
 }
