@@ -36,14 +36,13 @@ export default function PayslipsPage() {
     !empFilter || (p.employeeName?.toLowerCase().includes(empFilter.toLowerCase()) || p.employeeCode?.toLowerCase().includes(empFilter.toLowerCase()))
   );
 
-  function downloadPayslip(payslip: any) {
-    if (!payslip?.htmlContent) return;
-    const blob = new Blob([payslip.htmlContent], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url;
-    const month = MONTHS[payslip.periodMonth - 1];
-    a.download = `payslip-${payslip.employeeId}-${month}-${payslip.periodYear}.html`;
-    a.click(); URL.revokeObjectURL(url);
+  function downloadPdf(payslipId: number) {
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    const url = `${base}/api/payroll/payslips/${payslipId}/pdf`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `payslip-${payslipId}.pdf`;
+    a.click();
   }
 
   return (
@@ -111,6 +110,9 @@ export default function PayslipsPage() {
                     <Button size="sm" variant="outline" onClick={() => setViewId(p.id)}>
                       <Eye className="w-3 h-3 mr-1" />View
                     </Button>
+                    <Button size="sm" variant="outline" onClick={() => downloadPdf(p.id)}>
+                      <Download className="w-3 h-3 mr-1" />PDF
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -142,8 +144,8 @@ export default function PayslipsPage() {
           <DialogFooter className="p-4 pt-0">
             <Button variant="outline" onClick={() => setViewId(null)}>Close</Button>
             {viewPayslip && (
-              <Button onClick={() => downloadPayslip(viewPayslip)}>
-                <Download className="w-4 h-4 mr-1" />Download HTML
+              <Button onClick={() => downloadPdf(viewPayslip.id)}>
+                <Download className="w-4 h-4 mr-1" />Download PDF
               </Button>
             )}
           </DialogFooter>

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import {
   salaryStructuresTable, salaryComponentsTable, payrollRunsTable, payrollRecordsTable,
   payslipsTable, taxRegimeDeclarationsTable, salaryRevisionsTable, payrollLocksTable,
@@ -296,9 +297,9 @@ router.get("/payroll/tax-declarations", requireHrmsUser, requireRole(...ALL_ROLE
     const u = req.hrmsUser!;
     const { employeeId, financialYear } = req.query as { employeeId?: string; financialYear?: string };
     const conds = [];
-    const isEmployee = u.role === "employee" || u.role === "hod";
 
-    if (isEmployee && u.role === "employee") {
+    // Employees and HODs can only see their own tax declarations
+    if (u.role === "employee" || u.role === "hod") {
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
@@ -682,7 +683,9 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
       const grossEarnings = basic + hra + specialAllowance + travelAllowance + medicalAllowance +
         performanceBonus + shiftAllowance + nightDifferential + otherEarnings;
 
-      const lopDeduction = lopDays > 0 ? (Number(structure.grossCtc) / workingDays) * lopDays : 0;
+      // LOP is captured by prorating earnings via the attendance factor (presentDays/workingDays),
+      // so we do NOT add a separate lopDeduction to avoid double-counting absence.
+      const lopDeduction = 0;
       const { pfEmployee, pfEmployer } = computePF(basic);
       const { esiEmployee, esiEmployer } = computeESI(grossEarnings);
       const professionalTax = computeProfessionalTax(grossEarnings, month);
@@ -884,7 +887,8 @@ router.get("/payroll/payslips", requireHrmsUser, requireRole(...ALL_ROLES), asyn
     const { employeeId, year, month } = req.query as { employeeId?: string; year?: string; month?: string };
     const conds = [];
 
-    if (u.role === "employee") {
+    // Employees and HODs can only view their own payslips
+    if (u.role === "employee" || u.role === "hod") {
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id)).where(eq(hrmsUsersTable.id, u.id));
       if (emp) conds.push(eq(payslipsTable.employeeId, emp.id));
@@ -919,7 +923,8 @@ router.get("/payroll/payslips/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
     if (!payslip) { res.status(404).json({ error: "Not found" }); return; }
 
     const u = req.hrmsUser!;
-    if (u.role === "employee") {
+    // Employees and HODs may only access their own payslip
+    if (u.role === "employee" || u.role === "hod") {
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id)).where(eq(hrmsUsersTable.id, u.id));
       if (!emp || emp.id !== payslip.employeeId) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -1156,5 +1161,140 @@ function generatePayslipHtml(data: PayslipData, monthName: string, year: number)
 </body>
 </html>`;
 }
+
+// ─── PDF PAYSLIP GENERATOR ───────────────────────────────────────────────────
+
+async function generatePayslipPdf(data: PayslipData, monthName: string, year: number): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]); // A4
+  const { height } = page.getSize();
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const fmt = (n: string | number | null | undefined) =>
+    `INR ${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+
+  const e = data.earnings;
+  const d = data.deductions;
+  const a = data.attendance;
+  const navy = rgb(0.118, 0.176, 0.235);
+  const white = rgb(1, 1, 1);
+  const light = rgb(0.95, 0.97, 0.99);
+  const gray = rgb(0.39, 0.47, 0.56);
+  const margin = 40;
+  let y = height - 40;
+
+  // Header band
+  page.drawRectangle({ x: 0, y: height - 80, width: 595, height: 80, color: navy });
+  page.drawText("Automystics Technologies", { x: margin, y: height - 35, size: 16, font: bold, color: white });
+  page.drawText(`Salary Slip — ${monthName} ${year}`, { x: margin, y: height - 55, size: 11, font: regular, color: rgb(0.75, 0.82, 0.9) });
+  page.drawText(`Tax Regime: ${data.taxRegime ?? "New"}`, { x: margin, y: height - 72, size: 9, font: regular, color: rgb(0.75, 0.82, 0.9) });
+
+  y = height - 100;
+
+  // Employee info row
+  page.drawRectangle({ x: 0, y: y - 50, width: 595, height: 55, color: light });
+  const infoItems = [
+    ["Employee Name", data.employee.name],
+    ["Employee Code", data.employee.code ?? "—"],
+    ["Department", data.employee.department || "—"],
+    ["Designation", data.employee.designation || "—"],
+  ];
+  const colW = 148;
+  infoItems.forEach(([label, val], i) => {
+    const x = margin + i * colW;
+    page.drawText(label, { x, y: y - 18, size: 7, font: regular, color: gray });
+    page.drawText(String(val).slice(0, 20), { x, y: y - 32, size: 10, font: bold, color: navy });
+  });
+
+  y -= 70;
+
+  // Attendance bar
+  page.drawRectangle({ x: 0, y: y - 40, width: 595, height: 45, color: rgb(0.94, 0.97, 1) });
+  const attItems = [
+    ["Working Days", a.workingDays ?? "0"],
+    ["Days Present", a.presentDays ?? "0"],
+    ["LOP Days", a.lopDays ?? "0"],
+    ["Overtime Hours", a.overtimeHours ?? "0.00"],
+  ];
+  attItems.forEach(([label, val], i) => {
+    const x = margin + i * 130;
+    page.drawText(String(val), { x, y: y - 22, size: 14, font: bold, color: navy });
+    page.drawText(label, { x, y: y - 36, size: 8, font: regular, color: gray });
+  });
+
+  y -= 60;
+
+  // Table header
+  page.drawRectangle({ x: margin, y: y - 18, width: 515, height: 20, color: rgb(0.94, 0.95, 0.97) });
+  page.drawText("Earnings", { x: margin + 4, y: y - 13, size: 9, font: bold, color: gray });
+  page.drawText("Amount", { x: margin + 200, y: y - 13, size: 9, font: bold, color: gray });
+  page.drawText("Deductions", { x: margin + 265, y: y - 13, size: 9, font: bold, color: gray });
+  page.drawText("Amount", { x: margin + 445, y: y - 13, size: 9, font: bold, color: gray });
+  y -= 22;
+
+  const rows = [
+    ["Basic Pay", fmt(e.basic), "PF (Employee)", fmt(d.pfEmployee)],
+    ["HRA", fmt(e.hra), "ESI (Employee)", fmt(d.esiEmployee)],
+    ["Special Allowance", fmt(e.specialAllowance), "Professional Tax", fmt(d.professionalTax)],
+    ["Travel Allowance", fmt(e.travelAllowance), "TDS", fmt(d.tds)],
+    ["Medical Allowance", fmt(e.medicalAllowance), "LOP Deduction", fmt(d.lopDeduction)],
+    ["Performance Bonus", fmt(e.performanceBonus), "Loan Repayment", fmt(d.loanDeduction)],
+    ["Shift/Night Allowance", fmt(Number(e.shiftAllowance ?? 0) + Number(e.nightDifferential ?? 0)), "Other Deductions", fmt(d.otherDeductions)],
+    ["Other Earnings", fmt(e.otherEarnings), "", ""],
+  ];
+
+  rows.forEach((row, i) => {
+    if (i % 2 === 0) page.drawRectangle({ x: margin, y: y - 14, width: 515, height: 16, color: rgb(0.98, 0.99, 1) });
+    page.drawText(row[0], { x: margin + 4, y: y - 10, size: 9, font: regular, color: navy });
+    page.drawText(row[1], { x: margin + 160, y: y - 10, size: 9, font: regular, color: navy });
+    page.drawText(row[2], { x: margin + 268, y: y - 10, size: 9, font: regular, color: navy });
+    page.drawText(row[3], { x: margin + 405, y: y - 10, size: 9, font: regular, color: navy });
+    y -= 17;
+  });
+
+  // Totals row
+  page.drawRectangle({ x: margin, y: y - 16, width: 515, height: 18, color: rgb(0.92, 0.94, 0.96) });
+  page.drawText("Gross Earnings", { x: margin + 4, y: y - 11, size: 9, font: bold, color: navy });
+  page.drawText(fmt(e.grossEarnings), { x: margin + 160, y: y - 11, size: 9, font: bold, color: navy });
+  page.drawText("Total Deductions", { x: margin + 268, y: y - 11, size: 9, font: bold, color: navy });
+  page.drawText(fmt(d.totalDeductions), { x: margin + 405, y: y - 11, size: 9, font: bold, color: navy });
+  y -= 30;
+
+  // Net pay box
+  page.drawRectangle({ x: margin, y: y - 40, width: 515, height: 45, color: navy });
+  page.drawText("NET PAY (TAKE HOME)", { x: margin + 180, y: y - 16, size: 9, font: regular, color: rgb(0.75, 0.82, 0.9) });
+  page.drawText(fmt(data.netPay), { x: margin + 170, y: y - 33, size: 18, font: bold, color: white });
+
+  return pdfDoc.save();
+}
+
+// PDF download endpoint
+router.get("/payroll/payslips/:id/pdf", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const [payslip] = await db.select().from(payslipsTable).where(eq(payslipsTable.id, Number(req.params.id)));
+    if (!payslip) { res.status(404).json({ error: "Not found" }); return; }
+
+    const u = req.hrmsUser!;
+    if (u.role === "employee" || u.role === "hod") {
+      const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id)).where(eq(hrmsUsersTable.id, u.id));
+      if (!emp || emp.id !== payslip.employeeId) { res.status(403).json({ error: "Forbidden" }); return; }
+    }
+
+    const [run] = await db.select().from(payrollRunsTable)
+      .leftJoin(payrollRecordsTable, eq(payrollRecordsTable.id, payslip.payrollRecordId))
+      .where(eq(payrollRunsTable.id, payrollRecordsTable.payrollRunId));
+
+    const data = payslip.payslipData as PayslipData;
+    const monthName = new Date(payslip.periodYear, payslip.periodMonth - 1).toLocaleString("en-IN", { month: "long" });
+    const pdfBytes = await generatePayslipPdf(data, monthName, payslip.periodYear);
+
+    const empName = (data?.employee?.name ?? "payslip").replace(/\s+/g, "_");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${empName}_${payslip.periodYear}_${payslip.periodMonth}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
 
 export default router;

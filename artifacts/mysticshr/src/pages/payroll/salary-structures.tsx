@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useListSalaryStructures, useCreateSalaryStructure, useUpdateSalaryStructure, useGetSalaryStructure,
   getListSalaryStructuresQueryKey,
@@ -97,18 +97,35 @@ export default function SalaryStructuresPage() {
     resetForm(); setError(null); setShowCreate(true);
   }
 
-  function openEdit(s: any) {
+  // When editDetail loads, populate the form with actual existing components
+  useEffect(() => {
+    if (editId && editDetail) {
+      setForm({
+        employeeId: String(editDetail.employeeId),
+        name: editDetail.name,
+        effectiveFrom: editDetail.effectiveFrom,
+        grossCtc: editDetail.grossCtc,
+        annualCtc: editDetail.annualCtc,
+        notes: editDetail.notes ?? "",
+        components: editDetail.components && editDetail.components.length > 0
+          ? editDetail.components.map((c) => ({
+              id: c.id,
+              componentType: c.componentType,
+              componentName: c.componentName,
+              amount: c.amount,
+              percentageOfBasic: c.percentageOfBasic ?? undefined,
+              isEarning: c.isEarning,
+              sequence: c.sequence,
+            }))
+          : DEFAULT_COMPONENTS.map(c => ({ ...c })),
+      });
+    }
+  }, [editId, editDetail]);
+
+  function openEdit(s: { id: number; employeeId: number; name: string; effectiveFrom: string; grossCtc: string; annualCtc: string; notes?: string | null }) {
     setEditId(s.id);
     setError(null);
-    setForm({
-      employeeId: String(s.employeeId),
-      name: s.name,
-      effectiveFrom: s.effectiveFrom,
-      grossCtc: s.grossCtc,
-      annualCtc: s.annualCtc,
-      notes: s.notes ?? "",
-      components: DEFAULT_COMPONENTS.map(c => ({ ...c })),
-    });
+    // form will be populated via useEffect once editDetail loads
   }
 
   function updateComp(idx: number, field: keyof Component, val: any) {
