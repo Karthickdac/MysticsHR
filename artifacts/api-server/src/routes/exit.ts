@@ -16,7 +16,7 @@ import {
   payrollRecordsTable,
   payrollRunsTable,
 } from "@workspace/db/schema";
-import { eq, and, desc, or, sql } from "drizzle-orm";
+import { eq, and, desc, or, sql, type SQL } from "drizzle-orm";
 import { logAudit } from "../lib/audit";
 
 const router = Router();
@@ -137,9 +137,9 @@ router.get("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async (
     const { status, exitType, employeeId } = req.query as Record<string, string>;
     const isHr = (HR_ROLES as readonly string[]).includes(u.role);
 
-    const conds: any[] = [];
-    if (status) conds.push(eq(exitRequestsTable.status, status as any));
-    if (exitType) conds.push(eq(exitRequestsTable.exitType, exitType as any));
+    const conds: SQL<unknown>[] = [];
+    if (status) conds.push(sql`${exitRequestsTable.status} = ${status}`);
+    if (exitType) conds.push(sql`${exitRequestsTable.exitType} = ${exitType}`);
 
     if (!isHr) {
       const emp = await getEmployeeForUser(u.id);
@@ -272,8 +272,14 @@ router.get("/exit/requests/:id", requireHrmsUser, requireRole(...ALL_ROLES), asy
       ? await db.select().from(exitInterviewsTable).where(eq(exitInterviewsTable.exitRequestId, id))
       : [null];
 
+    // Mask exit-interview responses for hr_executive — only hr_manager and super_admin may view them
+    const canReadResponses = u.role === "hr_manager" || u.role === "super_admin";
+    const exitInterview = interview
+      ? { ...interview, responses: canReadResponses ? interview.responses : [] }
+      : null;
+
     const enriched = await enrichExitRequest(exitReq);
-    res.json({ ...enriched, clearanceTasks, fnfComputation: fnf ?? null, exitInterview: interview ?? null });
+    res.json({ ...enriched, clearanceTasks, fnfComputation: fnf ?? null, exitInterview });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

@@ -8,6 +8,8 @@ import {
   useGetAttritionReport,
   useGetPerformanceSummaryReport,
   useGetRecruitmentPipelineReport,
+  useGetPermissionUsageReport,
+  useGetStatutoryComplianceReport,
   useListReportSchedules,
   useCreateReportSchedule,
   useDeleteReportSchedule,
@@ -25,6 +27,8 @@ import {
   getGetAttritionReportQueryKey,
   getGetPerformanceSummaryReportQueryKey,
   getGetRecruitmentPipelineReportQueryKey,
+  getGetPermissionUsageReportQueryKey,
+  getGetStatutoryComplianceReportQueryKey,
   type CreateReportScheduleBody,
   type ReportSchedule,
   type SavedReportTemplate,
@@ -37,6 +41,8 @@ import {
   type GetAttritionReportParams,
   type GetPerformanceSummaryReportParams,
   type GetRecruitmentPipelineReportParams,
+  type GetPermissionUsageReportParams,
+  type GetStatutoryComplianceReportParams,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +68,8 @@ const REPORT_TYPES = [
   { id: "attrition", label: "Attrition Report", icon: TrendingDown, description: "Employees who have exited with tenure and exit type." },
   { id: "performance-summary", label: "Performance Summary", icon: Target, description: "Appraisal outcomes and scores by cycle and department." },
   { id: "recruitment-pipeline", label: "Recruitment Pipeline", icon: UserPlus, description: "Job requisitions and their current status." },
+  { id: "permission-usage", label: "Permission Usage", icon: Clock, description: "Employee permission applications, approvals, and usage summary." },
+  { id: "statutory-compliance", label: "Statutory Compliance", icon: DollarSign, description: "Monthly PF and ESI statutory compliance report." },
 ] as const;
 
 type ReportType = (typeof REPORT_TYPES)[number]["id"];
@@ -211,6 +219,15 @@ function ReportCatalog() {
   const recParams: GetRecruitmentPipelineReportParams = {
     ...dateFilters(filters, {}), departmentId: toNum(filters.departmentId),
   };
+  const permParams: GetPermissionUsageReportParams = {
+    ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
+    departmentId: toNum(filters.departmentId),
+  };
+  const statParams: GetStatutoryComplianceReportParams = {
+    month: filters.month ?? String(new Date().getMonth() + 1),
+    year: filters.year ?? String(new Date().getFullYear()),
+    departmentId: toNum(filters.departmentId),
+  };
 
   const empDirQuery = useGetEmployeeDirectoryReport(selected === "employee-directory" ? dirParams : undefined, { query: { enabled: selected === "employee-directory", queryKey: getGetEmployeeDirectoryReportQueryKey(dirParams) } });
   const attQuery = useGetAttendanceSummaryReport(selected === "attendance-summary" ? attParams : undefined, { query: { enabled: selected === "attendance-summary", queryKey: getGetAttendanceSummaryReportQueryKey(attParams) } });
@@ -220,6 +237,8 @@ function ReportCatalog() {
   const attrQuery = useGetAttritionReport(selected === "attrition" ? attrParams : undefined, { query: { enabled: selected === "attrition", queryKey: getGetAttritionReportQueryKey(attrParams) } });
   const perfQuery = useGetPerformanceSummaryReport(selected === "performance-summary" ? perfParams : undefined, { query: { enabled: selected === "performance-summary", queryKey: getGetPerformanceSummaryReportQueryKey(perfParams) } });
   const recQuery = useGetRecruitmentPipelineReport(selected === "recruitment-pipeline" ? recParams : undefined, { query: { enabled: selected === "recruitment-pipeline", queryKey: getGetRecruitmentPipelineReportQueryKey(recParams) } });
+  const permQuery = useGetPermissionUsageReport(selected === "permission-usage" ? permParams : undefined, { query: { enabled: selected === "permission-usage", queryKey: getGetPermissionUsageReportQueryKey(permParams) } });
+  const statQuery = useGetStatutoryComplianceReport(selected === "statutory-compliance" ? statParams : undefined, { query: { enabled: selected === "statutory-compliance", queryKey: getGetStatutoryComplianceReportQueryKey(statParams) } });
 
   const queryMap: Record<ReportType, { data?: { data?: object[]; total?: number }; isLoading?: boolean }> = {
     "employee-directory": empDirQuery,
@@ -230,6 +249,8 @@ function ReportCatalog() {
     "attrition": attrQuery,
     "performance-summary": perfQuery,
     "recruitment-pipeline": recQuery,
+    "permission-usage": permQuery,
+    "statutory-compliance": statQuery,
   };
 
   const activeQuery = selected ? queryMap[selected] : null;
