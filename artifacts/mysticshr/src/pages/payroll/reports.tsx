@@ -20,6 +20,28 @@ function fmt(n: string | number | null | undefined) {
 
 type ReportType = "pf-ecr" | "esi" | "pt" | "tds" | "bank-transfer" | "form-16";
 
+type StatutoryRecord = {
+  employeeCode: string | null;
+  employeeName: string | null;
+  basic?: string | null;
+  pfEmployee?: string | null;
+  pfEmployer?: string | null;
+  grossEarnings?: string | null;
+  esiEmployee?: string | null;
+  esiEmployer?: string | null;
+  professionalTax?: string | null;
+  tds?: string | null;
+  taxRegime?: string | null;
+  netPay?: string | null;
+  status?: string | null;
+};
+
+type StatutoryReportData = {
+  period: string;
+  records: StatutoryRecord[];
+  summary: Record<string, string | number>;
+};
+
 const REPORT_META: Record<ReportType, { label: string; icon: React.ElementType; color: string; bg: string; desc: string }> = {
   "pf-ecr": { label: "PF ECR File", icon: Shield, color: "text-blue-600", bg: "bg-blue-50", desc: "Employee Contribution Receipt for PF filing" },
   "esi": { label: "ESI Contribution", icon: Building2, color: "text-green-600", bg: "bg-green-50", desc: "ESI contribution report for employees earning ≤ ₹21,000/mo" },
@@ -29,7 +51,7 @@ const REPORT_META: Record<ReportType, { label: string; icon: React.ElementType; 
   "form-16": { label: "Form 16", icon: FileText, color: "text-red-600", bg: "bg-red-50", desc: "Annual TDS certificate generation (FY year-end)" },
 };
 
-function exportReportCSV(report: any, type: string) {
+function exportReportCSV(report: StatutoryReportData, type: string) {
   if (!report?.records?.length) return;
   let headers: string[] = [];
   if (type === "pf-ecr") headers = ["Employee Code", "Employee Name", "Basic Pay", "PF Employee", "PF Employer"];
@@ -38,7 +60,7 @@ function exportReportCSV(report: any, type: string) {
   else if (type === "tds") headers = ["Employee Code", "Employee Name", "Gross Earnings", "TDS", "Tax Regime"];
   else if (type === "bank-transfer") headers = ["Employee Code", "Employee Name", "Net Pay", "Status"];
 
-  const rows = report.records.map((r: any) => {
+  const rows = report.records.map((r) => {
     if (type === "pf-ecr") return [r.employeeCode, r.employeeName, r.basic, r.pfEmployee, r.pfEmployer];
     if (type === "esi") return [r.employeeCode, r.employeeName, r.grossEarnings, r.esiEmployee, r.esiEmployer];
     if (type === "pt") return [r.employeeCode, r.employeeName, r.grossEarnings, r.professionalTax];
@@ -47,14 +69,14 @@ function exportReportCSV(report: any, type: string) {
     return [];
   });
 
-  const csv = [headers, ...rows].map(row => row.map((c: any) => `"${c ?? ""}"`).join(",")).join("\n");
+  const csv = [headers, ...rows].map(row => row.map((c) => `"${c ?? ""}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url;
   a.download = `${type}-${report.period}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
-function ReportTable({ report, type }: { report: any; type: ReportType }) {
+function ReportTable({ report, type }: { report: StatutoryReportData; type: ReportType }) {
   if (!report?.records?.length) return <div className="text-center py-8 text-muted-foreground text-sm">No data found for this period.</div>;
 
   const summary = report.summary;
@@ -101,7 +123,7 @@ function ReportTable({ report, type }: { report: any; type: ReportType }) {
             </tr>
           </thead>
           <tbody>
-            {report.records.map((r: any, i: number) => (
+            {report.records.map((r, i) => (
               <tr key={i} className="border-b hover:bg-muted/20">
                 <td className="p-2 pl-3">{r.employeeName}</td>
                 <td className="p-2 text-muted-foreground">{r.employeeCode ?? "—"}</td>
@@ -149,13 +171,17 @@ export default function StatutoryReportsPage() {
   const [fetched, setFetched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const enabled = fetched && !!year && !!month;
+  const { data: pfRaw } = useGetPfEcrReport({ year, month });
+  const { data: esiRaw } = useGetEsiReport({ year, month });
+  const { data: ptRaw } = useGetPtReport({ year, month });
+  const { data: tdsRaw } = useGetTdsSummaryReport({ year, month });
+  const { data: bankRaw } = useGetBankTransferReport({ year, month });
 
-  const { data: pfData } = useGetPfEcrReport({ year, month });
-  const { data: esiData } = useGetEsiReport({ year, month });
-  const { data: ptData } = useGetPtReport({ year, month });
-  const { data: tdsData } = useGetTdsSummaryReport({ year, month });
-  const { data: bankData } = useGetBankTransferReport({ year, month });
+  const pfData = pfRaw as StatutoryReportData | undefined;
+  const esiData = esiRaw as StatutoryReportData | undefined;
+  const ptData = ptRaw as StatutoryReportData | undefined;
+  const tdsData = tdsRaw as StatutoryReportData | undefined;
+  const bankData = bankRaw as StatutoryReportData | undefined;
 
   const currentReport = { "pf-ecr": pfData, "esi": esiData, "pt": ptData, "tds": tdsData, "bank-transfer": bankData, "form-16": null }[selectedType];
   const meta = REPORT_META[selectedType];

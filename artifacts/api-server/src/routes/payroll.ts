@@ -283,7 +283,8 @@ router.get("/payroll/tax-declarations", requireHrmsUser, requireRole(...ALL_ROLE
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
-      if (emp) conds.push(eq(taxRegimeDeclarationsTable.employeeId, emp.id));
+      if (!emp) { res.status(403).json({ error: "No employee record found for current user." }); return; }
+      conds.push(eq(taxRegimeDeclarationsTable.employeeId, emp.id));
     } else if (employeeId) {
       conds.push(eq(taxRegimeDeclarationsTable.employeeId, Number(employeeId)));
     }
@@ -857,6 +858,13 @@ router.post("/payroll/runs/:id/finalize", requireHrmsUser, requireRole("super_ad
         updatedAt: new Date(),
       }).where(eq(loanRepaymentsTable.id, loan.id));
     }
+
+    // Auto-release the payroll lock for this period once finalized so that
+    // normal operations (attendance corrections, leave accruals, etc.) can resume.
+    await db.update(payrollLocksTable)
+      .set({ isLocked: false, updatedAt: new Date() })
+      .where(and(eq(payrollLocksTable.year, run.periodYear), eq(payrollLocksTable.month, run.periodMonth)));
+
     res.json({ message: "Payroll finalized and marked as Locked." });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -906,7 +914,8 @@ router.get("/payroll/payslips", requireHrmsUser, requireRole(...ALL_ROLES), asyn
     if (u.role === "employee" || u.role === "hod") {
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id)).where(eq(hrmsUsersTable.id, u.id));
-      if (emp) conds.push(eq(payslipsTable.employeeId, emp.id));
+      if (!emp) { res.status(403).json({ error: "No employee record found for current user." }); return; }
+      conds.push(eq(payslipsTable.employeeId, emp.id));
     } else if (employeeId) {
       conds.push(eq(payslipsTable.employeeId, Number(employeeId)));
     }

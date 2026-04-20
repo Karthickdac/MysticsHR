@@ -1,5 +1,5 @@
 import { useParams } from "wouter";
-import { useGetPayrollRun, useGetPayrollRunRecords } from "@workspace/api-client-react";
+import { useGetPayrollRun, useGetPayrollRunRecords, type PayrollRecord } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
   Paid: "bg-green-100 text-green-700",
 };
 
-function exportCSV(records: any[], period: string) {
+function exportCSV(records: PayrollRecord[], period: string) {
   const headers = ["Employee","Code","Working Days","Present Days","LOP Days","Gross Earnings","PF Emp","TDS","Prof Tax","Loan","Total Deductions","Net Pay","Status"];
   const rows = records.map(r => [
     r.employeeName ?? "", r.employeeCode ?? "",
