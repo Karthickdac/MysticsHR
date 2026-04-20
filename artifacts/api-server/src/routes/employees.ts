@@ -5,6 +5,7 @@ import { db } from "../lib/db";
 import { employeesTable, departmentsTable, designationsTable } from "@workspace/db/schema";
 import { eq, isNull, and, sql, desc } from "drizzle-orm";
 import { autoCreateOnboardingChecklist } from "../lib/onboarding-utils";
+import { recordHistory } from "../lib/history-utils";
 
 const router = Router();
 
@@ -164,6 +165,17 @@ router.patch(
         dateOfJoining, ctc, managerId, location, avatarUrl, isActive,
       } = req.body;
 
+      const [existing] = await db
+        .select()
+        .from(employeesTable)
+        .where(and(eq(employeesTable.id, id), isNull(employeesTable.deletedAt)))
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Employee not found" });
+        return;
+      }
+
       const [emp] = await db
         .update(employeesTable)
         .set({
@@ -179,6 +191,33 @@ router.patch(
         res.status(404).json({ error: "Employee not found" });
         return;
       }
+
+      const changedById = req.hrmsUser?.id ?? null;
+      const coreFields: Array<{ key: keyof typeof existing; val: unknown }> = [
+        { key: "firstName", val: firstName },
+        { key: "lastName", val: lastName },
+        { key: "email", val: email },
+        { key: "phone", val: phone },
+        { key: "dateOfBirth", val: dateOfBirth },
+        { key: "gender", val: gender },
+        { key: "departmentId", val: departmentId },
+        { key: "designationId", val: designationId },
+        { key: "employmentType", val: employmentType },
+        { key: "status", val: status },
+        { key: "dateOfJoining", val: dateOfJoining },
+        { key: "ctc", val: ctc },
+        { key: "managerId", val: managerId },
+        { key: "location", val: location },
+        { key: "isActive", val: isActive },
+      ];
+      for (const { key, val } of coreFields) {
+        if (val !== undefined) {
+          const oldVal = String(existing[key] ?? "");
+          const newVal = String(val ?? "");
+          await recordHistory(id, "Employee", key, oldVal === "null" ? null : oldVal, newVal === "null" ? null : newVal, changedById);
+        }
+      }
+
       await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "Employees", recordId: id, ipAddress: req.ip });
 
       if (dateOfJoining) {
@@ -239,6 +278,15 @@ router.patch(
         res.status(400).json({ error: "status is required" });
         return;
       }
+      const [existing] = await db
+        .select({ status: employeesTable.status })
+        .from(employeesTable)
+        .where(and(eq(employeesTable.id, id), isNull(employeesTable.deletedAt)))
+        .limit(1);
+      if (!existing) {
+        res.status(404).json({ error: "Employee not found" });
+        return;
+      }
       const [emp] = await db
         .update(employeesTable)
         .set({ status, updatedAt: new Date() })
@@ -248,6 +296,7 @@ router.patch(
         res.status(404).json({ error: "Employee not found" });
         return;
       }
+      await recordHistory(id, "Employee", "status", existing.status, status, req.hrmsUser?.id ?? null);
       await logAudit({ user: req.hrmsUser, action: "STATUS_CHANGE", module: "Employees", recordId: id, newValue: status, ipAddress: req.ip });
       res.json(emp);
     } catch (err) {

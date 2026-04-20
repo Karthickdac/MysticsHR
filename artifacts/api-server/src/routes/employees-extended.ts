@@ -13,31 +13,13 @@ import {
   designationsTable,
 } from "@workspace/db/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
+import { recordHistory } from "../lib/history-utils";
+import { autoCreateOnboardingChecklist } from "../lib/onboarding-utils";
 
 const router = Router();
 
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
 const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
-
-async function recordHistory(
-  employeeId: number,
-  module: string,
-  fieldName: string,
-  oldValue: string | null,
-  newValue: string | null,
-  changedById: number | null | undefined
-) {
-  if (oldValue !== newValue) {
-    await db.insert(employeeHistoryTable).values({
-      employeeId,
-      module,
-      fieldName,
-      oldValue: oldValue ?? null,
-      newValue: newValue ?? null,
-      changedById: changedById ?? null,
-    });
-  }
-}
 
 router.post(
   "/employees/bulk-import",
@@ -59,7 +41,7 @@ router.post(
             errors.push({ row: i + 1, error: "employeeId, firstName, lastName, email are required" });
             continue;
           }
-          await db.insert(employeesTable).values({
+          const [insertedEmp] = await db.insert(employeesTable).values({
             employeeId: r.employeeId,
             firstName: r.firstName,
             lastName: r.lastName,
@@ -71,8 +53,15 @@ router.post(
             employmentType: (r.employmentType as "Permanent" | "Contract" | "Probation" | "Intern" | "Part-Time") ?? "Permanent",
             status: (r.status as "Pre-Joining" | "Active" | "On Leave of Absence" | "Suspended" | "Notice Period" | "Separated") ?? "Pre-Joining",
             dateOfJoining: r.dateOfJoining ?? null,
-          });
+          }).returning({ id: employeesTable.id });
           imported++;
+          if (insertedEmp && r.dateOfJoining) {
+            try {
+              await autoCreateOnboardingChecklist(insertedEmp.id, r.dateOfJoining);
+            } catch (e) {
+              console.error(`Auto-checklist creation for bulk row ${i + 1} failed (non-fatal):`, e);
+            }
+          }
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string };
           const msg = e?.code === "23505" ? "Duplicate employee ID or email" : (e?.message ?? "Unknown error");
@@ -444,4 +433,3 @@ router.get("/employees/:id/history", requireHrmsUser, requireRole(...HR_READ_ROL
 });
 
 export default router;
-export { recordHistory };

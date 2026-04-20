@@ -33,7 +33,6 @@ async function recomputeChecklist(checklistId: number) {
   const pct = Math.round((completed / total) * 100);
   const status = pct === 100 ? "Completed" : pct === 0 ? "Not Started" : "In Progress";
   const updates: Record<string, unknown> = { completionPercentage: pct, status, updatedAt: new Date() };
-  if (pct === 100) updates.idCardGeneratedAt = null;
   await db
     .update(onboardingChecklistsTable)
     .set(updates)
@@ -450,9 +449,20 @@ router.delete("/induction-sessions/:id", requireHrmsUser, requireRole(...HR_ROLE
   }
 });
 
-router.get("/employees/:id/id-card", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+router.get("/employees/:id/id-card", requireHrmsUser, requireRole(...HR_READ_ROLES, "employee"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
+    if (req.hrmsUser?.role === "employee") {
+      const [hrmsUser] = await db
+        .select({ employeeId: hrmsUsersTable.employeeId })
+        .from(hrmsUsersTable)
+        .where(eq(hrmsUsersTable.id, req.hrmsUser.id))
+        .limit(1);
+      if (!hrmsUser?.employeeId || hrmsUser.employeeId !== id) {
+        res.status(403).json({ error: "Access denied. You can only download your own ID card." });
+        return;
+      }
+    }
     const [emp] = await db
       .select({
         id: employeesTable.id,
