@@ -80,7 +80,7 @@ router.post(
         }
       }
       await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "Employees", recordId: 0, newValue: `${imported} imported`, ipAddress: req.ip });
-      res.json({ imported, failed: errors.length, errors });
+      res.json({ imported, skipped: errors.length, errors });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Internal server error" });

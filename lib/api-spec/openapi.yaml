@@ -924,19 +924,21 @@ paths:
 
   /employees/{id}/id-card:
     get:
-      summary: Generate and download employee ID card PDF
+      summary: Generate and download employee ID card as PDF
+      operationId: downloadEmployeeIdCard
       tags: [Onboarding]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         "200":
-          description: ID card status and data
+          description: PDF binary file of the employee ID card
           content:
-            application/json:
+            application/pdf:
               schema:
-                $ref: "#/components/schemas/IdCardData"
+                type: string
+                format: binary
         "403":
-          description: Conditions not met (onboarding incomplete or documents pending)
+          description: Conditions not met — onboarding checklist not 100% complete
 
   /employees/{id}/status:
     patch:

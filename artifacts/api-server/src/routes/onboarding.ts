@@ -9,6 +9,9 @@ import {
   employeesTable,
   departmentsTable,
   designationsTable,
+  hrmsUsersTable,
+  preOnboardingRecordsTable,
+  candidatesTable,
 } from "@workspace/db/schema";
 import { eq, sql, desc } from "drizzle-orm";
 import QRCode from "qrcode";
@@ -264,6 +267,35 @@ router.post("/onboarding/tasks/:id/complete", requireHrmsUser, requireRole(...HR
   try {
     const id = parseInt(String(req.params.id), 10);
     const { notes } = req.body ?? {};
+
+    const [existingTask] = await db
+      .select()
+      .from(onboardingTasksTable)
+      .where(eq(onboardingTasksTable.id, id))
+      .limit(1);
+    if (!existingTask) { res.status(404).json({ error: "Task not found" }); return; }
+
+    if (req.hrmsUser?.role === "employee") {
+      if (existingTask.assigneeRole !== "employee") {
+        res.status(403).json({ error: "You can only complete tasks assigned to employees." });
+        return;
+      }
+      const [checklist] = await db
+        .select({ employeeId: onboardingChecklistsTable.employeeId })
+        .from(onboardingChecklistsTable)
+        .where(eq(onboardingChecklistsTable.id, existingTask.checklistId))
+        .limit(1);
+      const [hrmsUser] = await db
+        .select({ employeeId: hrmsUsersTable.employeeId })
+        .from(hrmsUsersTable)
+        .where(eq(hrmsUsersTable.id, req.hrmsUser.id))
+        .limit(1);
+      if (!checklist || !hrmsUser?.employeeId || checklist.employeeId !== hrmsUser.employeeId) {
+        res.status(403).json({ error: "You can only complete tasks in your own onboarding checklist." });
+        return;
+      }
+    }
+
     const [task] = await db
       .update(onboardingTasksTable)
       .set({
@@ -407,6 +439,21 @@ router.get("/employees/:id/id-card", requireHrmsUser, requireRole(...HR_READ_ROL
       res.status(403).json({
         error: "ID card cannot be generated: onboarding checklist is not 100% complete.",
         completionPercentage: checklist?.completionPercentage ?? 0,
+      });
+      return;
+    }
+
+    const [preOnboardingRecord] = await db
+      .select({ completionPercentage: preOnboardingRecordsTable.completionPercentage })
+      .from(preOnboardingRecordsTable)
+      .innerJoin(candidatesTable, eq(preOnboardingRecordsTable.candidateId, candidatesTable.id))
+      .where(eq(candidatesTable.email, emp.email))
+      .limit(1);
+
+    if (preOnboardingRecord && preOnboardingRecord.completionPercentage < 100) {
+      res.status(403).json({
+        error: "ID card cannot be generated: pre-onboarding document verification is not complete.",
+        documentCompletionPercentage: preOnboardingRecord.completionPercentage,
       });
       return;
     }
