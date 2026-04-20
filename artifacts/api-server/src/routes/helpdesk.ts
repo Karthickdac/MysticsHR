@@ -93,7 +93,8 @@ async function autoAssignForCategory(category: string): Promise<number | null> {
   return null;
 }
 
-async function enrichTicket(ticket: typeof helpdeskTicketsTable.$inferSelect) {
+async function enrichTicket(ticketInput: typeof helpdeskTicketsTable.$inferSelect) {
+  let ticket = ticketInput;
   const [raisedBy] = ticket.raisedByEmployeeId
     ? await db.select({ firstName: employeesTable.firstName, lastName: employeesTable.lastName })
         .from(employeesTable).where(eq(employeesTable.id, ticket.raisedByEmployeeId))
@@ -103,9 +104,21 @@ async function enrichTicket(ticket: typeof helpdeskTicketsTable.$inferSelect) {
         .where(eq(hrmsUsersTable.id, ticket.assignedToUserId))
     : [null];
 
-  // Check SLA breach
-  const slaBreached = ticket.slaDeadline ? (new Date() > new Date(ticket.slaDeadline) &&
-    ticket.status !== "Resolved" && ticket.status !== "Closed") : false;
+  const now = new Date();
+  const isOpenStatus = !["Resolved", "Closed"].includes(ticket.status);
+  const slaBreached = !!(ticket.slaDeadline && now > new Date(ticket.slaDeadline) && isOpenStatus);
+
+  // Lazy SLA escalation: if breach is newly detected and not yet logged, write escalation log
+  if (slaBreached && !ticket.slaEscalatedAt) {
+    await db.update(helpdeskTicketsTable)
+      .set({ slaBreached: true, slaEscalatedAt: now })
+      .where(eq(helpdeskTicketsTable.id, ticket.id));
+    await db.insert(ticketSlaLogsTable).values({
+      ticketId: ticket.id,
+      event: `SLA BREACH ESCALATION: Ticket overdue. Assigned to user ${ticket.assignedToUserId ?? "unassigned"}. Manager and HR Head should be notified.`,
+    });
+    ticket = { ...ticket, slaBreached: true, slaEscalatedAt: now };
+  }
 
   return {
     ...ticket,
@@ -167,7 +180,7 @@ router.get("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asyn
 router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
-    const { subject, description, category, priority } = req.body;
+    const { subject, description, category, priority, attachmentUrl } = req.body;
     if (!subject || !description || !category || !priority) {
       res.status(400).json({ error: "subject, description, category and priority are required" }); return;
     }
@@ -184,6 +197,7 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
       raisedByEmployeeId: emp?.id ?? null,
       assignedToUserId,
       slaDeadline,
+      attachmentUrl: attachmentUrl ?? null,
     }).returning();
 
     await db.insert(ticketSlaLogsTable).values({
@@ -200,28 +214,13 @@ router.get("/helpdesk/tickets/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
   try {
     const id = Number(req.params.id);
     const u = req.hrmsUser!;
-    const isHrRole = (HR_ROLES as readonly string[]).includes(u.role);
 
-    const [ticket] = await db.select().from(helpdeskTicketsTable).where(eq(helpdeskTicketsTable.id, id));
-    if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
-
-    if (!isHrRole) {
-      const emp = await getEmployeeForUser(u.id);
-      if (emp && ticket.raisedByEmployeeId !== emp.id) {
-        if (u.role === "hod") {
-          const directReports = await db.select({ id: employeesTable.id }).from(employeesTable)
-            .where(eq(employeesTable.managerId, emp.id));
-          const teamIds = [emp.id, ...directReports.map(r => r.id)];
-          if (!ticket.raisedByEmployeeId || !teamIds.includes(ticket.raisedByEmployeeId)) {
-            res.status(403).json({ error: "Access denied" }); return;
-          }
-        } else {
-          res.status(403).json({ error: "Access denied" }); return;
-        }
-      }
-    }
+    const ticket = await checkTicketAccess(id, u);
+    if (!ticket) { res.status(404).json({ error: "Ticket not found or access denied" }); return; }
 
     const enriched = await enrichTicket(ticket);
+    const isManagerRole = (MANAGER_ROLES as readonly string[]).includes(u.role);
+
     const comments = await db.select({
       id: ticketCommentsTable.id,
       ticketId: ticketCommentsTable.ticketId,
@@ -235,8 +234,7 @@ router.get("/helpdesk/tickets/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
       .where(eq(ticketCommentsTable.ticketId, id))
       .orderBy(ticketCommentsTable.createdAt);
 
-    const isHr = isHrRole || u.role === "hod";
-    const visibleComments = isHr ? comments : comments.filter(c => !c.isInternal);
+    const visibleComments = isManagerRole ? comments : comments.filter(c => !c.isInternal);
 
     res.json({ ...enriched, comments: visibleComments });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -246,10 +244,12 @@ router.get("/helpdesk/tickets/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
 router.put("/helpdesk/tickets/:id", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const u = req.hrmsUser!;
     const { status, priority, assignedToUserId } = req.body;
 
-    const [existing] = await db.select().from(helpdeskTicketsTable).where(eq(helpdeskTicketsTable.id, id));
-    if (!existing) { res.status(404).json({ error: "Ticket not found" }); return; }
+    // HOD can only update tickets within their team scope; HR roles have unrestricted access
+    const existing = await checkTicketAccess(id, u);
+    if (!existing) { res.status(404).json({ error: "Ticket not found or access denied" }); return; }
 
     const updates: Partial<typeof helpdeskTicketsTable.$inferInsert> = {
       updatedAt: new Date(),

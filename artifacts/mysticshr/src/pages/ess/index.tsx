@@ -4,7 +4,9 @@ import {
   useGetEssDashboard,
   useGetEssProfile,
   useUpdateEssProfile,
+  useListIssuedDocuments,
   type EssProfile,
+  type IssuedDocument,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -171,9 +173,13 @@ export default function EssPortalPage() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const { data: profile, isLoading: loadingProfile } = useGetEssProfile();
   const { data: dashboard } = useGetEssDashboard();
+  const { data: issuedDocs = [] } = useListIssuedDocuments(
+    profile?.employeeId ? { employeeId: profile.employeeId } : {}
+  );
 
   if (loadingProfile) return <div className="p-6">Loading...</div>;
 
+  const myDocuments = issuedDocs as IssuedDocument[];
   const leaveBalances = (dashboard?.leaveBalances ?? []) as LeaveBalanceItem[];
   const performanceGoals = (dashboard?.performanceGoals ?? []) as GoalSummaryItem[];
   const recentPayslip = dashboard?.recentPayslip as PayslipSummaryItem | null | undefined;
@@ -333,7 +339,7 @@ export default function EssPortalPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="services">
+        <TabsContent value="services" className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {ESS_MODULES.map(mod => (
               <Link key={mod.href} href={mod.href}>
@@ -352,6 +358,38 @@ export default function EssPortalPage() {
               </Link>
             ))}
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                My HR Documents
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {myDocuments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No documents issued yet. Contact HR to request a document.</p>
+              ) : (
+                <div className="space-y-2">
+                  {myDocuments.map((doc: IssuedDocument) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium capitalize">
+                          {(doc.documentType ?? "").replace(/_/g, " ")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Issued: {doc.generatedAt ? new Date(doc.generatedAt).toLocaleDateString() : "—"}
+                        </p>
+                      </div>
+                      <Link href={`/api/documents/issued/${doc.id}/download`}>
+                        <Button variant="outline" size="sm" className="ml-3">Download</Button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

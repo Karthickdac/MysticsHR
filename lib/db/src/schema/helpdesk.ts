@@ -28,6 +28,8 @@ export const helpdeskTicketsTable = pgTable("helpdesk_tickets", {
   assignedToUserId: integer("assigned_to_user_id").references(() => hrmsUsersTable.id),
   slaDeadline: timestamp("sla_deadline", { withTimezone: true }),
   slaBreached: boolean("sla_breached").notNull().default(false),
+  slaEscalatedAt: timestamp("sla_escalated_at", { withTimezone: true }),
+  attachmentUrl: text("attachment_url"),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   closedAt: timestamp("closed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
