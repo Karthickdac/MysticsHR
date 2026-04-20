@@ -504,7 +504,7 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/performance/goals">
             <ProtectedRoute>
-              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "employee"]}>
                 <GoalsPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
@@ -512,7 +512,7 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/performance/appraisals">
             <ProtectedRoute>
-              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "employee"]}>
                 <AppraisalsPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
@@ -536,7 +536,7 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/performance/cycles/:id">
             <ProtectedRoute>
-              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "employee"]}>
                 <CycleDetailPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
@@ -544,7 +544,7 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/performance">
             <ProtectedRoute>
-              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "employee"]}>
                 <PerformancePage />
               </RoleProtectedRoute>
             </ProtectedRoute>

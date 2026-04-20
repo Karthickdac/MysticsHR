@@ -164,7 +164,7 @@ router.get("/performance/goals", requireHrmsUser, requireRole(...PERF_ROLES), as
         .where(inArray(goalProgressTable.goalId, goalIds))
         .orderBy(desc(goalProgressTable.updatedAt));
       for (const p of latestProgress) {
-        if (!progressMap[p.goalId]) progressMap[p.goalId] = p.progressPercent;
+        if (!(p.goalId in progressMap)) progressMap[p.goalId] = p.progressPercent;
       }
     }
 

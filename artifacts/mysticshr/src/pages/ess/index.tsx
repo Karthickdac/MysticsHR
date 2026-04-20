@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   useGetEssDashboard,
@@ -48,6 +48,19 @@ function EditProfileModal({ open, onClose }: { open: boolean; onClose: () => voi
     emergencyContactPhone: profile?.emergencyContactPhone ?? "",
     emergencyContactRelation: profile?.emergencyContactRelation ?? "",
   });
+
+  useEffect(() => {
+    if (open && profile) {
+      setForm({
+        phone: profile.phone ?? "",
+        personalEmail: profile.personalEmail ?? "",
+        currentAddress: profile.currentAddress ?? "",
+        emergencyContactName: profile.emergencyContactName ?? "",
+        emergencyContactPhone: profile.emergencyContactPhone ?? "",
+        emergencyContactRelation: profile.emergencyContactRelation ?? "",
+      });
+    }
+  }, [open, profile]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
