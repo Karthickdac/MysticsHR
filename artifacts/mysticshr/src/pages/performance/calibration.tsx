@@ -4,6 +4,8 @@ import {
   useGetCalibrationView,
   useComputeAppraisalOutcomes,
   useListAppraisalOutcomes,
+  getGetCalibrationViewQueryKey,
+  getListAppraisalOutcomesQueryKey,
   type CalibrationRecord,
   type AppraisalOutcome,
 } from "@workspace/api-client-react";
@@ -49,12 +51,12 @@ export default function CalibrationPage() {
 
   const { data: calibration = [], isLoading: loadingCalib } = useGetCalibrationView(
     cycleId ?? 0,
-    { query: { enabled: !!cycleId } }
+    { query: { queryKey: getGetCalibrationViewQueryKey(cycleId ?? 0), enabled: !!cycleId } }
   );
 
   const { data: outcomes = [], isLoading: loadingOutcomes } = useListAppraisalOutcomes(
     { cycleId: cycleId ?? undefined },
-    { query: { enabled: !!cycleId } }
+    { query: { queryKey: getListAppraisalOutcomesQueryKey({ cycleId: cycleId ?? undefined }), enabled: !!cycleId } }
   );
 
   const computeOutcomes = useComputeAppraisalOutcomes();

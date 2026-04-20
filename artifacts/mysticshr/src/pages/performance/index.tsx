@@ -6,6 +6,7 @@ import {
   useAdvancePerformanceCycleStage,
   useListPerformanceGoals,
   type PerformanceCycle,
+  CreatePerformanceCycleBodyCycleType,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -120,8 +121,14 @@ function CycleCard({ cycle, isHR }: { cycle: PerformanceCycle; isHR: boolean }) 
 function CreateCycleModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const create = useCreatePerformanceCycle();
-  const [form, setForm] = useState({
-    title: "", cycleType: "Annual", startDate: "", endDate: "", description: "",
+  const [form, setForm] = useState<{
+    title: string;
+    cycleType: CreatePerformanceCycleBodyCycleType;
+    startDate: string;
+    endDate: string;
+    description: string;
+  }>({
+    title: "", cycleType: CreatePerformanceCycleBodyCycleType.Annual, startDate: "", endDate: "", description: "",
   });
 
   function handleSubmit(e: React.FormEvent) {
@@ -130,7 +137,7 @@ function CreateCycleModal({ open, onClose }: { open: boolean; onClose: () => voi
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: ["/performance/cycles"] });
         onClose();
-        setForm({ title: "", cycleType: "Annual", startDate: "", endDate: "", description: "" });
+        setForm({ title: "", cycleType: CreatePerformanceCycleBodyCycleType.Annual, startDate: "", endDate: "", description: "" });
       },
     });
   }
@@ -149,12 +156,15 @@ function CreateCycleModal({ open, onClose }: { open: boolean; onClose: () => voi
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Cycle Type *</Label>
-              <Select value={form.cycleType} onValueChange={v => setForm(f => ({ ...f, cycleType: v }))}>
+              <Select
+                value={form.cycleType}
+                onValueChange={v => setForm(f => ({ ...f, cycleType: v as CreatePerformanceCycleBodyCycleType }))}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Annual">Annual</SelectItem>
-                  <SelectItem value="Semi-Annual">Semi-Annual</SelectItem>
-                  <SelectItem value="Quarterly">Quarterly</SelectItem>
+                  <SelectItem value={CreatePerformanceCycleBodyCycleType.Annual}>Annual</SelectItem>
+                  <SelectItem value={CreatePerformanceCycleBodyCycleType["Semi-Annual"]}>Semi-Annual</SelectItem>
+                  <SelectItem value={CreatePerformanceCycleBodyCycleType.Quarterly}>Quarterly</SelectItem>
                 </SelectContent>
               </Select>
             </div>

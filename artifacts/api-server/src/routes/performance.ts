@@ -111,12 +111,16 @@ router.get("/performance/goals", requireHrmsUser, requireRole(...ALL_ROLES), asy
     if (cycleId) conds.push(eq(performanceGoalsTable.cycleId, Number(cycleId)));
     if (employeeId) conds.push(eq(performanceGoalsTable.employeeId, Number(employeeId)));
 
-    // Employees can only see their own goals
+    // Employees can only see their own goals — fail closed if no linked employee
     if (u.role === "employee") {
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
-      if (emp) conds.push(eq(performanceGoalsTable.employeeId, emp.id));
+      if (!emp) {
+        res.json([]); // No linked employee record: return empty, not all goals
+        return;
+      }
+      conds.push(eq(performanceGoalsTable.employeeId, emp.id));
     }
 
     const goals = await db.select({
@@ -202,8 +206,27 @@ router.delete("/performance/goals/:id", requireHrmsUser, requireRole(...HR_ROLES
 
 router.get("/performance/goals/:id/progress", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
+    const u = req.hrmsUser!;
+    const goalId = Number(req.params.id);
+
+    // Verify goal exists
+    const [goal] = await db.select({ id: performanceGoalsTable.id, employeeId: performanceGoalsTable.employeeId })
+      .from(performanceGoalsTable).where(eq(performanceGoalsTable.id, goalId));
+    if (!goal) { res.status(404).json({ error: "Goal not found" }); return; }
+
+    // Employees can only see progress for their own goals
+    if (u.role === "employee") {
+      const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!emp || emp.id !== goal.employeeId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+    }
+
     const rows = await db.select().from(goalProgressTable)
-      .where(eq(goalProgressTable.goalId, Number(req.params.id)))
+      .where(eq(goalProgressTable.goalId, goalId))
       .orderBy(desc(goalProgressTable.updatedAt));
     res.json(rows);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -212,13 +235,31 @@ router.get("/performance/goals/:id/progress", requireHrmsUser, requireRole(...AL
 router.post("/performance/goals/:id/progress", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
+    const goalId = Number(req.params.id);
     const { progressPercent, commentary } = req.body;
     if (progressPercent === undefined) {
       res.status(400).json({ error: "progressPercent is required" });
       return;
     }
+
+    // Verify goal exists
+    const [goal] = await db.select({ id: performanceGoalsTable.id, employeeId: performanceGoalsTable.employeeId })
+      .from(performanceGoalsTable).where(eq(performanceGoalsTable.id, goalId));
+    if (!goal) { res.status(404).json({ error: "Goal not found" }); return; }
+
+    // Employees can only update progress for their own goals
+    if (u.role === "employee") {
+      const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!emp || emp.id !== goal.employeeId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+    }
+
     const [row] = await db.insert(goalProgressTable).values({
-      goalId: Number(req.params.id),
+      goalId,
       progressPercent: Math.min(100, Math.max(0, Number(progressPercent))),
       commentary: commentary ?? null,
       updatedBy: u.id,
@@ -277,19 +318,24 @@ router.post("/performance/self-appraisals", requireHrmsUser, requireRole(...ALL_
       return;
     }
 
-    // Get employee for this user
+    // Get employee for this user — required for all roles; fail closed
     const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
       .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
       .where(eq(hrmsUsersTable.id, u.id));
 
-    if (!emp && u.role === "employee") {
-      res.status(400).json({ error: "No employee record linked to your account" });
+    if (!emp) {
+      res.status(403).json({ error: "No employee record linked to your account" });
       return;
     }
 
-    const employeeId = emp?.id;
-    if (!employeeId) {
-      res.status(400).json({ error: "No employee record found" });
+    const employeeId = emp.id;
+
+    // Verify that the goalId belongs to this employee — prevent appraisal of others' goals
+    const [goal] = await db.select({ id: performanceGoalsTable.id, empId: performanceGoalsTable.employeeId })
+      .from(performanceGoalsTable).where(eq(performanceGoalsTable.id, Number(goalId)));
+    if (!goal) { res.status(404).json({ error: "Goal not found" }); return; }
+    if (goal.empId !== employeeId) {
+      res.status(403).json({ error: "You can only self-appraise your own goals" });
       return;
     }
 
@@ -349,13 +395,44 @@ router.post("/performance/manager-evaluations", requireHrmsUser, requireRole(...
       return;
     }
 
+    const targetEmployeeId = Number(employeeId);
+
+    // Scope enforcement: HOD can only evaluate their direct reports;
+    // HR roles and super_admin have unrestricted scope.
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
+    if (!isHrRole) {
+      // Get HOD's own employee record to compare with target employee's managerId
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp) {
+        res.status(403).json({ error: "No employee record linked to your account" });
+        return;
+      }
+      const [targetEmp] = await db.select({ managerId: employeesTable.managerId }).from(employeesTable)
+        .where(eq(employeesTable.id, targetEmployeeId));
+      if (!targetEmp || targetEmp.managerId !== hodEmp.id) {
+        res.status(403).json({ error: "You can only evaluate your direct reports" });
+        return;
+      }
+    }
+
+    // Verify goal belongs to the target employee
+    const [goal] = await db.select({ id: performanceGoalsTable.id, empId: performanceGoalsTable.employeeId })
+      .from(performanceGoalsTable).where(eq(performanceGoalsTable.id, Number(goalId)));
+    if (!goal) { res.status(404).json({ error: "Goal not found" }); return; }
+    if (goal.empId !== targetEmployeeId) {
+      res.status(400).json({ error: "Goal does not belong to the specified employee" });
+      return;
+    }
+
     // Upsert
     await db.delete(managerEvaluationsTable).where(
-      and(eq(managerEvaluationsTable.goalId, Number(goalId)), eq(managerEvaluationsTable.employeeId, Number(employeeId)))
+      and(eq(managerEvaluationsTable.goalId, Number(goalId)), eq(managerEvaluationsTable.employeeId, targetEmployeeId))
     );
     const [row] = await db.insert(managerEvaluationsTable).values({
       goalId: Number(goalId),
-      employeeId: Number(employeeId),
+      employeeId: targetEmployeeId,
       rating: Number(rating),
       commentary: commentary ?? null,
       evaluatedBy: u.id,

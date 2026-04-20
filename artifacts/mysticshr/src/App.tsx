@@ -43,6 +43,7 @@ import GoalsPage from "@/pages/performance/goals";
 import AppraisalsPage from "@/pages/performance/appraisals";
 import EvaluationsPage from "@/pages/performance/evaluations";
 import CalibrationPage from "@/pages/performance/calibration";
+import CycleDetailPage from "@/pages/performance/cycle-detail";
 import EssPortalPage from "@/pages/ess/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
@@ -529,6 +530,14 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
                 <CalibrationPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/performance/cycles/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <CycleDetailPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

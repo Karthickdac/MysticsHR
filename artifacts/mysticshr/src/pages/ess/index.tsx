@@ -4,6 +4,7 @@ import {
   useGetEssDashboard,
   useGetEssProfile,
   useUpdateEssProfile,
+  type EssProfile,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,25 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   User, FileText, Calendar, Clock, Target, Wallet, Home, Phone, AlertCircle,
-  ChevronRight, TrendingUp, CheckCircle2, Bell,
+  ChevronRight, CheckCircle2,
 } from "lucide-react";
+
+type LeaveBalanceItem = {
+  leaveTypeName: string;
+  balance: number | null;
+  used: number | null;
+};
+
+type GoalSummaryItem = {
+  id: number;
+  title: string;
+  weightage: number;
+};
+
+type PayslipSummaryItem = {
+  periodYear: number | null;
+  periodMonth: number | null;
+};
 
 function EditProfileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
@@ -24,7 +42,7 @@ function EditProfileModal({ open, onClose }: { open: boolean; onClose: () => voi
   const update = useUpdateEssProfile();
   const [form, setForm] = useState({
     phone: profile?.phone ?? "",
-    personalEmail: (profile as any)?.personalEmail ?? "",
+    personalEmail: profile?.personalEmail ?? "",
     currentAddress: profile?.currentAddress ?? "",
     emergencyContactName: profile?.emergencyContactName ?? "",
     emergencyContactPhone: profile?.emergencyContactPhone ?? "",
@@ -139,13 +157,16 @@ const ESS_MODULES = [
 export default function EssPortalPage() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const { data: profile, isLoading: loadingProfile } = useGetEssProfile();
-  const { data: dashboard, isLoading: loadingDashboard } = useGetEssDashboard();
+  const { data: dashboard } = useGetEssDashboard();
 
   if (loadingProfile) return <div className="p-6">Loading...</div>;
 
+  const leaveBalances = (dashboard?.leaveBalances ?? []) as LeaveBalanceItem[];
+  const performanceGoals = (dashboard?.performanceGoals ?? []) as GoalSummaryItem[];
+  const recentPayslip = dashboard?.recentPayslip as PayslipSummaryItem | null | undefined;
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -163,9 +184,7 @@ export default function EssPortalPage() {
           <TabsTrigger value="services">Services</TabsTrigger>
         </TabsList>
 
-        {/* DASHBOARD TAB */}
         <TabsContent value="dashboard" className="space-y-4">
-          {/* Attendance summary */}
           {dashboard && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card>
@@ -206,7 +225,6 @@ export default function EssPortalPage() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Leave Balances */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -214,11 +232,11 @@ export default function EssPortalPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {dashboard?.leaveBalances?.length === 0 ? (
+                {leaveBalances.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No leave balances found.</p>
                 ) : (
                   <div className="space-y-2">
-                    {(dashboard?.leaveBalances ?? []).map((lb: any, i: number) => (
+                    {leaveBalances.map((lb, i) => (
                       <div key={i} className="flex items-center justify-between">
                         <span className="text-sm">{lb.leaveTypeName}</span>
                         <div className="flex gap-2">
@@ -237,7 +255,6 @@ export default function EssPortalPage() {
               </CardContent>
             </Card>
 
-            {/* Performance Goals */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -245,11 +262,11 @@ export default function EssPortalPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {dashboard?.performanceGoals?.length === 0 ? (
+                {performanceGoals.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No active performance goals.</p>
                 ) : (
                   <div className="space-y-2">
-                    {(dashboard?.performanceGoals ?? []).map((g: any) => (
+                    {performanceGoals.map(g => (
                       <div key={g.id} className="flex items-center justify-between">
                         <span className="text-sm line-clamp-1">{g.title}</span>
                         <Badge variant="outline" className="text-xs">{g.weightage}%</Badge>
@@ -263,8 +280,7 @@ export default function EssPortalPage() {
               </CardContent>
             </Card>
 
-            {/* Recent Payslip */}
-            {dashboard?.recentPayslip && (
+            {recentPayslip && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -273,7 +289,7 @@ export default function EssPortalPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    {(dashboard.recentPayslip as any)?.periodYear} — Month {(dashboard.recentPayslip as any)?.periodMonth}
+                    {recentPayslip.periodYear} — Month {recentPayslip.periodMonth}
                   </p>
                   <Link href="/payroll/payslips" className="text-xs text-primary hover:underline mt-2 block">
                     View all payslips →
@@ -284,7 +300,6 @@ export default function EssPortalPage() {
           </div>
         </TabsContent>
 
-        {/* PROFILE TAB */}
         <TabsContent value="profile">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -297,26 +312,7 @@ export default function EssPortalPage() {
             </CardHeader>
             <CardContent>
               {profile ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InfoRow label="Full Name" value={profile.name} />
-                  <InfoRow label="Employee Code" value={profile.employeeCode ?? "—"} />
-                  <InfoRow label="Email" value={profile.email} />
-                  <InfoRow label="Designation" value={profile.designation ?? "—"} />
-                  <InfoRow label="Department" value={profile.department ?? "—"} />
-                  <InfoRow label="Date of Joining" value={profile.dateOfJoining ?? "—"} />
-                  <InfoRow label="Phone" value={profile.phone ?? "—"} />
-                  <InfoRow label="Current Address" value={profile.currentAddress ?? "—"} />
-                  <div className="col-span-2 border-t pt-3">
-                    <p className="text-sm font-medium mb-2 flex items-center gap-1">
-                      <Phone className="w-3 h-3" /> Emergency Contact
-                    </p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <InfoRow label="Name" value={profile.emergencyContactName ?? "—"} />
-                      <InfoRow label="Relation" value={profile.emergencyContactRelation ?? "—"} />
-                      <InfoRow label="Phone" value={profile.emergencyContactPhone ?? "—"} />
-                    </div>
-                  </div>
-                </div>
+                <ProfileDetails profile={profile} />
               ) : (
                 <p className="text-sm text-muted-foreground">No employee record linked to your account.</p>
               )}
@@ -324,7 +320,6 @@ export default function EssPortalPage() {
           </Card>
         </TabsContent>
 
-        {/* SERVICES TAB */}
         <TabsContent value="services">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {ESS_MODULES.map(mod => (
@@ -348,6 +343,32 @@ export default function EssPortalPage() {
       </Tabs>
 
       <EditProfileModal open={showEditProfile} onClose={() => setShowEditProfile(false)} />
+    </div>
+  );
+}
+
+function ProfileDetails({ profile }: { profile: EssProfile }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <InfoRow label="Full Name" value={profile.name} />
+      <InfoRow label="Employee Code" value={profile.employeeCode ?? "—"} />
+      <InfoRow label="Email" value={profile.email} />
+      <InfoRow label="Designation" value={profile.designation ?? "—"} />
+      <InfoRow label="Department" value={profile.department ?? "—"} />
+      <InfoRow label="Date of Joining" value={profile.dateOfJoining ?? "—"} />
+      <InfoRow label="Phone" value={profile.phone ?? "—"} />
+      <InfoRow label="Personal Email" value={profile.personalEmail ?? "—"} />
+      <InfoRow label="Current Address" value={profile.currentAddress ?? "—"} />
+      <div className="col-span-2 border-t pt-3">
+        <p className="text-sm font-medium mb-2 flex items-center gap-1">
+          <Phone className="w-3 h-3" /> Emergency Contact
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <InfoRow label="Name" value={profile.emergencyContactName ?? "—"} />
+          <InfoRow label="Relation" value={profile.emergencyContactRelation ?? "—"} />
+          <InfoRow label="Phone" value={profile.emergencyContactPhone ?? "—"} />
+        </div>
+      </div>
     </div>
   );
 }

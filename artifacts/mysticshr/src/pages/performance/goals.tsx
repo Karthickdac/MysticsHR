@@ -8,6 +8,7 @@ import {
   useListGoalProgress,
   useListEmployees,
   type PerformanceGoal,
+  type Employee,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -153,7 +154,7 @@ function GoalCard({ goal, canManage, canDelete }: { goal: PerformanceGoal; canMa
 function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: () => void; cycleId?: number }) {
   const qc = useQueryClient();
   const create = useCreatePerformanceGoal();
-  const { data: employees = [] } = useListEmployees({ status: "Active", page: 1, pageSize: 200 });
+  const { data: employeeResponse } = useListEmployees({ status: "Active", limit: 200, offset: 0 });
   const [form, setForm] = useState({
     cycleId: cycleId ? String(cycleId) : "",
     employeeId: "",
@@ -186,7 +187,7 @@ function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: (
     });
   }
 
-  const employeeList = employees && 'employees' in employees ? (employees as any).employees : Array.isArray(employees) ? employees : [];
+  const employeeList: Employee[] = employeeResponse?.data ?? [];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -203,7 +204,7 @@ function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: (
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employeeList.map((e: any) => (
+                  {employeeList.map((e: Employee) => (
                     <SelectItem key={e.id} value={String(e.id)}>
                       {e.firstName} {e.lastName}
                     </SelectItem>
