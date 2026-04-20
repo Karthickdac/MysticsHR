@@ -4,6 +4,7 @@ import { db } from "./db";
 import {
   reportSchedulesTable,
   employeesTable,
+  hrmsUsersTable,
   departmentsTable,
   attendanceRecordsTable,
   leaveApplicationsTable,
@@ -273,10 +274,15 @@ async function revokeAccessForPastLwd() {
       ));
 
     for (const row of pending) {
+      // Mark employee as inactive
       await db.update(employeesTable)
         .set({ status: "Separated", isActive: false, updatedAt: new Date() })
         .where(eq(employeesTable.id, row.employeeId));
-      logger.info({ employeeId: row.employeeId, lwd: row.actualLwd ?? row.requestedLwd }, "[scheduler] auto-revoked system access (LWD+1 passed)");
+      // Also deactivate linked HRMS user account to revoke system login
+      await db.update(hrmsUsersTable)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(hrmsUsersTable.employeeId, row.employeeId));
+      logger.info({ employeeId: row.employeeId, lwd: row.actualLwd ?? row.requestedLwd }, "[scheduler] auto-revoked system access and HRMS login (LWD+1 passed)");
     }
   } catch (err) {
     logger.error({ err }, "[scheduler] LWD+1 access revocation failed");

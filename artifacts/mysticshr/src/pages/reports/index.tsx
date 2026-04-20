@@ -18,6 +18,7 @@ import {
   useCreateSavedReportTemplate,
   useDeleteSavedReportTemplate,
   useRunCustomReport,
+  useListDepartments,
   getListReportSchedulesQueryKey,
   getListSavedReportTemplatesQueryKey,
   getGetEmployeeDirectoryReportQueryKey,
@@ -381,12 +382,16 @@ function CustomReportBuilder() {
   const createTemplate = useCreateSavedReportTemplate();
   const deleteTemplate = useDeleteSavedReportTemplate();
   const { data: templates = [] } = useListSavedReportTemplates();
+  const { data: departments = [] } = useListDepartments();
 
   const [reportType, setReportType] = useState<ReportType>("employee-directory");
   const [selectedFields, setSelectedFields] = useState<string[]>(["employeeName", "department", "designation", "dateOfJoining"]);
   const [results, setResults] = useState<RunCustomReport200DataItem[] | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [saveTemplateModal, setSaveTemplateModal] = useState(false);
+  const [filterFromDate, setFilterFromDate] = useState("");
+  const [filterToDate, setFilterToDate] = useState("");
+  const [filterDepartmentId, setFilterDepartmentId] = useState<string>("all");
 
   const CUSTOM_REPORT_TYPES = [
     { id: "employee-directory" as const, label: "Employee Directory" },
@@ -412,16 +417,24 @@ function CustomReportBuilder() {
     setSelectedFields((f) => f.includes(field) ? f.filter((x) => x !== field) : [...f, field]);
   }
 
+  function buildFilters() {
+    const f: Record<string, string> = {};
+    if (filterFromDate) f.fromDate = filterFromDate;
+    if (filterToDate) f.toDate = filterToDate;
+    if (filterDepartmentId && filterDepartmentId !== "all") f.departmentId = filterDepartmentId;
+    return Object.keys(f).length > 0 ? f : undefined;
+  }
+
   function handleRun() {
     runCustom.mutate(
-      { data: { reportType, selectedFields } },
+      { data: { reportType, selectedFields, filters: buildFilters() } },
       { onSuccess: (data) => setResults(data?.data ?? []) },
     );
   }
 
   function handleSaveTemplate() {
     createTemplate.mutate(
-      { data: { name: templateName, reportType, selectedFields } },
+      { data: { name: templateName, reportType, selectedFields, filters: buildFilters() } },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getListSavedReportTemplatesQueryKey() });
@@ -435,6 +448,10 @@ function CustomReportBuilder() {
   function loadTemplate(tmpl: SavedReportTemplate) {
     setReportType((tmpl.reportType ?? "employee-directory") as ReportType);
     setSelectedFields(tmpl.selectedFields ?? []);
+    const f = (tmpl.filters ?? {}) as Record<string, string>;
+    setFilterFromDate(f.fromDate ?? "");
+    setFilterToDate(f.toDate ?? "");
+    setFilterDepartmentId(f.departmentId ?? "all");
     setResults(null);
   }
 
@@ -477,6 +494,41 @@ function CustomReportBuilder() {
                     {field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}
                   </label>
                 ))}
+              </div>
+            </div>
+            <div className="border-t pt-4 space-y-3">
+              <Label className="text-sm font-semibold text-gray-700">Filters (optional)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs text-gray-500">From Date</Label>
+                  <Input
+                    type="date"
+                    value={filterFromDate}
+                    onChange={(e) => setFilterFromDate(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">To Date</Label>
+                  <Input
+                    type="date"
+                    value={filterToDate}
+                    onChange={(e) => setFilterToDate(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Department</Label>
+                  <Select value={filterDepartmentId} onValueChange={setFilterDepartmentId}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="All departments" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {(departments as Array<{ id: number; name: string }>).map((d) => (
+                        <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <div className="flex gap-2">
