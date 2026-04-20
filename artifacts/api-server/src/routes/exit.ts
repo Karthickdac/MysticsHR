@@ -20,6 +20,8 @@ import {
 import { eq, and, desc, or, sql, type SQL } from "drizzle-orm";
 import { logAudit } from "../lib/audit";
 import { generatePdf, substituteTemplate } from "../lib/pdf";
+import { dispatchNotification } from "../lib/notification-service";
+import { getUsersByRoles } from "./system-config";
 
 const router = Router();
 
@@ -364,21 +366,20 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
       const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
         .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, existing.employeeId)).limit(1);
       const isCompletion = status === "FnF Pending" || status === "Separated";
-      import("../lib/notification-service").then(async ({ dispatchNotification }) => {
-        const eventType = isCompletion ? "exit_clearance_done" : "exit_initiated";
-        // Notify the employee
-        if (empUser?.email) {
-          await dispatchNotification({
-            eventType, module: "exit",
-            recipientEmail: empUser.email, recipientName: empUser.name,
-            recipientEmployeeDbId: existing.employeeId,
-            variables: { status, recipientName: empUser.name },
-            entityType: "exit_request", entityId: id,
-          }).catch(() => {});
-        }
-        // On completion, also notify HR + Finance (super_admin, hr_manager) to initiate FnF
-        if (isCompletion) {
-          const { getUsersByRoles } = await import("./system-config");
+      const eventType = isCompletion ? "exit_clearance_done" : "exit_initiated";
+      // Notify the employee that their exit clearance is complete (or in progress)
+      if (empUser?.email) {
+        dispatchNotification({
+          eventType, module: "exit",
+          recipientEmail: empUser.email, recipientName: empUser.name,
+          recipientEmployeeDbId: existing.employeeId,
+          variables: { status, recipientName: empUser.name },
+          entityType: "exit_request", entityId: id,
+        }).catch(() => {});
+      }
+      // On completion, also notify HR + Finance to initiate FnF
+      if (isCompletion) {
+        (async () => {
           const hrUsers = await getUsersByRoles(["super_admin", "hr_manager", "payroll_admin"]);
           const empName = empUser?.name ?? "An employee";
           await Promise.allSettled(hrUsers.map(hr =>
@@ -390,8 +391,8 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
               entityType: "exit_request", entityId: id,
             })
           ));
-        }
-      }).catch(() => {});
+        })().catch(() => {});
+      }
     }
 
     res.json(await enrichExitRequest(updated));
@@ -480,9 +481,37 @@ router.put("/exit/clearance-tasks/:taskId", requireHrmsUser, requireRole(...ALL_
         : (t.status === "Completed" || t.status === "Waived")
     );
     if (allDone) {
-      await db.update(exitRequestsTable)
+      const [exitReq] = await db.update(exitRequestsTable)
         .set({ status: "FnF Pending", updatedAt: new Date() })
-        .where(eq(exitRequestsTable.id, task.exitRequestId));
+        .where(eq(exitRequestsTable.id, task.exitRequestId)).returning();
+
+      // Notify the employee that exit clearance is complete, and HR/Finance to initiate FnF
+      if (exitReq) {
+        const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+          .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, exitReq.employeeId)).limit(1);
+        if (empUser?.email) {
+          dispatchNotification({
+            eventType: "exit_clearance_done", module: "exit",
+            recipientEmail: empUser.email, recipientName: empUser.name,
+            recipientEmployeeDbId: exitReq.employeeId,
+            variables: { status: "FnF Pending", recipientName: empUser.name },
+            entityType: "exit_request", entityId: exitReq.id,
+          }).catch(() => {});
+        }
+        (async () => {
+          const hrUsers = await getUsersByRoles(["super_admin", "hr_manager", "payroll_admin"]);
+          const empName = empUser?.name ?? "An employee";
+          await Promise.allSettled(hrUsers.map(hr =>
+            dispatchNotification({
+              eventType: "exit_clearance_completed", module: "exit",
+              recipientEmail: hr.email, recipientName: hr.name,
+              recipientEmployeeDbId: hr.employeeId,
+              variables: { employeeName: empName, employeeId: String(exitReq.employeeId), recipientName: hr.name },
+              entityType: "exit_request", entityId: exitReq.id,
+            })
+          ));
+        })().catch(() => {});
+      }
     }
 
     res.json({ ...updated, assigneeName: null });

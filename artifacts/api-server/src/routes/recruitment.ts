@@ -15,6 +15,7 @@ import {
   hrmsUsersTable,
 } from "@workspace/db/schema";
 import { and, eq, isNull, sql, desc } from "drizzle-orm";
+import { dispatchNotification } from "../lib/notification-service";
 
 const router = Router();
 
@@ -869,14 +870,12 @@ router.post("/offers/:id/issue", requireHrmsUser, requireRole(...HR_WRITE_ROLES)
     const [candidate] = await db.select({ email: candidatesTable.email, firstName: candidatesTable.firstName, lastName: candidatesTable.lastName })
       .from(candidatesTable).where(eq(candidatesTable.id, row.candidateId)).limit(1);
     if (candidate?.email) {
-      import("../lib/notification-service").then(({ dispatchNotification }) => {
-        dispatchNotification({
-          eventType: "offer_letter_issued", module: "recruitment",
-          recipientEmail: candidate.email, recipientName: `${candidate.firstName} ${candidate.lastName}`,
-          recipientCandidateId: row.candidateId,
-          variables: { jobTitle: row.jobTitle, joiningDate: row.joiningDate ?? "", offerCode: row.offerCode, recipientName: `${candidate.firstName} ${candidate.lastName}` },
-          entityType: "offer_letter", entityId: id,
-        }).catch(() => {});
+      dispatchNotification({
+        eventType: "offer_letter_issued", module: "recruitment",
+        recipientEmail: candidate.email, recipientName: `${candidate.firstName} ${candidate.lastName}`,
+        recipientCandidateId: row.candidateId,
+        variables: { jobTitle: row.jobTitle, joiningDate: row.joiningDate ?? "", offerCode: row.offerCode, recipientName: `${candidate.firstName} ${candidate.lastName}` },
+        entityType: "offer_letter", entityId: id,
       }).catch(() => {});
     }
 
