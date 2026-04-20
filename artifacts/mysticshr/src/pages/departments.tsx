@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useListDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment } from "@workspace/api-client-react";
+import type { ListDepartmentsQueryResult } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getListDepartmentsQueryKey } from "@workspace/api-client-react";
 
 interface DeptFormState { name: string; code: string; description: string; }
+type Department = ListDepartmentsQueryResult[number];
 
 export default function DepartmentsPage() {
   const qc = useQueryClient();
@@ -32,7 +34,7 @@ export default function DepartmentsPage() {
     setShowForm(true);
   }
 
-  function openEdit(dept: any) {
+  function openEdit(dept: Department) {
     setForm({ name: dept.name, code: dept.code, description: dept.description ?? "" });
     setEditingId(dept.id);
     setError("");

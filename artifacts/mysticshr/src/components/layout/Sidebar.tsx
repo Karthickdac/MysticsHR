@@ -12,16 +12,16 @@ import {
   Menu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useGetCurrentUser, getGetCurrentUserQueryKey } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
+import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 
 export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boolean) => void }) {
   const [location, setLocation] = useLocation();
   const { signOut } = useClerk();
   const { user } = useUser();
-  const { data: currentUser } = useGetCurrentUser({ query: { enabled: !!user?.id, retry: false, queryKey: getGetCurrentUserQueryKey() } });
+  const { hrmsUser, role: hrmsRole } = useCurrentHrmsUser();
 
-  const role = currentUser?.role || "employee";
+  const role = hrmsRole ?? "employee";
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
@@ -86,13 +86,13 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
           <div className="flex items-center gap-3 mb-4 px-2">
             <div className="w-10 h-10 rounded-full bg-sidebar-primary/20 flex items-center justify-center text-sidebar-primary font-bold overflow-hidden">
               {user?.imageUrl ? (
-                <img src={user.imageUrl} alt={currentUser?.name || user?.fullName || ""} className="w-full h-full object-cover" />
+                <img src={user.imageUrl} alt={hrmsUser?.name || user?.fullName || ""} className="w-full h-full object-cover" />
               ) : (
-                (currentUser?.name || user?.fullName || "U").charAt(0).toUpperCase()
+                (hrmsUser?.name || user?.fullName || "U").charAt(0).toUpperCase()
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{currentUser?.name || user?.fullName}</div>
+              <div className="text-sm font-medium truncate">{hrmsUser?.name || user?.fullName}</div>
               <div className="text-xs text-sidebar-foreground/60 truncate capitalize">{role.replace("_", " ")}</div>
             </div>
           </div>

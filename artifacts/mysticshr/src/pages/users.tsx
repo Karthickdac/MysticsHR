@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useListUsers, useUpdateUser, getListUsersQueryKey } from "@workspace/api-client-react";
+import type { HrmsUser } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,12 +34,12 @@ export default function UsersPage() {
   const qc = useQueryClient();
   const { data: users, isLoading } = useListUsers();
   const updateMut = useUpdateUser();
-  const [editUser, setEditUser] = useState<any>(null);
+  const [editUser, setEditUser] = useState<HrmsUser | null>(null);
   const [role, setRole] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState("");
 
-  function openEdit(u: any) {
+  function openEdit(u: HrmsUser) {
     setEditUser(u);
     setRole(u.role);
     setIsActive(u.isActive);
@@ -52,8 +53,8 @@ export default function UsersPage() {
       await updateMut.mutateAsync({ id: editUser.id, data: { ...editUser, role, isActive } });
       await qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
       setEditUser(null);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to update");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to update");
     }
   }
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../lib/auth";
+import { requireHrmsUser } from "../lib/auth";
 import { db } from "../lib/db";
 import {
   employeesTable,
@@ -10,7 +10,7 @@ import { eq, sql, desc, gte, isNull } from "drizzle-orm";
 
 const router = Router();
 
-router.get("/dashboard/kpis", requireAuth, async (req, res) => {
+router.get("/dashboard/kpis", requireHrmsUser, async (req, res) => {
   try {
     const [headcountRow] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -70,7 +70,7 @@ router.get("/dashboard/kpis", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/dashboard/recent-activity", requireAuth, async (req, res) => {
+router.get("/dashboard/recent-activity", requireHrmsUser, async (req, res) => {
   try {
     const limit = parseInt(String(req.query.limit ?? "10"), 10);
     const logs = await db
@@ -95,7 +95,7 @@ router.get("/dashboard/recent-activity", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/dashboard/headcount-by-department", requireAuth, async (req, res) => {
+router.get("/dashboard/headcount-by-department", requireHrmsUser, async (req, res) => {
   try {
     const rows = await db
       .select({
@@ -119,7 +119,7 @@ router.get("/dashboard/headcount-by-department", requireAuth, async (req, res) =
   }
 });
 
-router.get("/dashboard/employee-status-breakdown", requireAuth, async (req, res) => {
+router.get("/dashboard/employee-status-breakdown", requireHrmsUser, async (req, res) => {
   try {
     const rows = await db
       .select({

@@ -3,6 +3,7 @@ import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect, Link } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { ShieldAlert } from "lucide-react";
 
 import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
@@ -13,6 +14,7 @@ import DesignationsPage from "@/pages/designations";
 import UsersPage from "@/pages/users";
 import AuditLogsPage from "@/pages/audit-logs";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
 const Settings = () => (
   <div className="p-6">
@@ -20,6 +22,28 @@ const Settings = () => (
     <p className="text-muted-foreground mt-2">System settings coming soon.</p>
   </div>
 );
+
+const NewEmployee = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-bold">New Employee</h1>
+    <p className="text-muted-foreground mt-2">Employee creation form coming soon.</p>
+  </div>
+);
+
+function Forbidden() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+      <ShieldAlert className="w-16 h-16 text-muted-foreground" />
+      <h1 className="text-2xl font-bold">Access Denied</h1>
+      <p className="text-muted-foreground max-w-sm">
+        You don't have permission to view this page. Contact your HR administrator if you believe this is an error.
+      </p>
+      <Link href="/dashboard" className="text-primary hover:underline text-sm">
+        Return to Dashboard
+      </Link>
+    </div>
+  );
+}
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -117,6 +141,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
+function RoleProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles: HrmsRole[];
+}) {
+  const { role, isLoading, isNotProvisioned } = useCurrentHrmsUser();
+
+  if (isLoading) return null;
+  if (isNotProvisioned) return <>{children}</>;
+
+  if (!hasRole(role, allowedRoles)) {
+    return <Forbidden />;
+  }
+
+  return <>{children}</>;
+}
+
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const qc = useQueryClient();
@@ -185,31 +228,62 @@ function ClerkProviderWithRoutes() {
           <Route path="/dashboard">
             <ProtectedRoute><DashboardPage /></ProtectedRoute>
           </Route>
+
           <Route path="/employees/new">
             <ProtectedRoute>
-              <div className="p-6"><h1 className="text-2xl font-bold">New Employee</h1><p className="text-muted-foreground mt-2">Employee creation form coming soon.</p></div>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <NewEmployee />
+              </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>
           <Route path="/employees/:id">
             <ProtectedRoute><EmployeeDetailPage /></ProtectedRoute>
           </Route>
           <Route path="/employees">
-            <ProtectedRoute><EmployeesPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]}>
+                <EmployeesPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
+
           <Route path="/departments">
-            <ProtectedRoute><DepartmentsPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <DepartmentsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
           <Route path="/designations">
-            <ProtectedRoute><DesignationsPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <DesignationsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
+
           <Route path="/users">
-            <ProtectedRoute><UsersPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager"]}>
+                <UsersPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
+
           <Route path="/audit-logs">
-            <ProtectedRoute><AuditLogsPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager"]}>
+                <AuditLogsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
+
           <Route path="/settings">
-            <ProtectedRoute><Settings /></ProtectedRoute>
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager"]}>
+                <Settings />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
 
           <Route component={NotFound} />

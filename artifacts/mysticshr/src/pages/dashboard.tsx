@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend 
 } from "recharts";
-import { Users, UserCheck, TrendingDown, Calendar, BriefcaseBusiness, Clock, UserX, Activity } from "lucide-react";
+import { Users, UserCheck, TrendingDown, Calendar, BriefcaseBusiness, Clock, UserX, Activity, type LucideIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -22,7 +22,7 @@ const STATUS_COLORS: Record<string, string> = {
   "Separated": "hsl(0 0% 60%)",
 };
 
-function KPICard({ title, value, icon: Icon, sub, loading }: { title: string; value: string; icon: any; sub?: string; loading?: boolean }) {
+function KPICard({ title, value, icon: Icon, sub, loading }: { title: string; value: string; icon: LucideIcon; sub?: string; loading?: boolean }) {
   return (
     <Card className="border-border hover:shadow-md transition-shadow">
       <CardContent className="p-5">

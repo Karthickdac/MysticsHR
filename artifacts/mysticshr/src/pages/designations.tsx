@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useListDesignations, useCreateDesignation, useUpdateDesignation, useDeleteDesignation, useListDepartments, getListDesignationsQueryKey } from "@workspace/api-client-react";
+import type { ListDesignationsQueryResult } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { Plus, Pencil, Trash2, Briefcase } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface DesigForm { title: string; code: string; departmentId: string; level: string; }
+type Designation = ListDesignationsQueryResult[number];
 
 export default function DesignationsPage() {
   const qc = useQueryClient();
@@ -35,7 +37,7 @@ export default function DesignationsPage() {
     setShowForm(true);
   }
 
-  function openEdit(d: any) {
+  function openEdit(d: Designation) {
     setForm({ title: d.title, code: d.code, departmentId: d.departmentId ? String(d.departmentId) : "", level: String(d.level ?? 1) });
     setEditingId(d.id);
     setError("");
