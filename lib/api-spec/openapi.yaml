@@ -20,6 +20,16 @@ tags:
     description: User management
   - name: roles
     description: Role definitions
+  - name: requisitions
+    description: Job requisitions
+  - name: candidates
+    description: Recruitment candidates
+  - name: interviews
+    description: Interview scheduling and feedback
+  - name: offers
+    description: Offer letters
+  - name: pre-onboarding
+    description: Pre-onboarding documents and verification
   - name: audit-logs
     description: Audit log access
   - name: dashboard
@@ -564,6 +574,746 @@ paths:
           description: Role not found
 
   # ──────────────────────────────────────────────
+  # JOB REQUISITIONS
+  # ──────────────────────────────────────────────
+  /requisitions:
+    get:
+      operationId: listRequisitions
+      tags: [requisitions]
+      summary: List job requisitions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: departmentId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of requisitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobRequisition"
+    post:
+      operationId: createRequisition
+      tags: [requisitions]
+      summary: Create a new job requisition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRequisitionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRequisition"
+
+  /requisitions/{id}:
+    get:
+      operationId: getRequisition
+      tags: [requisitions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Requisition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRequisition"
+    patch:
+      operationId: updateRequisition
+      tags: [requisitions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRequisitionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRequisition"
+    delete:
+      operationId: deleteRequisition
+      tags: [requisitions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /requisitions/{id}/approve:
+    post:
+      operationId: approveRequisition
+      tags: [requisitions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: ["string", "null"]
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRequisition"
+
+  /requisitions/{id}/reject:
+    post:
+      operationId: rejectRequisition
+      tags: [requisitions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [notes]
+              properties:
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRequisition"
+
+  # ──────────────────────────────────────────────
+  # CANDIDATES
+  # ──────────────────────────────────────────────
+  /candidates:
+    get:
+      operationId: listCandidates
+      tags: [candidates]
+      parameters:
+        - name: requisitionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: stage
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of candidates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Candidate"
+    post:
+      operationId: createCandidate
+      tags: [candidates]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCandidateBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+
+  /candidates/{id}:
+    get:
+      operationId: getCandidate
+      tags: [candidates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Candidate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+    patch:
+      operationId: updateCandidate
+      tags: [candidates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCandidateBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+    delete:
+      operationId: deleteCandidate
+      tags: [candidates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /candidates/{id}/move-stage:
+    post:
+      operationId: moveCandidateStage
+      tags: [candidates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage]
+              properties:
+                stage:
+                  type: string
+                rejectionReason:
+                  type: ["string", "null"]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+
+  # ──────────────────────────────────────────────
+  # INTERVIEWS
+  # ──────────────────────────────────────────────
+  /candidates/{candidateId}/interviews:
+    get:
+      operationId: listCandidateInterviews
+      tags: [interviews]
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Interview rounds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterviewRound"
+    post:
+      operationId: scheduleInterview
+      tags: [interviews]
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleInterviewBody"
+      responses:
+        "201":
+          description: Scheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewRound"
+
+  /interviews/{id}:
+    patch:
+      operationId: updateInterview
+      tags: [interviews]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInterviewBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewRound"
+    delete:
+      operationId: deleteInterview
+      tags: [interviews]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /interviews/{id}/feedback:
+    get:
+      operationId: getInterviewFeedback
+      tags: [interviews]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Feedback list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InterviewFeedback"
+    post:
+      operationId: submitInterviewFeedback
+      tags: [interviews]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitFeedbackBody"
+      responses:
+        "201":
+          description: Feedback created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InterviewFeedback"
+
+  # ──────────────────────────────────────────────
+  # OFFER LETTERS
+  # ──────────────────────────────────────────────
+  /offers:
+    get:
+      operationId: listOffers
+      tags: [offers]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: candidateId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Offer letters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OfferLetter"
+
+  /candidates/{candidateId}/offer:
+    post:
+      operationId: createOffer
+      tags: [offers]
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOfferBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferLetter"
+
+  /offers/{id}:
+    get:
+      operationId: getOffer
+      tags: [offers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Offer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferLetter"
+    patch:
+      operationId: updateOffer
+      tags: [offers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOfferBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferLetter"
+
+  /offers/{id}/issue:
+    post:
+      operationId: issueOffer
+      tags: [offers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferLetter"
+
+  /offers/{id}/accept:
+    post:
+      operationId: acceptOffer
+      tags: [offers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Accepted (auto-creates pre-onboarding record)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptOfferResponse"
+
+  /offers/{id}/reject:
+    post:
+      operationId: rejectOffer
+      tags: [offers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: ["string", "null"]
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferLetter"
+
+  # ──────────────────────────────────────────────
+  # PRE-ONBOARDING
+  # ──────────────────────────────────────────────
+  /pre-onboarding:
+    get:
+      operationId: listPreOnboardingRecords
+      tags: [pre-onboarding]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreOnboardingRecord"
+
+  /pre-onboarding/{id}:
+    get:
+      operationId: getPreOnboardingRecord
+      tags: [pre-onboarding]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreOnboardingRecord"
+    patch:
+      operationId: updatePreOnboardingRecord
+      tags: [pre-onboarding]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expectedJoiningDate:
+                  type: ["string", "null"]
+                  format: date
+                status:
+                  type: ["string", "null"]
+                notes:
+                  type: ["string", "null"]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreOnboardingRecord"
+
+  /pre-onboarding/{id}/documents:
+    get:
+      operationId: listPreOnboardingDocuments
+      tags: [pre-onboarding]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Documents list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreOnboardingDocument"
+    post:
+      operationId: addPreOnboardingDocument
+      tags: [pre-onboarding]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreOnboardingDocument"
+
+  /pre-onboarding-documents/{docId}:
+    patch:
+      operationId: updatePreOnboardingDocument
+      tags: [pre-onboarding]
+      parameters:
+        - name: docId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileUrl:
+                  type: ["string", "null"]
+                documentName:
+                  type: ["string", "null"]
+                status:
+                  type: ["string", "null"]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreOnboardingDocument"
+
+  /pre-onboarding-documents/{docId}/verify:
+    post:
+      operationId: verifyPreOnboardingDocument
+      tags: [pre-onboarding]
+      parameters:
+        - name: docId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreOnboardingDocument"
+
+  /pre-onboarding-documents/{docId}/reject:
+    post:
+      operationId: rejectPreOnboardingDocument
+      tags: [pre-onboarding]
+      parameters:
+        - name: docId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreOnboardingDocument"
+
+  # ──────────────────────────────────────────────
   # AUDIT LOGS
   # ──────────────────────────────────────────────
   /audit-logs:
@@ -1072,6 +1822,625 @@ components:
         - level
         - createdAt
         - updatedAt
+
+    # ──────────────────────────────────────────────
+    # JOB REQUISITIONS
+    # ──────────────────────────────────────────────
+    JobRequisition:
+      type: object
+      properties:
+        id:
+          type: integer
+        requisitionCode:
+          type: string
+        title:
+          type: string
+        departmentId:
+          type: ["integer", "null"]
+        departmentName:
+          type: ["string", "null"]
+        designationId:
+          type: ["integer", "null"]
+        designationTitle:
+          type: ["string", "null"]
+        numberOfPositions:
+          type: integer
+        employmentType:
+          type: string
+        location:
+          type: ["string", "null"]
+        experienceMin:
+          type: ["integer", "null"]
+        experienceMax:
+          type: ["integer", "null"]
+        budgetMin:
+          type: ["string", "null"]
+        budgetMax:
+          type: ["string", "null"]
+        jobDescription:
+          type: ["string", "null"]
+        requiredSkills:
+          type: ["string", "null"]
+        status:
+          type: string
+        raisedById:
+          type: ["integer", "null"]
+        raisedByName:
+          type: ["string", "null"]
+        approverId:
+          type: ["integer", "null"]
+        approverName:
+          type: ["string", "null"]
+        approvalNotes:
+          type: ["string", "null"]
+        approvedAt:
+          type: ["string", "null"]
+          format: date-time
+        closedAt:
+          type: ["string", "null"]
+          format: date-time
+        candidateCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - requisitionCode
+        - title
+        - numberOfPositions
+        - employmentType
+        - status
+        - candidateCount
+        - createdAt
+        - updatedAt
+
+    CreateRequisitionBody:
+      type: object
+      required: [title, numberOfPositions]
+      properties:
+        title:
+          type: string
+        departmentId:
+          type: ["integer", "null"]
+        designationId:
+          type: ["integer", "null"]
+        numberOfPositions:
+          type: integer
+        employmentType:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        experienceMin:
+          type: ["integer", "null"]
+        experienceMax:
+          type: ["integer", "null"]
+        budgetMin:
+          type: ["string", "null"]
+        budgetMax:
+          type: ["string", "null"]
+        jobDescription:
+          type: ["string", "null"]
+        requiredSkills:
+          type: ["string", "null"]
+
+    UpdateRequisitionBody:
+      type: object
+      properties:
+        title:
+          type: ["string", "null"]
+        departmentId:
+          type: ["integer", "null"]
+        designationId:
+          type: ["integer", "null"]
+        numberOfPositions:
+          type: ["integer", "null"]
+        employmentType:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        experienceMin:
+          type: ["integer", "null"]
+        experienceMax:
+          type: ["integer", "null"]
+        budgetMin:
+          type: ["string", "null"]
+        budgetMax:
+          type: ["string", "null"]
+        jobDescription:
+          type: ["string", "null"]
+        requiredSkills:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+
+    # ──────────────────────────────────────────────
+    # CANDIDATES
+    # ──────────────────────────────────────────────
+    Candidate:
+      type: object
+      properties:
+        id:
+          type: integer
+        requisitionId:
+          type: ["integer", "null"]
+        requisitionTitle:
+          type: ["string", "null"]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        currentCompany:
+          type: ["string", "null"]
+        currentDesignation:
+          type: ["string", "null"]
+        totalExperience:
+          type: ["integer", "null"]
+        currentCtc:
+          type: ["string", "null"]
+        expectedCtc:
+          type: ["string", "null"]
+        noticePeriod:
+          type: ["string", "null"]
+        resumeUrl:
+          type: ["string", "null"]
+        source:
+          type: string
+        stage:
+          type: string
+        rejectionReason:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - source
+        - stage
+        - createdAt
+        - updatedAt
+
+    CreateCandidateBody:
+      type: object
+      required: [firstName, lastName, email]
+      properties:
+        requisitionId:
+          type: ["integer", "null"]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        currentCompany:
+          type: ["string", "null"]
+        currentDesignation:
+          type: ["string", "null"]
+        totalExperience:
+          type: ["integer", "null"]
+        currentCtc:
+          type: ["string", "null"]
+        expectedCtc:
+          type: ["string", "null"]
+        noticePeriod:
+          type: ["string", "null"]
+        resumeUrl:
+          type: ["string", "null"]
+        source:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    UpdateCandidateBody:
+      type: object
+      properties:
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        currentCompany:
+          type: ["string", "null"]
+        currentDesignation:
+          type: ["string", "null"]
+        totalExperience:
+          type: ["integer", "null"]
+        currentCtc:
+          type: ["string", "null"]
+        expectedCtc:
+          type: ["string", "null"]
+        noticePeriod:
+          type: ["string", "null"]
+        resumeUrl:
+          type: ["string", "null"]
+        source:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    # ──────────────────────────────────────────────
+    # INTERVIEWS
+    # ──────────────────────────────────────────────
+    InterviewRound:
+      type: object
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        roundNumber:
+          type: integer
+        roundName:
+          type: string
+        interviewerId:
+          type: ["integer", "null"]
+        interviewerName:
+          type: ["string", "null"]
+        scheduledAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        mode:
+          type: string
+        meetingLink:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - candidateId
+        - roundNumber
+        - roundName
+        - scheduledAt
+        - durationMinutes
+        - mode
+        - status
+        - createdAt
+        - updatedAt
+
+    ScheduleInterviewBody:
+      type: object
+      required: [roundName, scheduledAt]
+      properties:
+        roundNumber:
+          type: ["integer", "null"]
+        roundName:
+          type: string
+        interviewerId:
+          type: ["integer", "null"]
+        scheduledAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: ["integer", "null"]
+        mode:
+          type: ["string", "null"]
+        meetingLink:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+
+    UpdateInterviewBody:
+      type: object
+      properties:
+        roundName:
+          type: ["string", "null"]
+        interviewerId:
+          type: ["integer", "null"]
+        scheduledAt:
+          type: ["string", "null"]
+          format: date-time
+        durationMinutes:
+          type: ["integer", "null"]
+        mode:
+          type: ["string", "null"]
+        meetingLink:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+
+    InterviewFeedback:
+      type: object
+      properties:
+        id:
+          type: integer
+        interviewRoundId:
+          type: integer
+        interviewerId:
+          type: ["integer", "null"]
+        interviewerName:
+          type: ["string", "null"]
+        technicalScore:
+          type: ["integer", "null"]
+        communicationScore:
+          type: ["integer", "null"]
+        problemSolvingScore:
+          type: ["integer", "null"]
+        cultureFitScore:
+          type: ["integer", "null"]
+        overallScore:
+          type: ["integer", "null"]
+        strengths:
+          type: ["string", "null"]
+        weaknesses:
+          type: ["string", "null"]
+        comments:
+          type: ["string", "null"]
+        recommendation:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - interviewRoundId
+        - createdAt
+        - updatedAt
+
+    SubmitFeedbackBody:
+      type: object
+      properties:
+        technicalScore:
+          type: ["integer", "null"]
+        communicationScore:
+          type: ["integer", "null"]
+        problemSolvingScore:
+          type: ["integer", "null"]
+        cultureFitScore:
+          type: ["integer", "null"]
+        overallScore:
+          type: ["integer", "null"]
+        strengths:
+          type: ["string", "null"]
+        weaknesses:
+          type: ["string", "null"]
+        comments:
+          type: ["string", "null"]
+        recommendation:
+          type: ["string", "null"]
+
+    # ──────────────────────────────────────────────
+    # OFFER LETTERS
+    # ──────────────────────────────────────────────
+    OfferLetter:
+      type: object
+      properties:
+        id:
+          type: integer
+        offerCode:
+          type: string
+        candidateId:
+          type: integer
+        candidateName:
+          type: ["string", "null"]
+        candidateEmail:
+          type: ["string", "null"]
+        jobTitle:
+          type: string
+        ctc:
+          type: string
+        joiningDate:
+          type: string
+          format: date
+        expiryDate:
+          type: ["string", "null"]
+          format: date
+        letterContent:
+          type: ["string", "null"]
+        letterUrl:
+          type: ["string", "null"]
+        status:
+          type: string
+        issuedById:
+          type: ["integer", "null"]
+        issuedByName:
+          type: ["string", "null"]
+        issuedAt:
+          type: ["string", "null"]
+          format: date-time
+        respondedAt:
+          type: ["string", "null"]
+          format: date-time
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - offerCode
+        - candidateId
+        - jobTitle
+        - ctc
+        - joiningDate
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateOfferBody:
+      type: object
+      required: [jobTitle, ctc, joiningDate]
+      properties:
+        jobTitle:
+          type: string
+        ctc:
+          type: string
+        joiningDate:
+          type: string
+          format: date
+        expiryDate:
+          type: ["string", "null"]
+          format: date
+        letterContent:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    UpdateOfferBody:
+      type: object
+      properties:
+        jobTitle:
+          type: ["string", "null"]
+        ctc:
+          type: ["string", "null"]
+        joiningDate:
+          type: ["string", "null"]
+          format: date
+        expiryDate:
+          type: ["string", "null"]
+          format: date
+        letterContent:
+          type: ["string", "null"]
+        letterUrl:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    AcceptOfferResponse:
+      type: object
+      properties:
+        offer:
+          $ref: "#/components/schemas/OfferLetter"
+        preOnboardingRecord:
+          $ref: "#/components/schemas/PreOnboardingRecord"
+      required:
+        - offer
+        - preOnboardingRecord
+
+    # ──────────────────────────────────────────────
+    # PRE-ONBOARDING
+    # ──────────────────────────────────────────────
+    PreOnboardingRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        candidateName:
+          type: ["string", "null"]
+        candidateEmail:
+          type: ["string", "null"]
+        offerLetterId:
+          type: ["integer", "null"]
+        expectedJoiningDate:
+          type: string
+          format: date
+        status:
+          type: string
+        completionPercentage:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - candidateId
+        - expectedJoiningDate
+        - status
+        - completionPercentage
+        - createdAt
+        - updatedAt
+
+    PreOnboardingDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        recordId:
+          type: integer
+        documentType:
+          type: string
+        documentName:
+          type: string
+        fileUrl:
+          type: ["string", "null"]
+        status:
+          type: string
+        uploadedAt:
+          type: ["string", "null"]
+          format: date-time
+        verifiedById:
+          type: ["integer", "null"]
+        verifiedByName:
+          type: ["string", "null"]
+        verifiedAt:
+          type: ["string", "null"]
+          format: date-time
+        rejectionReason:
+          type: ["string", "null"]
+        isRequired:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - recordId
+        - documentType
+        - documentName
+        - status
+        - isRequired
+        - createdAt
+        - updatedAt
+
+    CreateDocumentBody:
+      type: object
+      required: [documentType, documentName]
+      properties:
+        documentType:
+          type: string
+        documentName:
+          type: string
+        fileUrl:
+          type: ["string", "null"]
+        isRequired:
+          type: ["integer", "null"]
 
     # ──────────────────────────────────────────────
     # AUDIT LOGS

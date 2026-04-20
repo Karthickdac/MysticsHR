@@ -261,6 +261,423 @@ export interface Role {
   updatedAt: string;
 }
 
+export interface JobRequisition {
+  id: number;
+  requisitionCode: string;
+  title: string;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  departmentName?: string | null;
+  /** @nullable */
+  designationId?: number | null;
+  /** @nullable */
+  designationTitle?: string | null;
+  numberOfPositions: number;
+  employmentType: string;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  experienceMin?: number | null;
+  /** @nullable */
+  experienceMax?: number | null;
+  /** @nullable */
+  budgetMin?: string | null;
+  /** @nullable */
+  budgetMax?: string | null;
+  /** @nullable */
+  jobDescription?: string | null;
+  /** @nullable */
+  requiredSkills?: string | null;
+  status: string;
+  /** @nullable */
+  raisedById?: number | null;
+  /** @nullable */
+  raisedByName?: string | null;
+  /** @nullable */
+  approverId?: number | null;
+  /** @nullable */
+  approverName?: string | null;
+  /** @nullable */
+  approvalNotes?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  closedAt?: string | null;
+  candidateCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRequisitionBody {
+  title: string;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  designationId?: number | null;
+  numberOfPositions: number;
+  /** @nullable */
+  employmentType?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  experienceMin?: number | null;
+  /** @nullable */
+  experienceMax?: number | null;
+  /** @nullable */
+  budgetMin?: string | null;
+  /** @nullable */
+  budgetMax?: string | null;
+  /** @nullable */
+  jobDescription?: string | null;
+  /** @nullable */
+  requiredSkills?: string | null;
+}
+
+export interface UpdateRequisitionBody {
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  designationId?: number | null;
+  /** @nullable */
+  numberOfPositions?: number | null;
+  /** @nullable */
+  employmentType?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  experienceMin?: number | null;
+  /** @nullable */
+  experienceMax?: number | null;
+  /** @nullable */
+  budgetMin?: string | null;
+  /** @nullable */
+  budgetMax?: string | null;
+  /** @nullable */
+  jobDescription?: string | null;
+  /** @nullable */
+  requiredSkills?: string | null;
+  /** @nullable */
+  status?: string | null;
+}
+
+export interface Candidate {
+  id: number;
+  /** @nullable */
+  requisitionId?: number | null;
+  /** @nullable */
+  requisitionTitle?: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  currentCompany?: string | null;
+  /** @nullable */
+  currentDesignation?: string | null;
+  /** @nullable */
+  totalExperience?: number | null;
+  /** @nullable */
+  currentCtc?: string | null;
+  /** @nullable */
+  expectedCtc?: string | null;
+  /** @nullable */
+  noticePeriod?: string | null;
+  /** @nullable */
+  resumeUrl?: string | null;
+  source: string;
+  stage: string;
+  /** @nullable */
+  rejectionReason?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCandidateBody {
+  /** @nullable */
+  requisitionId?: number | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  currentCompany?: string | null;
+  /** @nullable */
+  currentDesignation?: string | null;
+  /** @nullable */
+  totalExperience?: number | null;
+  /** @nullable */
+  currentCtc?: string | null;
+  /** @nullable */
+  expectedCtc?: string | null;
+  /** @nullable */
+  noticePeriod?: string | null;
+  /** @nullable */
+  resumeUrl?: string | null;
+  /** @nullable */
+  source?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface UpdateCandidateBody {
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  currentCompany?: string | null;
+  /** @nullable */
+  currentDesignation?: string | null;
+  /** @nullable */
+  totalExperience?: number | null;
+  /** @nullable */
+  currentCtc?: string | null;
+  /** @nullable */
+  expectedCtc?: string | null;
+  /** @nullable */
+  noticePeriod?: string | null;
+  /** @nullable */
+  resumeUrl?: string | null;
+  /** @nullable */
+  source?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface InterviewRound {
+  id: number;
+  candidateId: number;
+  roundNumber: number;
+  roundName: string;
+  /** @nullable */
+  interviewerId?: number | null;
+  /** @nullable */
+  interviewerName?: string | null;
+  scheduledAt: string;
+  durationMinutes: number;
+  mode: string;
+  /** @nullable */
+  meetingLink?: string | null;
+  /** @nullable */
+  location?: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScheduleInterviewBody {
+  /** @nullable */
+  roundNumber?: number | null;
+  roundName: string;
+  /** @nullable */
+  interviewerId?: number | null;
+  scheduledAt: string;
+  /** @nullable */
+  durationMinutes?: number | null;
+  /** @nullable */
+  mode?: string | null;
+  /** @nullable */
+  meetingLink?: string | null;
+  /** @nullable */
+  location?: string | null;
+}
+
+export interface UpdateInterviewBody {
+  /** @nullable */
+  roundName?: string | null;
+  /** @nullable */
+  interviewerId?: number | null;
+  /** @nullable */
+  scheduledAt?: string | null;
+  /** @nullable */
+  durationMinutes?: number | null;
+  /** @nullable */
+  mode?: string | null;
+  /** @nullable */
+  meetingLink?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  status?: string | null;
+}
+
+export interface InterviewFeedback {
+  id: number;
+  interviewRoundId: number;
+  /** @nullable */
+  interviewerId?: number | null;
+  /** @nullable */
+  interviewerName?: string | null;
+  /** @nullable */
+  technicalScore?: number | null;
+  /** @nullable */
+  communicationScore?: number | null;
+  /** @nullable */
+  problemSolvingScore?: number | null;
+  /** @nullable */
+  cultureFitScore?: number | null;
+  /** @nullable */
+  overallScore?: number | null;
+  /** @nullable */
+  strengths?: string | null;
+  /** @nullable */
+  weaknesses?: string | null;
+  /** @nullable */
+  comments?: string | null;
+  /** @nullable */
+  recommendation?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitFeedbackBody {
+  /** @nullable */
+  technicalScore?: number | null;
+  /** @nullable */
+  communicationScore?: number | null;
+  /** @nullable */
+  problemSolvingScore?: number | null;
+  /** @nullable */
+  cultureFitScore?: number | null;
+  /** @nullable */
+  overallScore?: number | null;
+  /** @nullable */
+  strengths?: string | null;
+  /** @nullable */
+  weaknesses?: string | null;
+  /** @nullable */
+  comments?: string | null;
+  /** @nullable */
+  recommendation?: string | null;
+}
+
+export interface OfferLetter {
+  id: number;
+  offerCode: string;
+  candidateId: number;
+  /** @nullable */
+  candidateName?: string | null;
+  /** @nullable */
+  candidateEmail?: string | null;
+  jobTitle: string;
+  ctc: string;
+  joiningDate: string;
+  /** @nullable */
+  expiryDate?: string | null;
+  /** @nullable */
+  letterContent?: string | null;
+  /** @nullable */
+  letterUrl?: string | null;
+  status: string;
+  /** @nullable */
+  issuedById?: number | null;
+  /** @nullable */
+  issuedByName?: string | null;
+  /** @nullable */
+  issuedAt?: string | null;
+  /** @nullable */
+  respondedAt?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOfferBody {
+  jobTitle: string;
+  ctc: string;
+  joiningDate: string;
+  /** @nullable */
+  expiryDate?: string | null;
+  /** @nullable */
+  letterContent?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface UpdateOfferBody {
+  /** @nullable */
+  jobTitle?: string | null;
+  /** @nullable */
+  ctc?: string | null;
+  /** @nullable */
+  joiningDate?: string | null;
+  /** @nullable */
+  expiryDate?: string | null;
+  /** @nullable */
+  letterContent?: string | null;
+  /** @nullable */
+  letterUrl?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface PreOnboardingRecord {
+  id: number;
+  candidateId: number;
+  /** @nullable */
+  candidateName?: string | null;
+  /** @nullable */
+  candidateEmail?: string | null;
+  /** @nullable */
+  offerLetterId?: number | null;
+  expectedJoiningDate: string;
+  status: string;
+  completionPercentage: number;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AcceptOfferResponse {
+  offer: OfferLetter;
+  preOnboardingRecord: PreOnboardingRecord;
+}
+
+export interface PreOnboardingDocument {
+  id: number;
+  recordId: number;
+  documentType: string;
+  documentName: string;
+  /** @nullable */
+  fileUrl?: string | null;
+  status: string;
+  /** @nullable */
+  uploadedAt?: string | null;
+  /** @nullable */
+  verifiedById?: number | null;
+  /** @nullable */
+  verifiedByName?: string | null;
+  /** @nullable */
+  verifiedAt?: string | null;
+  /** @nullable */
+  rejectionReason?: string | null;
+  isRequired: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDocumentBody {
+  documentType: string;
+  documentName: string;
+  /** @nullable */
+  fileUrl?: string | null;
+  /** @nullable */
+  isRequired?: number | null;
+}
+
 export interface AuditLog {
   id: number;
   /** @nullable */
@@ -315,6 +732,88 @@ export type ListEmployeesParams = {
   search?: string | null;
   limit?: number;
   offset?: number;
+};
+
+export type ListRequisitionsParams = {
+  /**
+   * @nullable
+   */
+  status?: string | null;
+  /**
+   * @nullable
+   */
+  departmentId?: number | null;
+};
+
+export type ApproveRequisitionBody = {
+  /** @nullable */
+  notes?: string | null;
+};
+
+export type RejectRequisitionBody = {
+  notes: string;
+};
+
+export type ListCandidatesParams = {
+  /**
+   * @nullable
+   */
+  requisitionId?: number | null;
+  /**
+   * @nullable
+   */
+  stage?: string | null;
+};
+
+export type MoveCandidateStageBody = {
+  stage: string;
+  /** @nullable */
+  rejectionReason?: string | null;
+};
+
+export type ListOffersParams = {
+  /**
+   * @nullable
+   */
+  status?: string | null;
+  /**
+   * @nullable
+   */
+  candidateId?: number | null;
+};
+
+export type RejectOfferBody = {
+  /** @nullable */
+  notes?: string | null;
+};
+
+export type ListPreOnboardingRecordsParams = {
+  /**
+   * @nullable
+   */
+  status?: string | null;
+};
+
+export type UpdatePreOnboardingRecordBody = {
+  /** @nullable */
+  expectedJoiningDate?: string | null;
+  /** @nullable */
+  status?: string | null;
+  /** @nullable */
+  notes?: string | null;
+};
+
+export type UpdatePreOnboardingDocumentBody = {
+  /** @nullable */
+  fileUrl?: string | null;
+  /** @nullable */
+  documentName?: string | null;
+  /** @nullable */
+  status?: string | null;
+};
+
+export type RejectPreOnboardingDocumentBody = {
+  reason: string;
 };
 
 export type ListAuditLogsParams = {

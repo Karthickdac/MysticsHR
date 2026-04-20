@@ -8,6 +8,8 @@ import employeesRouter from "./employees";
 import rolesRouter from "./roles";
 import usersRouter from "./users";
 import auditLogsRouter from "./audit-logs";
+import recruitmentRouter from "./recruitment";
+import preOnboardingRouter from "./pre-onboarding";
 
 const router: IRouter = Router();
 
@@ -19,6 +21,8 @@ router.use(designationsRouter);
 router.use(employeesRouter);
 router.use(rolesRouter);
 router.use(usersRouter);
+router.use(recruitmentRouter);
+router.use(preOnboardingRouter);
 router.use(auditLogsRouter);
 
 export default router;

@@ -84,6 +84,20 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `/users` — User account management (Super Admin)
 - `/audit-logs` — Audit log viewer with table + filter
 - `/settings` — Settings placeholder
+- `/recruitment` — Job requisitions list + Candidate pipeline (Kanban)
+- `/recruitment/requisitions/:id` — Requisition detail + linked candidates
+- `/recruitment/candidates/:id` — Candidate profile + interviews + offers
+- `/pre-onboarding` — Pre-onboarding records list
+- `/pre-onboarding/:id` — Document review (verify/reject) with auto completion %
+
+## Recruitment & Pre-Onboarding (Task #2)
+
+- 7 DB tables: `job_requisitions`, `candidates`, `interview_rounds`, `interview_feedback`, `offer_letters`, `pre_onboarding_records`, `pre_onboarding_documents`
+- Backend routes: `routes/recruitment.ts` and `routes/pre-onboarding.ts`. RBAC via `requireRole(...)` on all writes; reads gated by `requireHrmsUser`
+- Offer acceptance auto-creates a `pre_onboarding_record` and seeds 9 default documents (Aadhaar, PAN, Bank, Photo, Educational, Experience, Relieving, Salary Slip, Address Proof)
+- Document verify/reject auto-recomputes `completion_percentage` based on required documents verified
+- Candidate stage auto-syncs when interviews are scheduled/completed and when offers are issued/accepted
+- Source-of-hire enum values: LinkedIn, Naukri, Indeed, Referral, Walk-In, Campus, Agency, Company Website, Other
 
 ## Key Commands
 

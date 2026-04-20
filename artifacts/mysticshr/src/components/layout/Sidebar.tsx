@@ -5,6 +5,8 @@ import {
   Users, 
   Building2, 
   Briefcase, 
+  UserPlus,
+  ClipboardCheck,
   ShieldCheck, 
   FileText, 
   Settings,
@@ -26,6 +28,8 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
+    { name: "Recruitment", href: "/recruitment", icon: UserPlus, roles: ["super_admin", "hr_manager", "hr_executive", "hod"] },
+    { name: "Pre-Onboarding", href: "/pre-onboarding", icon: ClipboardCheck, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Departments", href: "/departments", icon: Building2, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Designations", href: "/designations", icon: Briefcase, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Users", href: "/users", icon: ShieldCheck, roles: ["super_admin", "hr_manager"] },

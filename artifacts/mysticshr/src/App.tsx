@@ -13,6 +13,11 @@ import DepartmentsPage from "@/pages/departments";
 import DesignationsPage from "@/pages/designations";
 import UsersPage from "@/pages/users";
 import AuditLogsPage from "@/pages/audit-logs";
+import RecruitmentPage from "@/pages/recruitment/index";
+import RequisitionDetailPage from "@/pages/recruitment/requisition-detail";
+import CandidateDetailPage from "@/pages/recruitment/candidate-detail";
+import PreOnboardingPage from "@/pages/pre-onboarding/index";
+import PreOnboardingDetailPage from "@/pages/pre-onboarding/detail";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -270,6 +275,43 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager"]}>
                 <UsersPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/recruitment/requisitions/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <RequisitionDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/recruitment/candidates/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <CandidateDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/recruitment">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <RecruitmentPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/pre-onboarding/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <PreOnboardingDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/pre-onboarding">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <PreOnboardingPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

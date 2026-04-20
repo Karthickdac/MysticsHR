@@ -546,6 +546,866 @@ export const GetRoleResponse = zod.object({
 });
 
 /**
+ * @summary List job requisitions
+ */
+export const ListRequisitionsQueryParams = zod.object({
+  status: zod.coerce.string().nullish(),
+  departmentId: zod.coerce.number().nullish(),
+});
+
+export const ListRequisitionsResponseItem = zod.object({
+  id: zod.number(),
+  requisitionCode: zod.string(),
+  title: zod.string(),
+  departmentId: zod.number().nullish(),
+  departmentName: zod.string().nullish(),
+  designationId: zod.number().nullish(),
+  designationTitle: zod.string().nullish(),
+  numberOfPositions: zod.number(),
+  employmentType: zod.string(),
+  location: zod.string().nullish(),
+  experienceMin: zod.number().nullish(),
+  experienceMax: zod.number().nullish(),
+  budgetMin: zod.string().nullish(),
+  budgetMax: zod.string().nullish(),
+  jobDescription: zod.string().nullish(),
+  requiredSkills: zod.string().nullish(),
+  status: zod.string(),
+  raisedById: zod.number().nullish(),
+  raisedByName: zod.string().nullish(),
+  approverId: zod.number().nullish(),
+  approverName: zod.string().nullish(),
+  approvalNotes: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  closedAt: zod.coerce.date().nullish(),
+  candidateCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListRequisitionsResponse = zod.array(ListRequisitionsResponseItem);
+
+/**
+ * @summary Create a new job requisition
+ */
+export const CreateRequisitionBody = zod.object({
+  title: zod.string(),
+  departmentId: zod.number().nullish(),
+  designationId: zod.number().nullish(),
+  numberOfPositions: zod.number(),
+  employmentType: zod.string().nullish(),
+  location: zod.string().nullish(),
+  experienceMin: zod.number().nullish(),
+  experienceMax: zod.number().nullish(),
+  budgetMin: zod.string().nullish(),
+  budgetMax: zod.string().nullish(),
+  jobDescription: zod.string().nullish(),
+  requiredSkills: zod.string().nullish(),
+});
+
+export const GetRequisitionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetRequisitionResponse = zod.object({
+  id: zod.number(),
+  requisitionCode: zod.string(),
+  title: zod.string(),
+  departmentId: zod.number().nullish(),
+  departmentName: zod.string().nullish(),
+  designationId: zod.number().nullish(),
+  designationTitle: zod.string().nullish(),
+  numberOfPositions: zod.number(),
+  employmentType: zod.string(),
+  location: zod.string().nullish(),
+  experienceMin: zod.number().nullish(),
+  experienceMax: zod.number().nullish(),
+  budgetMin: zod.string().nullish(),
+  budgetMax: zod.string().nullish(),
+  jobDescription: zod.string().nullish(),
+  requiredSkills: zod.string().nullish(),
+  status: zod.string(),
+  raisedById: zod.number().nullish(),
+  raisedByName: zod.string().nullish(),
+  approverId: zod.number().nullish(),
+  approverName: zod.string().nullish(),
+  approvalNotes: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  closedAt: zod.coerce.date().nullish(),
+  candidateCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const UpdateRequisitionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateRequisitionBody = zod.object({
+  title: zod.string().nullish(),
+  departmentId: zod.number().nullish(),
+  designationId: zod.number().nullish(),
+  numberOfPositions: zod.number().nullish(),
+  employmentType: zod.string().nullish(),
+  location: zod.string().nullish(),
+  experienceMin: zod.number().nullish(),
+  experienceMax: zod.number().nullish(),
+  budgetMin: zod.string().nullish(),
+  budgetMax: zod.string().nullish(),
+  jobDescription: zod.string().nullish(),
+  requiredSkills: zod.string().nullish(),
+  status: zod.string().nullish(),
+});
+
+export const UpdateRequisitionResponse = zod.object({
+  id: zod.number(),
+  requisitionCode: zod.string(),
+  title: zod.string(),
+  departmentId: zod.number().nullish(),
+  departmentName: zod.string().nullish(),
+  designationId: zod.number().nullish(),
+  designationTitle: zod.string().nullish(),
+  numberOfPositions: zod.number(),
+  employmentType: zod.string(),
+  location: zod.string().nullish(),
+  experienceMin: zod.number().nullish(),
+  experienceMax: zod.number().nullish(),
+  budgetMin: zod.string().nullish(),
+  budgetMax: zod.string().nullish(),
+  jobDescription: zod.string().nullish(),
+  requiredSkills: zod.string().nullish(),
+  status: zod.string(),
+  raisedById: zod.number().nullish(),
+  raisedByName: zod.string().nullish(),
+  approverId: zod.number().nullish(),
+  approverName: zod.string().nullish(),
+  approvalNotes: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  closedAt: zod.coerce.date().nullish(),
+  candidateCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeleteRequisitionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveRequisitionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveRequisitionBody = zod.object({
+  notes: zod.string().nullish(),
+});
+
+export const ApproveRequisitionResponse = zod.object({
+  id: zod.number(),
+  requisitionCode: zod.string(),
+  title: zod.string(),
+  departmentId: zod.number().nullish(),
+  departmentName: zod.string().nullish(),
+  designationId: zod.number().nullish(),
+  designationTitle: zod.string().nullish(),
+  numberOfPositions: zod.number(),
+  employmentType: zod.string(),
+  location: zod.string().nullish(),
+  experienceMin: zod.number().nullish(),
+  experienceMax: zod.number().nullish(),
+  budgetMin: zod.string().nullish(),
+  budgetMax: zod.string().nullish(),
+  jobDescription: zod.string().nullish(),
+  requiredSkills: zod.string().nullish(),
+  status: zod.string(),
+  raisedById: zod.number().nullish(),
+  raisedByName: zod.string().nullish(),
+  approverId: zod.number().nullish(),
+  approverName: zod.string().nullish(),
+  approvalNotes: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  closedAt: zod.coerce.date().nullish(),
+  candidateCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const RejectRequisitionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RejectRequisitionBody = zod.object({
+  notes: zod.string(),
+});
+
+export const RejectRequisitionResponse = zod.object({
+  id: zod.number(),
+  requisitionCode: zod.string(),
+  title: zod.string(),
+  departmentId: zod.number().nullish(),
+  departmentName: zod.string().nullish(),
+  designationId: zod.number().nullish(),
+  designationTitle: zod.string().nullish(),
+  numberOfPositions: zod.number(),
+  employmentType: zod.string(),
+  location: zod.string().nullish(),
+  experienceMin: zod.number().nullish(),
+  experienceMax: zod.number().nullish(),
+  budgetMin: zod.string().nullish(),
+  budgetMax: zod.string().nullish(),
+  jobDescription: zod.string().nullish(),
+  requiredSkills: zod.string().nullish(),
+  status: zod.string(),
+  raisedById: zod.number().nullish(),
+  raisedByName: zod.string().nullish(),
+  approverId: zod.number().nullish(),
+  approverName: zod.string().nullish(),
+  approvalNotes: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  closedAt: zod.coerce.date().nullish(),
+  candidateCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const ListCandidatesQueryParams = zod.object({
+  requisitionId: zod.coerce.number().nullish(),
+  stage: zod.coerce.string().nullish(),
+});
+
+export const ListCandidatesResponseItem = zod.object({
+  id: zod.number(),
+  requisitionId: zod.number().nullish(),
+  requisitionTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  currentCompany: zod.string().nullish(),
+  currentDesignation: zod.string().nullish(),
+  totalExperience: zod.number().nullish(),
+  currentCtc: zod.string().nullish(),
+  expectedCtc: zod.string().nullish(),
+  noticePeriod: zod.string().nullish(),
+  resumeUrl: zod.string().nullish(),
+  source: zod.string(),
+  stage: zod.string(),
+  rejectionReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListCandidatesResponse = zod.array(ListCandidatesResponseItem);
+
+export const CreateCandidateBody = zod.object({
+  requisitionId: zod.number().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  currentCompany: zod.string().nullish(),
+  currentDesignation: zod.string().nullish(),
+  totalExperience: zod.number().nullish(),
+  currentCtc: zod.string().nullish(),
+  expectedCtc: zod.string().nullish(),
+  noticePeriod: zod.string().nullish(),
+  resumeUrl: zod.string().nullish(),
+  source: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const GetCandidateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCandidateResponse = zod.object({
+  id: zod.number(),
+  requisitionId: zod.number().nullish(),
+  requisitionTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  currentCompany: zod.string().nullish(),
+  currentDesignation: zod.string().nullish(),
+  totalExperience: zod.number().nullish(),
+  currentCtc: zod.string().nullish(),
+  expectedCtc: zod.string().nullish(),
+  noticePeriod: zod.string().nullish(),
+  resumeUrl: zod.string().nullish(),
+  source: zod.string(),
+  stage: zod.string(),
+  rejectionReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const UpdateCandidateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCandidateBody = zod.object({
+  firstName: zod.string().nullish(),
+  lastName: zod.string().nullish(),
+  email: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  currentCompany: zod.string().nullish(),
+  currentDesignation: zod.string().nullish(),
+  totalExperience: zod.number().nullish(),
+  currentCtc: zod.string().nullish(),
+  expectedCtc: zod.string().nullish(),
+  noticePeriod: zod.string().nullish(),
+  resumeUrl: zod.string().nullish(),
+  source: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const UpdateCandidateResponse = zod.object({
+  id: zod.number(),
+  requisitionId: zod.number().nullish(),
+  requisitionTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  currentCompany: zod.string().nullish(),
+  currentDesignation: zod.string().nullish(),
+  totalExperience: zod.number().nullish(),
+  currentCtc: zod.string().nullish(),
+  expectedCtc: zod.string().nullish(),
+  noticePeriod: zod.string().nullish(),
+  resumeUrl: zod.string().nullish(),
+  source: zod.string(),
+  stage: zod.string(),
+  rejectionReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeleteCandidateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MoveCandidateStageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MoveCandidateStageBody = zod.object({
+  stage: zod.string(),
+  rejectionReason: zod.string().nullish(),
+});
+
+export const MoveCandidateStageResponse = zod.object({
+  id: zod.number(),
+  requisitionId: zod.number().nullish(),
+  requisitionTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  currentCompany: zod.string().nullish(),
+  currentDesignation: zod.string().nullish(),
+  totalExperience: zod.number().nullish(),
+  currentCtc: zod.string().nullish(),
+  expectedCtc: zod.string().nullish(),
+  noticePeriod: zod.string().nullish(),
+  resumeUrl: zod.string().nullish(),
+  source: zod.string(),
+  stage: zod.string(),
+  rejectionReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const ListCandidateInterviewsParams = zod.object({
+  candidateId: zod.coerce.number(),
+});
+
+export const ListCandidateInterviewsResponseItem = zod.object({
+  id: zod.number(),
+  candidateId: zod.number(),
+  roundNumber: zod.number(),
+  roundName: zod.string(),
+  interviewerId: zod.number().nullish(),
+  interviewerName: zod.string().nullish(),
+  scheduledAt: zod.coerce.date(),
+  durationMinutes: zod.number(),
+  mode: zod.string(),
+  meetingLink: zod.string().nullish(),
+  location: zod.string().nullish(),
+  status: zod.string(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListCandidateInterviewsResponse = zod.array(
+  ListCandidateInterviewsResponseItem,
+);
+
+export const ScheduleInterviewParams = zod.object({
+  candidateId: zod.coerce.number(),
+});
+
+export const ScheduleInterviewBody = zod.object({
+  roundNumber: zod.number().nullish(),
+  roundName: zod.string(),
+  interviewerId: zod.number().nullish(),
+  scheduledAt: zod.coerce.date(),
+  durationMinutes: zod.number().nullish(),
+  mode: zod.string().nullish(),
+  meetingLink: zod.string().nullish(),
+  location: zod.string().nullish(),
+});
+
+export const UpdateInterviewParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateInterviewBody = zod.object({
+  roundName: zod.string().nullish(),
+  interviewerId: zod.number().nullish(),
+  scheduledAt: zod.coerce.date().nullish(),
+  durationMinutes: zod.number().nullish(),
+  mode: zod.string().nullish(),
+  meetingLink: zod.string().nullish(),
+  location: zod.string().nullish(),
+  status: zod.string().nullish(),
+});
+
+export const UpdateInterviewResponse = zod.object({
+  id: zod.number(),
+  candidateId: zod.number(),
+  roundNumber: zod.number(),
+  roundName: zod.string(),
+  interviewerId: zod.number().nullish(),
+  interviewerName: zod.string().nullish(),
+  scheduledAt: zod.coerce.date(),
+  durationMinutes: zod.number(),
+  mode: zod.string(),
+  meetingLink: zod.string().nullish(),
+  location: zod.string().nullish(),
+  status: zod.string(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeleteInterviewParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetInterviewFeedbackParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetInterviewFeedbackResponseItem = zod.object({
+  id: zod.number(),
+  interviewRoundId: zod.number(),
+  interviewerId: zod.number().nullish(),
+  interviewerName: zod.string().nullish(),
+  technicalScore: zod.number().nullish(),
+  communicationScore: zod.number().nullish(),
+  problemSolvingScore: zod.number().nullish(),
+  cultureFitScore: zod.number().nullish(),
+  overallScore: zod.number().nullish(),
+  strengths: zod.string().nullish(),
+  weaknesses: zod.string().nullish(),
+  comments: zod.string().nullish(),
+  recommendation: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetInterviewFeedbackResponse = zod.array(
+  GetInterviewFeedbackResponseItem,
+);
+
+export const SubmitInterviewFeedbackParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SubmitInterviewFeedbackBody = zod.object({
+  technicalScore: zod.number().nullish(),
+  communicationScore: zod.number().nullish(),
+  problemSolvingScore: zod.number().nullish(),
+  cultureFitScore: zod.number().nullish(),
+  overallScore: zod.number().nullish(),
+  strengths: zod.string().nullish(),
+  weaknesses: zod.string().nullish(),
+  comments: zod.string().nullish(),
+  recommendation: zod.string().nullish(),
+});
+
+export const ListOffersQueryParams = zod.object({
+  status: zod.coerce.string().nullish(),
+  candidateId: zod.coerce.number().nullish(),
+});
+
+export const ListOffersResponseItem = zod.object({
+  id: zod.number(),
+  offerCode: zod.string(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  jobTitle: zod.string(),
+  ctc: zod.string(),
+  joiningDate: zod.coerce.date(),
+  expiryDate: zod.coerce.date().nullish(),
+  letterContent: zod.string().nullish(),
+  letterUrl: zod.string().nullish(),
+  status: zod.string(),
+  issuedById: zod.number().nullish(),
+  issuedByName: zod.string().nullish(),
+  issuedAt: zod.coerce.date().nullish(),
+  respondedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListOffersResponse = zod.array(ListOffersResponseItem);
+
+export const CreateOfferParams = zod.object({
+  candidateId: zod.coerce.number(),
+});
+
+export const CreateOfferBody = zod.object({
+  jobTitle: zod.string(),
+  ctc: zod.string(),
+  joiningDate: zod.coerce.date(),
+  expiryDate: zod.coerce.date().nullish(),
+  letterContent: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const GetOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOfferResponse = zod.object({
+  id: zod.number(),
+  offerCode: zod.string(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  jobTitle: zod.string(),
+  ctc: zod.string(),
+  joiningDate: zod.coerce.date(),
+  expiryDate: zod.coerce.date().nullish(),
+  letterContent: zod.string().nullish(),
+  letterUrl: zod.string().nullish(),
+  status: zod.string(),
+  issuedById: zod.number().nullish(),
+  issuedByName: zod.string().nullish(),
+  issuedAt: zod.coerce.date().nullish(),
+  respondedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const UpdateOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateOfferBody = zod.object({
+  jobTitle: zod.string().nullish(),
+  ctc: zod.string().nullish(),
+  joiningDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+  letterContent: zod.string().nullish(),
+  letterUrl: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const UpdateOfferResponse = zod.object({
+  id: zod.number(),
+  offerCode: zod.string(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  jobTitle: zod.string(),
+  ctc: zod.string(),
+  joiningDate: zod.coerce.date(),
+  expiryDate: zod.coerce.date().nullish(),
+  letterContent: zod.string().nullish(),
+  letterUrl: zod.string().nullish(),
+  status: zod.string(),
+  issuedById: zod.number().nullish(),
+  issuedByName: zod.string().nullish(),
+  issuedAt: zod.coerce.date().nullish(),
+  respondedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const IssueOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const IssueOfferResponse = zod.object({
+  id: zod.number(),
+  offerCode: zod.string(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  jobTitle: zod.string(),
+  ctc: zod.string(),
+  joiningDate: zod.coerce.date(),
+  expiryDate: zod.coerce.date().nullish(),
+  letterContent: zod.string().nullish(),
+  letterUrl: zod.string().nullish(),
+  status: zod.string(),
+  issuedById: zod.number().nullish(),
+  issuedByName: zod.string().nullish(),
+  issuedAt: zod.coerce.date().nullish(),
+  respondedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const AcceptOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AcceptOfferResponse = zod.object({
+  offer: zod.object({
+    id: zod.number(),
+    offerCode: zod.string(),
+    candidateId: zod.number(),
+    candidateName: zod.string().nullish(),
+    candidateEmail: zod.string().nullish(),
+    jobTitle: zod.string(),
+    ctc: zod.string(),
+    joiningDate: zod.coerce.date(),
+    expiryDate: zod.coerce.date().nullish(),
+    letterContent: zod.string().nullish(),
+    letterUrl: zod.string().nullish(),
+    status: zod.string(),
+    issuedById: zod.number().nullish(),
+    issuedByName: zod.string().nullish(),
+    issuedAt: zod.coerce.date().nullish(),
+    respondedAt: zod.coerce.date().nullish(),
+    notes: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  preOnboardingRecord: zod.object({
+    id: zod.number(),
+    candidateId: zod.number(),
+    candidateName: zod.string().nullish(),
+    candidateEmail: zod.string().nullish(),
+    offerLetterId: zod.number().nullish(),
+    expectedJoiningDate: zod.coerce.date(),
+    status: zod.string(),
+    completionPercentage: zod.number(),
+    notes: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+export const RejectOfferParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RejectOfferBody = zod.object({
+  notes: zod.string().nullish(),
+});
+
+export const RejectOfferResponse = zod.object({
+  id: zod.number(),
+  offerCode: zod.string(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  jobTitle: zod.string(),
+  ctc: zod.string(),
+  joiningDate: zod.coerce.date(),
+  expiryDate: zod.coerce.date().nullish(),
+  letterContent: zod.string().nullish(),
+  letterUrl: zod.string().nullish(),
+  status: zod.string(),
+  issuedById: zod.number().nullish(),
+  issuedByName: zod.string().nullish(),
+  issuedAt: zod.coerce.date().nullish(),
+  respondedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const ListPreOnboardingRecordsQueryParams = zod.object({
+  status: zod.coerce.string().nullish(),
+});
+
+export const ListPreOnboardingRecordsResponseItem = zod.object({
+  id: zod.number(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  offerLetterId: zod.number().nullish(),
+  expectedJoiningDate: zod.coerce.date(),
+  status: zod.string(),
+  completionPercentage: zod.number(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListPreOnboardingRecordsResponse = zod.array(
+  ListPreOnboardingRecordsResponseItem,
+);
+
+export const GetPreOnboardingRecordParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPreOnboardingRecordResponse = zod.object({
+  id: zod.number(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  offerLetterId: zod.number().nullish(),
+  expectedJoiningDate: zod.coerce.date(),
+  status: zod.string(),
+  completionPercentage: zod.number(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const UpdatePreOnboardingRecordParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdatePreOnboardingRecordBody = zod.object({
+  expectedJoiningDate: zod.coerce.date().nullish(),
+  status: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const UpdatePreOnboardingRecordResponse = zod.object({
+  id: zod.number(),
+  candidateId: zod.number(),
+  candidateName: zod.string().nullish(),
+  candidateEmail: zod.string().nullish(),
+  offerLetterId: zod.number().nullish(),
+  expectedJoiningDate: zod.coerce.date(),
+  status: zod.string(),
+  completionPercentage: zod.number(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const ListPreOnboardingDocumentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListPreOnboardingDocumentsResponseItem = zod.object({
+  id: zod.number(),
+  recordId: zod.number(),
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  status: zod.string(),
+  uploadedAt: zod.coerce.date().nullish(),
+  verifiedById: zod.number().nullish(),
+  verifiedByName: zod.string().nullish(),
+  verifiedAt: zod.coerce.date().nullish(),
+  rejectionReason: zod.string().nullish(),
+  isRequired: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListPreOnboardingDocumentsResponse = zod.array(
+  ListPreOnboardingDocumentsResponseItem,
+);
+
+export const AddPreOnboardingDocumentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddPreOnboardingDocumentBody = zod.object({
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  isRequired: zod.number().nullish(),
+});
+
+export const UpdatePreOnboardingDocumentParams = zod.object({
+  docId: zod.coerce.number(),
+});
+
+export const UpdatePreOnboardingDocumentBody = zod.object({
+  fileUrl: zod.string().nullish(),
+  documentName: zod.string().nullish(),
+  status: zod.string().nullish(),
+});
+
+export const UpdatePreOnboardingDocumentResponse = zod.object({
+  id: zod.number(),
+  recordId: zod.number(),
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  status: zod.string(),
+  uploadedAt: zod.coerce.date().nullish(),
+  verifiedById: zod.number().nullish(),
+  verifiedByName: zod.string().nullish(),
+  verifiedAt: zod.coerce.date().nullish(),
+  rejectionReason: zod.string().nullish(),
+  isRequired: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const VerifyPreOnboardingDocumentParams = zod.object({
+  docId: zod.coerce.number(),
+});
+
+export const VerifyPreOnboardingDocumentResponse = zod.object({
+  id: zod.number(),
+  recordId: zod.number(),
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  status: zod.string(),
+  uploadedAt: zod.coerce.date().nullish(),
+  verifiedById: zod.number().nullish(),
+  verifiedByName: zod.string().nullish(),
+  verifiedAt: zod.coerce.date().nullish(),
+  rejectionReason: zod.string().nullish(),
+  isRequired: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const RejectPreOnboardingDocumentParams = zod.object({
+  docId: zod.coerce.number(),
+});
+
+export const RejectPreOnboardingDocumentBody = zod.object({
+  reason: zod.string(),
+});
+
+export const RejectPreOnboardingDocumentResponse = zod.object({
+  id: zod.number(),
+  recordId: zod.number(),
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  status: zod.string(),
+  uploadedAt: zod.coerce.date().nullish(),
+  verifiedById: zod.number().nullish(),
+  verifiedByName: zod.string().nullish(),
+  verifiedAt: zod.coerce.date().nullish(),
+  rejectionReason: zod.string().nullish(),
+  isRequired: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List audit log entries
  */
 export const listAuditLogsQueryLimitDefault = 50;
