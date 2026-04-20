@@ -195,6 +195,20 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
     // Compute notice period using contractual terms: employment-type defaults, then tenure-based fallback
     const noticePeriodDays = computeNoticePeriodDays(emp.dateOfJoining, emp.employmentType, null);
 
+    // Enforce minimum LWD = today + noticePeriodDays (HR Manager / Super Admin may override)
+    const canOverrideNotice = u.role === "hr_manager" || u.role === "super_admin";
+    if (noticePeriodDays > 0 && !canOverrideNotice) {
+      const minLwd = new Date();
+      minLwd.setDate(minLwd.getDate() + noticePeriodDays);
+      const minLwdStr = minLwd.toISOString().slice(0, 10);
+      if (requestedLwd < minLwdStr) {
+        res.status(400).json({
+          error: `Last working date must be at least ${noticePeriodDays} day(s) from today (minimum: ${minLwdStr})`,
+        });
+        return;
+      }
+    }
+
     const [exitReq] = await db.insert(exitRequestsTable).values({
       employeeId: empId,
       exitType,

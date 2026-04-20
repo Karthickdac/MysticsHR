@@ -22,7 +22,7 @@ import {
   permissionApplicationsTable,
   permissionRegistersTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, sql, desc, count, or } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, count, or, type SQL } from "drizzle-orm";
 
 const router = Router();
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
@@ -151,11 +151,11 @@ router.get("/reports/employee-directory", requireHrmsUser, requireRole(...MANAGE
   try {
     const { departmentId, designationId, employmentType, status, location } = req.query as Record<string, string>;
 
-    const conds: any[] = [];
+    const conds: SQL<unknown>[] = [];
     if (departmentId) conds.push(eq(employeesTable.departmentId, Number(departmentId)));
     if (designationId) conds.push(eq(employeesTable.designationId, Number(designationId)));
-    if (employmentType) conds.push(eq(employeesTable.employmentType, employmentType as any));
-    if (status) conds.push(eq(employeesTable.status, status as any));
+    if (employmentType) conds.push(sql`${employeesTable.employmentType} = ${employmentType}`);
+    if (status) conds.push(sql`${employeesTable.status} = ${status}`);
     if (location) conds.push(eq(employeesTable.location, location));
 
     const rows = await db.select({
@@ -191,7 +191,7 @@ router.get("/reports/attendance-summary", requireHrmsUser, requireRole(...MANAGE
   try {
     const { fromDate, toDate, departmentId, employeeId } = req.query as Record<string, string>;
 
-    const conds: any[] = [];
+    const conds: SQL<unknown>[] = [];
     if (fromDate) conds.push(gte(attendanceRecordsTable.attendanceDate, fromDate));
     if (toDate) conds.push(lte(attendanceRecordsTable.attendanceDate, toDate));
     if (employeeId) conds.push(eq(attendanceRecordsTable.employeeId, Number(employeeId)));
@@ -229,7 +229,7 @@ router.get("/reports/leave-utilization", requireHrmsUser, requireRole(...MANAGER
   try {
     const { fromDate, toDate, departmentId, leaveType } = req.query as Record<string, string>;
 
-    const conds: any[] = [eq(leaveApplicationsTable.status, "Approved")];
+    const conds: SQL<unknown>[] = [eq(leaveApplicationsTable.status, "Approved")];
     if (fromDate) conds.push(gte(leaveApplicationsTable.fromDate, fromDate));
     if (toDate) conds.push(lte(leaveApplicationsTable.toDate, toDate));
 
@@ -269,7 +269,7 @@ router.get("/reports/payroll-register", requireHrmsUser, requireRole(...HR_ROLES
   try {
     const { month, year, departmentId } = req.query as Record<string, string>;
 
-    const conds: any[] = [];
+    const conds: SQL<unknown>[] = [];
     if (month) conds.push(eq(payrollRunsTable.periodMonth, Number(month)));
     if (year) conds.push(eq(payrollRunsTable.periodYear, Number(year)));
 
@@ -314,7 +314,7 @@ router.get("/reports/headcount", requireHrmsUser, requireRole(...MANAGER_ROLES),
   try {
     const { fromDate, toDate, departmentId } = req.query as Record<string, string>;
 
-    const conds: any[] = [eq(employeesTable.isActive, true)];
+    const conds: SQL<unknown>[] = [eq(employeesTable.isActive, true)];
     if (departmentId) conds.push(eq(employeesTable.departmentId, Number(departmentId)));
     if (toDate) conds.push(lte(employeesTable.dateOfJoining, toDate));
 
@@ -342,7 +342,7 @@ router.get("/reports/attrition", requireHrmsUser, requireRole(...MANAGER_ROLES),
   try {
     const { fromDate, toDate, departmentId } = req.query as Record<string, string>;
 
-    const conds: any[] = [eq(exitRequestsTable.status, "Separated")];
+    const conds: SQL<unknown>[] = [eq(exitRequestsTable.status, "Separated")];
     if (fromDate) conds.push(gte(exitRequestsTable.separatedAt, new Date(fromDate)));
     if (toDate) conds.push(lte(exitRequestsTable.separatedAt, new Date(toDate)));
 
@@ -385,7 +385,7 @@ router.get("/reports/performance-summary", requireHrmsUser, requireRole(...MANAG
   try {
     const { cycleId, departmentId } = req.query as Record<string, string>;
 
-    const conds: any[] = [];
+    const conds: SQL<unknown>[] = [];
     if (cycleId) conds.push(eq(appraisalOutcomesTable.cycleId, Number(cycleId)));
 
     const rows = await db.select({
@@ -421,7 +421,7 @@ router.get("/reports/recruitment-pipeline", requireHrmsUser, requireRole(...MANA
   try {
     const { fromDate, toDate, departmentId } = req.query as Record<string, string>;
 
-    const conds: any[] = [];
+    const conds: SQL<unknown>[] = [];
     if (departmentId) conds.push(eq(jobRequisitionsTable.departmentId, Number(departmentId)));
     if (fromDate) conds.push(gte(jobRequisitionsTable.createdAt, new Date(fromDate)));
     if (toDate) conds.push(lte(jobRequisitionsTable.createdAt, new Date(toDate)));
@@ -762,8 +762,19 @@ router.delete("/report-templates/:id", requireHrmsUser, requireRole(...MANAGER_R
 });
 
 // ─── XLSX / PDF EXPORT ────────────────────────────────────────────────────────
+/** Escape user-controlled values to prevent XSS when embedding in HTML */
+function escHtml(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  return String(v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // GET /reports/:type/export?format=xlsx|pdf  — streams a formatted Excel or print-ready HTML report
-router.get("/reports/:type/export", requireHrmsUser, requireRole(...HR_ROLES, "payroll_admin"), async (req, res) => {
+router.get("/reports/:type/export", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
     const type = String(req.params.type);
     const { format = "xlsx", fromDate, toDate, departmentId, month, year } = req.query as Record<string, string>;
@@ -786,9 +797,9 @@ router.get("/reports/:type/export", requireHrmsUser, requireRole(...HR_ROLES, "p
       const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
       const title = type.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) + " Report";
       const tableHtml = `
-        <thead><tr>${headers.map(h => `<th>${h.replace(/([A-Z])/g, " $1").trim()}</th>`).join("")}</tr></thead>
-        <tbody>${rows.map(r => `<tr>${headers.map(h => `<td>${r[h] ?? ""}</td>`).join("")}</tr>`).join("")}</tbody>`;
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
+        <thead><tr>${headers.map(h => `<th>${escHtml(h.replace(/([A-Z])/g, " $1").trim())}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map(r => `<tr>${headers.map(h => `<td>${escHtml(r[h])}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title><style>
         body{font-family:Arial,sans-serif;font-size:11px;margin:20px}
         .letterhead{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1e3a5f;padding-bottom:8px;margin-bottom:16px}
         .company{font-size:20px;font-weight:bold;color:#1e3a5f}
@@ -802,8 +813,8 @@ router.get("/reports/:type/export", requireHrmsUser, requireRole(...HR_ROLES, "p
         @media print{@page{margin:1cm}}</style></head><body>
         <div class="letterhead"><div><div class="company">Automystics Technologies</div>
         <div class="subtitle">Internal HR Management System · MysticsHR</div></div></div>
-        <h2>${title}</h2>
-        <div class="meta">Generated on ${date} · ${rows.length} record(s)</div>
+        <h2>${escHtml(title)}</h2>
+        <div class="meta">Generated on ${escHtml(date)} · ${rows.length} record(s)</div>
         <table>${tableHtml}</table></body></html>`;
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("Content-Disposition", `inline; filename="${type}-report.html"`);
