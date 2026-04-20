@@ -18,6 +18,7 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, desc, or, sql, type SQL } from "drizzle-orm";
 import { logAudit } from "../lib/audit";
+import { generatePdf, substituteTemplate } from "../lib/pdf";
 
 const router = Router();
 
@@ -654,30 +655,47 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
         .set({ status: "FnF Approved", updatedAt: new Date() })
         .where(eq(exitRequestsTable.id, exitRequestId));
 
-      // Auto-generate Relieving Letter
+      // Auto-generate Relieving Letter & Experience Certificate at FnF approval
       if (exitReq) {
-        const [template] = await db.select().from(documentTemplatesTable)
-          .where(and(eq(documentTemplatesTable.documentType, "Relieving Letter"), eq(documentTemplatesTable.isActive, true)))
-          .limit(1);
+        const [emp] = await db.select({
+          id: employeesTable.id,
+          firstName: employeesTable.firstName,
+          lastName: employeesTable.lastName,
+          employeeCode: employeesTable.employeeId,
+          dateOfJoining: employeesTable.dateOfJoining,
+        }).from(employeesTable).where(eq(employeesTable.id, exitReq.employeeId));
 
-        // Try to insert issued document records for both Relieving Letter and Experience Certificate
         for (const docType of ["Relieving Letter", "Experience Certificate"] as const) {
           const [tmpl] = await db.select().from(documentTemplatesTable)
             .where(and(eq(documentTemplatesTable.documentType, docType), eq(documentTemplatesTable.isActive, true)))
             .limit(1);
-          if (tmpl) {
+          if (tmpl && emp) {
             try {
+              const autoFields: Record<string, string> = {
+                employeeName: `${emp.firstName} ${emp.lastName}`,
+                employeeCode: emp.employeeCode ?? "",
+                dateOfJoining: emp.dateOfJoining ?? "",
+                lastWorkingDay: exitReq.actualLwd ?? exitReq.requestedLwd ?? "",
+                currentDate: new Date().toLocaleDateString("en-IN"),
+              };
+              const bodyText = substituteTemplate(tmpl.bodyTemplate, autoFields);
+              const pdfBuffer = await generatePdf({
+                companyName: tmpl.companyName ?? "Automystics Technologies",
+                companyAddress: tmpl.companyAddress ?? "",
+                headerText: tmpl.headerText ?? "",
+                footerText: tmpl.footerText ?? "",
+                bodyText,
+                title: docType,
+              });
+              const filename = `${docType.replace(/ /g, "_")}_${emp.employeeCode ?? emp.id}_${Date.now()}.pdf`;
               await db.insert(issuedDocumentsTable).values({
                 employeeId: exitReq.employeeId,
                 templateId: tmpl.id,
                 documentType: docType,
-                filename: `${docType.replace(/ /g, "_")}_${exitReq.employeeId}_${Date.now()}.pdf`,
+                filename,
                 generatedBy: u.id,
-                fieldValues: {
-                  lastWorkingDay: exitReq.actualLwd ?? exitReq.requestedLwd,
-                  currentDate: new Date().toLocaleDateString("en-IN"),
-                },
-                fileContent: "PENDING_GENERATION",
+                fieldValues: autoFields,
+                fileContent: pdfBuffer.toString("base64"),
               });
             } catch (docErr) {
               console.error(`[FnF] Failed to issue ${docType} for employee ${exitReq.employeeId}:`, docErr);

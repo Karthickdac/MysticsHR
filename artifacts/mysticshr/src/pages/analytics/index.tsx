@@ -1,3 +1,4 @@
+import React from "react";
 import { useGetDashboardAnalytics } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,7 +19,7 @@ function KpiCard({
   title: string;
   value: string | number;
   subtitle?: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
   trend?: { value: number; label: string };
 }) {

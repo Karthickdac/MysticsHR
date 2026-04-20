@@ -4,7 +4,6 @@ import {
   useListExitRequests,
   useCreateExitRequest,
   getListExitRequestsQueryKey,
-  type CreateExitRequestBody,
   type ExitRequestDetail,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,7 +53,7 @@ function ResignationModal({ open, onClose }: { open: boolean; onClose: () => voi
     e.preventDefault();
     if (!form.reason.trim() || !form.requestedLwd) return;
     create.mutate(
-      { data: form as CreateExitRequestBody },
+      { data: { exitType: form.exitType, reason: form.reason, requestedLwd: form.requestedLwd } },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getListExitRequestsQueryKey() });
@@ -117,7 +116,7 @@ function HrInitiateModal({ open, onClose }: { open: boolean; onClose: () => void
     e.preventDefault();
     if (!form.reason.trim() || !form.requestedLwd || !form.employeeId) return;
     create.mutate(
-      { data: { ...form, employeeId: Number(form.employeeId) } as unknown as CreateExitRequestBody },
+      { data: { employeeId: Number(form.employeeId), exitType: form.exitType, reason: form.reason, requestedLwd: form.requestedLwd } },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getListExitRequestsQueryKey() });
