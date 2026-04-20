@@ -49,6 +49,10 @@ import HelpdeskPage from "@/pages/helpdesk/index";
 import TicketDetailPage from "@/pages/helpdesk/ticket-detail";
 import SlaReportPage from "@/pages/helpdesk/sla-report";
 import DocumentsPage from "@/pages/documents/index";
+import ExitPage from "@/pages/exit/index";
+import ExitDetailPage from "@/pages/exit/detail";
+import AnalyticsDashboard from "@/pages/analytics/index";
+import ReportsPage from "@/pages/reports/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -590,6 +594,38 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
                 <DocumentsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/exit/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <ExitDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/exit">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <ExitPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/analytics">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]}>
+                <AnalyticsDashboard />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/reports">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]}>
+                <ReportsPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

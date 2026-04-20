@@ -205,6 +205,19 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Frontend pages: `/performance` (cycles dashboard + quick-nav), `/performance/goals` (KRA/KPI list with progress bars + assign modal), `/performance/appraisals` (self-rating with star UI), `/performance/evaluations` (manager ratings for team), `/performance/calibration` (score matrix + outcome computation), `/ess` (3-tab hub: Dashboard / My Profile / Services)
 - Role gates: HR creates cycles, HOD+ assigns goals, all roles access ESS, HR-only calibration
 
+### Task #9: Exit & Offboarding + Reporting & Analytics
+- DB tables: `exit_requests`, `exit_clearance_tasks`, `fnf_computations`, `exit_interviews`, `report_schedules`, `saved_report_templates`
+- Backend routes: `routes/exit.ts` (resignations, clearance CRUD, FnF dual-approval, exit interviews, auto-issue documents) and `routes/reports.ts` (8 pre-built reports, analytics dashboard, custom runner, scheduler CRUD, template CRUD)
+- Notice period: <1yr=30 days, <3yr=60 days, else=90 days (calculated from DOJ)
+- Auto-clearance tasks generated across IT/Finance/HR/Manager when status changes to "Clearance Pending"
+- FnF requires dual approval (HR + Finance). On full approval: status→"FnF Approved", auto-issues Relieving Letter + Experience Certificate via `issuedDocumentsTable`
+- Analytics: headcount, attrition rate, avg attendance, open positions KPIs + 6-month headcount trend + department distribution (Recharts)
+- 8 pre-built reports: Employee Directory, Attendance Summary, Leave Utilization, Payroll Register, Headcount, Attrition, Performance Summary, Recruitment Pipeline
+- Custom report builder: field picker + column selector + saved templates CRUD
+- Report scheduler: CRON-based schedule CRUD (frequency: daily/weekly/monthly, format: CSV/PDF/Excel)
+- Frontend pages: `/exit` (list + KPIs + initiate modal), `/exit/:id` (status flow + clearance checklist + FnF compute/approve + exit interview), `/analytics` (KPI cards + Recharts charts), `/reports` (3-tab: Catalog + Custom Builder + Scheduler)
+- Role gates: All roles see exit; Analytics + Reports restricted to HR roles + HOD + payroll_admin
+
 ### Task #8: Helpdesk Ticketing + Document Generation
 - DB tables: `helpdesk_tickets`, `ticket_comments`, `ticket_sla_logs`, `document_templates`, `issued_documents`
 - Enum: `hrDocumentTypeEnum` (pg `hr_document_type`) — offer_letter, appointment_letter, experience_letter, salary_certificate, noc, increment_letter, relieving_letter, custom

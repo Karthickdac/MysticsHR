@@ -2523,6 +2523,305 @@ export interface GenerateDocumentBody {
   fieldValues?: GenerateDocumentBodyFieldValues;
 }
 
+export type ExitRequestExitType =
+  (typeof ExitRequestExitType)[keyof typeof ExitRequestExitType];
+
+export const ExitRequestExitType = {
+  Resignation: "Resignation",
+  Termination: "Termination",
+  Retirement: "Retirement",
+  Contract_Expiry: "Contract Expiry",
+} as const;
+
+export type ExitRequestStatus =
+  (typeof ExitRequestStatus)[keyof typeof ExitRequestStatus];
+
+export const ExitRequestStatus = {
+  Submitted: "Submitted",
+  HR_Reviewing: "HR Reviewing",
+  Notice_Period: "Notice Period",
+  Clearance_Pending: "Clearance Pending",
+  FnF_Pending: "FnF Pending",
+  FnF_Approved: "FnF Approved",
+  Separated: "Separated",
+  Rejected: "Rejected",
+  Withdrawn: "Withdrawn",
+} as const;
+
+export interface ExitRequest {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  departmentName?: string | null;
+  exitType: ExitRequestExitType;
+  status: ExitRequestStatus;
+  reason: string;
+  /** @nullable */
+  requestedLwd: string | null;
+  /** @nullable */
+  actualLwd?: string | null;
+  /** @nullable */
+  noticePeriodDays?: number | null;
+  noticePeriodWaived: boolean;
+  noticePeriodBuyout: boolean;
+  /** @nullable */
+  hrRemarks?: string | null;
+  /** @nullable */
+  initiatedByUserId?: number | null;
+  /** @nullable */
+  approvedByUserId?: number | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  separatedAt?: string | null;
+  createdAt: string;
+}
+
+export type ClearanceTaskStatus =
+  (typeof ClearanceTaskStatus)[keyof typeof ClearanceTaskStatus];
+
+export const ClearanceTaskStatus = {
+  Pending: "Pending",
+  Completed: "Completed",
+  Waived: "Waived",
+} as const;
+
+export interface ClearanceTask {
+  id: number;
+  exitRequestId: number;
+  department: string;
+  taskName: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  assignedToUserId?: number | null;
+  /** @nullable */
+  assigneeName?: string | null;
+  /** @nullable */
+  dueDate?: string | null;
+  status: ClearanceTaskStatus;
+  /** @nullable */
+  completedAt?: string | null;
+  /** @nullable */
+  remarks?: string | null;
+}
+
+export interface FnfComputation {
+  id: number;
+  exitRequestId: number;
+  pendingSalary: string;
+  leaveEncashment: string;
+  gratuity: string;
+  bonusProration: string;
+  noticePeriodLop: string;
+  otherDeductions: string;
+  totalPayable: string;
+  /** @nullable */
+  computedByUserId?: number | null;
+  /** @nullable */
+  computedAt?: string | null;
+  /** @nullable */
+  hrApprovedByUserId?: number | null;
+  /** @nullable */
+  hrApprovedAt?: string | null;
+  /** @nullable */
+  financeApprovedByUserId?: number | null;
+  /** @nullable */
+  financeApprovedAt?: string | null;
+  /** @nullable */
+  remarks?: string | null;
+}
+
+export type ExitInterviewQuestionsItem = { [key: string]: unknown };
+
+export type ExitInterviewResponsesItem = { [key: string]: unknown };
+
+export interface ExitInterview {
+  id: number;
+  exitRequestId: number;
+  employeeId: number;
+  questions?: ExitInterviewQuestionsItem[];
+  responses?: ExitInterviewResponsesItem[];
+  /** @nullable */
+  submittedAt?: string | null;
+}
+
+export type ExitRequestDetail = ExitRequest & {
+  clearanceTasks?: ClearanceTask[];
+  fnfComputation?: FnfComputation | null;
+  exitInterview?: ExitInterview | null;
+};
+
+export type CreateExitRequestBodyExitType =
+  (typeof CreateExitRequestBodyExitType)[keyof typeof CreateExitRequestBodyExitType];
+
+export const CreateExitRequestBodyExitType = {
+  Resignation: "Resignation",
+  Termination: "Termination",
+  Retirement: "Retirement",
+  Contract_Expiry: "Contract Expiry",
+} as const;
+
+export interface CreateExitRequestBody {
+  exitType: CreateExitRequestBodyExitType;
+  reason: string;
+  requestedLwd: string;
+  employeeId?: number;
+}
+
+export type UpdateExitRequestBodyStatus =
+  (typeof UpdateExitRequestBodyStatus)[keyof typeof UpdateExitRequestBodyStatus];
+
+export const UpdateExitRequestBodyStatus = {
+  Submitted: "Submitted",
+  HR_Reviewing: "HR Reviewing",
+  Notice_Period: "Notice Period",
+  Clearance_Pending: "Clearance Pending",
+  FnF_Pending: "FnF Pending",
+  FnF_Approved: "FnF Approved",
+  Separated: "Separated",
+  Rejected: "Rejected",
+  Withdrawn: "Withdrawn",
+} as const;
+
+export interface UpdateExitRequestBody {
+  status?: UpdateExitRequestBodyStatus;
+  actualLwd?: string;
+  noticePeriodDays?: number;
+  noticePeriodWaived?: boolean;
+  noticePeriodBuyout?: boolean;
+  hrRemarks?: string;
+}
+
+export type UpdateClearanceTaskBodyStatus =
+  (typeof UpdateClearanceTaskBodyStatus)[keyof typeof UpdateClearanceTaskBodyStatus];
+
+export const UpdateClearanceTaskBodyStatus = {
+  Pending: "Pending",
+  Completed: "Completed",
+  Waived: "Waived",
+} as const;
+
+export interface UpdateClearanceTaskBody {
+  status?: UpdateClearanceTaskBodyStatus;
+  remarks?: string;
+}
+
+export interface ComputeFnfBody {
+  pendingSalary?: number;
+  leaveEncashment?: number;
+  gratuity?: number;
+  bonusProration?: number;
+  noticePeriodLop?: number;
+  otherDeductions?: number;
+  remarks?: string;
+}
+
+export type ApproveFnfBodyApproverRole =
+  (typeof ApproveFnfBodyApproverRole)[keyof typeof ApproveFnfBodyApproverRole];
+
+export const ApproveFnfBodyApproverRole = {
+  hr: "hr",
+  finance: "finance",
+} as const;
+
+export interface ApproveFnfBody {
+  approverRole: ApproveFnfBodyApproverRole;
+  remarks?: string;
+}
+
+export type SubmitExitInterviewBodyResponsesItem = { [key: string]: unknown };
+
+export interface SubmitExitInterviewBody {
+  responses: SubmitExitInterviewBodyResponsesItem[];
+}
+
+export type DashboardAnalyticsByDepartmentItem = {
+  departmentName?: string;
+  headcount?: number;
+};
+
+export type DashboardAnalyticsHeadcountTrendItem = {
+  month?: string;
+  headcount?: number;
+  joiners?: number;
+  leavers?: number;
+};
+
+export interface DashboardAnalytics {
+  totalHeadcount?: number;
+  newJoinersThisMonth?: number;
+  attritionRate?: number;
+  attendanceTodayRate?: number;
+  openPositions?: number;
+  pendingApprovals?: number;
+  separatedThisMonth?: number;
+  byDepartment?: DashboardAnalyticsByDepartmentItem[];
+  headcountTrend?: DashboardAnalyticsHeadcountTrendItem[];
+}
+
+export type ReportScheduleFilters = { [key: string]: unknown };
+
+export interface ReportSchedule {
+  id: number;
+  reportType: string;
+  name: string;
+  frequency: string;
+  recipients: string[];
+  filters: ReportScheduleFilters;
+  isActive: boolean;
+  /** @nullable */
+  lastRunAt?: string | null;
+  /** @nullable */
+  createdByUserId?: number | null;
+  createdAt: string;
+}
+
+export type CreateReportScheduleBodyFilters = { [key: string]: unknown };
+
+export interface CreateReportScheduleBody {
+  reportType: string;
+  name: string;
+  frequency: string;
+  recipients: string[];
+  filters?: CreateReportScheduleBodyFilters;
+  isActive?: boolean;
+}
+
+export type SavedReportTemplateFilters = { [key: string]: unknown };
+
+export interface SavedReportTemplate {
+  id: number;
+  name: string;
+  reportType: string;
+  selectedFields: string[];
+  filters: SavedReportTemplateFilters;
+  /** @nullable */
+  createdByUserId?: number | null;
+  createdAt: string;
+}
+
+export type CreateSavedReportTemplateBodyFilters = { [key: string]: unknown };
+
+export interface CreateSavedReportTemplateBody {
+  name: string;
+  reportType: string;
+  selectedFields: string[];
+  filters?: CreateSavedReportTemplateBodyFilters;
+}
+
+export type RunCustomReportBodyFilters = { [key: string]: unknown };
+
+export interface RunCustomReportBody {
+  reportType: string;
+  selectedFields: string[];
+  filters?: RunCustomReportBodyFilters;
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -2976,4 +3275,135 @@ export type RunHelpdeskSlaCheck200 = {
 export type ListIssuedDocumentsParams = {
   employeeId?: number;
   documentType?: string;
+};
+
+export type ListExitRequestsParams = {
+  status?: string;
+  exitType?: string;
+  employeeId?: number;
+};
+
+export type GetEmployeeDirectoryReportParams = {
+  departmentId?: number;
+  designationId?: number;
+  employmentType?: string;
+  status?: string;
+  location?: string;
+  format?: GetEmployeeDirectoryReportFormat;
+};
+
+export type GetEmployeeDirectoryReportFormat =
+  (typeof GetEmployeeDirectoryReportFormat)[keyof typeof GetEmployeeDirectoryReportFormat];
+
+export const GetEmployeeDirectoryReportFormat = {
+  json: "json",
+  csv: "csv",
+} as const;
+
+export type GetEmployeeDirectoryReport200DataItem = { [key: string]: unknown };
+
+export type GetEmployeeDirectoryReport200 = {
+  data?: GetEmployeeDirectoryReport200DataItem[];
+  total?: number;
+};
+
+export type GetAttendanceSummaryReportParams = {
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+  employeeId?: number;
+};
+
+export type GetAttendanceSummaryReport200DataItem = { [key: string]: unknown };
+
+export type GetAttendanceSummaryReport200 = {
+  data?: GetAttendanceSummaryReport200DataItem[];
+  total?: number;
+};
+
+export type GetLeaveUtilizationReportParams = {
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+  leaveType?: string;
+};
+
+export type GetLeaveUtilizationReport200DataItem = { [key: string]: unknown };
+
+export type GetLeaveUtilizationReport200 = {
+  data?: GetLeaveUtilizationReport200DataItem[];
+  total?: number;
+};
+
+export type GetPayrollRegisterReportParams = {
+  month?: string;
+  year?: number;
+  departmentId?: number;
+};
+
+export type GetPayrollRegisterReport200DataItem = { [key: string]: unknown };
+
+export type GetPayrollRegisterReport200 = {
+  data?: GetPayrollRegisterReport200DataItem[];
+  total?: number;
+};
+
+export type GetHeadcountReportParams = {
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+};
+
+export type GetHeadcountReport200DataItem = { [key: string]: unknown };
+
+export type GetHeadcountReport200 = {
+  data?: GetHeadcountReport200DataItem[];
+  total?: number;
+};
+
+export type GetAttritionReportParams = {
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+};
+
+export type GetAttritionReport200DataItem = { [key: string]: unknown };
+
+export type GetAttritionReport200 = {
+  data?: GetAttritionReport200DataItem[];
+  total?: number;
+};
+
+export type GetPerformanceSummaryReportParams = {
+  cycleId?: number;
+  departmentId?: number;
+};
+
+export type GetPerformanceSummaryReport200DataItem = { [key: string]: unknown };
+
+export type GetPerformanceSummaryReport200 = {
+  data?: GetPerformanceSummaryReport200DataItem[];
+  total?: number;
+};
+
+export type GetRecruitmentPipelineReportParams = {
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+};
+
+export type GetRecruitmentPipelineReport200DataItem = {
+  [key: string]: unknown;
+};
+
+export type GetRecruitmentPipelineReport200 = {
+  data?: GetRecruitmentPipelineReport200DataItem[];
+  total?: number;
+};
+
+export type RunCustomReport200DataItem = { [key: string]: unknown };
+
+export type RunCustomReport200 = {
+  data?: RunCustomReport200DataItem[];
+  total?: number;
 };

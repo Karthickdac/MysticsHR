@@ -5140,3 +5140,666 @@ export const GenerateDocumentBody = zod.object({
 export const DownloadIssuedDocumentParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary List exit requests (HR sees all; employees see own)
+ */
+export const ListExitRequestsQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+  exitType: zod.coerce.string().optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const ListExitRequestsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  exitType: zod.enum([
+    "Resignation",
+    "Termination",
+    "Retirement",
+    "Contract Expiry",
+  ]),
+  status: zod.enum([
+    "Submitted",
+    "HR Reviewing",
+    "Notice Period",
+    "Clearance Pending",
+    "FnF Pending",
+    "FnF Approved",
+    "Separated",
+    "Rejected",
+    "Withdrawn",
+  ]),
+  reason: zod.string(),
+  requestedLwd: zod.string().nullable(),
+  actualLwd: zod.string().nullish(),
+  noticePeriodDays: zod.number().nullish(),
+  noticePeriodWaived: zod.boolean(),
+  noticePeriodBuyout: zod.boolean(),
+  hrRemarks: zod.string().nullish(),
+  initiatedByUserId: zod.number().nullish(),
+  approvedByUserId: zod.number().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  separatedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListExitRequestsResponse = zod.array(ListExitRequestsResponseItem);
+
+/**
+ * @summary Submit a resignation or initiate exit
+ */
+export const CreateExitRequestBody = zod.object({
+  exitType: zod.enum([
+    "Resignation",
+    "Termination",
+    "Retirement",
+    "Contract Expiry",
+  ]),
+  reason: zod.string(),
+  requestedLwd: zod.string(),
+  employeeId: zod.number().optional(),
+});
+
+/**
+ * @summary Get exit request detail
+ */
+export const GetExitRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetExitRequestResponse = zod
+  .object({
+    id: zod.number(),
+    employeeId: zod.number(),
+    employeeName: zod.string().nullish(),
+    employeeCode: zod.string().nullish(),
+    departmentName: zod.string().nullish(),
+    exitType: zod.enum([
+      "Resignation",
+      "Termination",
+      "Retirement",
+      "Contract Expiry",
+    ]),
+    status: zod.enum([
+      "Submitted",
+      "HR Reviewing",
+      "Notice Period",
+      "Clearance Pending",
+      "FnF Pending",
+      "FnF Approved",
+      "Separated",
+      "Rejected",
+      "Withdrawn",
+    ]),
+    reason: zod.string(),
+    requestedLwd: zod.string().nullable(),
+    actualLwd: zod.string().nullish(),
+    noticePeriodDays: zod.number().nullish(),
+    noticePeriodWaived: zod.boolean(),
+    noticePeriodBuyout: zod.boolean(),
+    hrRemarks: zod.string().nullish(),
+    initiatedByUserId: zod.number().nullish(),
+    approvedByUserId: zod.number().nullish(),
+    approvedAt: zod.coerce.date().nullish(),
+    separatedAt: zod.coerce.date().nullish(),
+    createdAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      clearanceTasks: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            exitRequestId: zod.number(),
+            department: zod.string(),
+            taskName: zod.string(),
+            description: zod.string().nullish(),
+            assignedToUserId: zod.number().nullish(),
+            assigneeName: zod.string().nullish(),
+            dueDate: zod.string().nullish(),
+            status: zod.enum(["Pending", "Completed", "Waived"]),
+            completedAt: zod.coerce.date().nullish(),
+            remarks: zod.string().nullish(),
+          }),
+        )
+        .optional(),
+      fnfComputation: zod
+        .object({
+          id: zod.number(),
+          exitRequestId: zod.number(),
+          pendingSalary: zod.string(),
+          leaveEncashment: zod.string(),
+          gratuity: zod.string(),
+          bonusProration: zod.string(),
+          noticePeriodLop: zod.string(),
+          otherDeductions: zod.string(),
+          totalPayable: zod.string(),
+          computedByUserId: zod.number().nullish(),
+          computedAt: zod.coerce.date().nullish(),
+          hrApprovedByUserId: zod.number().nullish(),
+          hrApprovedAt: zod.coerce.date().nullish(),
+          financeApprovedByUserId: zod.number().nullish(),
+          financeApprovedAt: zod.coerce.date().nullish(),
+          remarks: zod.string().nullish(),
+        })
+        .nullish(),
+      exitInterview: zod
+        .object({
+          id: zod.number(),
+          exitRequestId: zod.number(),
+          employeeId: zod.number(),
+          questions: zod.array(zod.object({}).passthrough()).optional(),
+          responses: zod.array(zod.object({}).passthrough()).optional(),
+          submittedAt: zod.coerce.date().nullish(),
+        })
+        .nullish(),
+    }),
+  );
+
+/**
+ * @summary Update exit request status or details (HR)
+ */
+export const UpdateExitRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateExitRequestBody = zod.object({
+  status: zod
+    .enum([
+      "Submitted",
+      "HR Reviewing",
+      "Notice Period",
+      "Clearance Pending",
+      "FnF Pending",
+      "FnF Approved",
+      "Separated",
+      "Rejected",
+      "Withdrawn",
+    ])
+    .optional(),
+  actualLwd: zod.string().optional(),
+  noticePeriodDays: zod.number().optional(),
+  noticePeriodWaived: zod.boolean().optional(),
+  noticePeriodBuyout: zod.boolean().optional(),
+  hrRemarks: zod.string().optional(),
+});
+
+export const UpdateExitRequestResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  exitType: zod.enum([
+    "Resignation",
+    "Termination",
+    "Retirement",
+    "Contract Expiry",
+  ]),
+  status: zod.enum([
+    "Submitted",
+    "HR Reviewing",
+    "Notice Period",
+    "Clearance Pending",
+    "FnF Pending",
+    "FnF Approved",
+    "Separated",
+    "Rejected",
+    "Withdrawn",
+  ]),
+  reason: zod.string(),
+  requestedLwd: zod.string().nullable(),
+  actualLwd: zod.string().nullish(),
+  noticePeriodDays: zod.number().nullish(),
+  noticePeriodWaived: zod.boolean(),
+  noticePeriodBuyout: zod.boolean(),
+  hrRemarks: zod.string().nullish(),
+  initiatedByUserId: zod.number().nullish(),
+  approvedByUserId: zod.number().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  separatedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List clearance tasks for an exit request
+ */
+export const ListClearanceTasksParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListClearanceTasksResponseItem = zod.object({
+  id: zod.number(),
+  exitRequestId: zod.number(),
+  department: zod.string(),
+  taskName: zod.string(),
+  description: zod.string().nullish(),
+  assignedToUserId: zod.number().nullish(),
+  assigneeName: zod.string().nullish(),
+  dueDate: zod.string().nullish(),
+  status: zod.enum(["Pending", "Completed", "Waived"]),
+  completedAt: zod.coerce.date().nullish(),
+  remarks: zod.string().nullish(),
+});
+export const ListClearanceTasksResponse = zod.array(
+  ListClearanceTasksResponseItem,
+);
+
+/**
+ * @summary Complete or update a clearance task
+ */
+export const UpdateClearanceTaskParams = zod.object({
+  taskId: zod.coerce.number(),
+});
+
+export const UpdateClearanceTaskBody = zod.object({
+  status: zod.enum(["Pending", "Completed", "Waived"]).optional(),
+  remarks: zod.string().optional(),
+});
+
+export const UpdateClearanceTaskResponse = zod.object({
+  id: zod.number(),
+  exitRequestId: zod.number(),
+  department: zod.string(),
+  taskName: zod.string(),
+  description: zod.string().nullish(),
+  assignedToUserId: zod.number().nullish(),
+  assigneeName: zod.string().nullish(),
+  dueDate: zod.string().nullish(),
+  status: zod.enum(["Pending", "Completed", "Waived"]),
+  completedAt: zod.coerce.date().nullish(),
+  remarks: zod.string().nullish(),
+});
+
+/**
+ * @summary Get FnF computation for an exit request
+ */
+export const GetFnfComputationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetFnfComputationResponse = zod.object({
+  id: zod.number(),
+  exitRequestId: zod.number(),
+  pendingSalary: zod.string(),
+  leaveEncashment: zod.string(),
+  gratuity: zod.string(),
+  bonusProration: zod.string(),
+  noticePeriodLop: zod.string(),
+  otherDeductions: zod.string(),
+  totalPayable: zod.string(),
+  computedByUserId: zod.number().nullish(),
+  computedAt: zod.coerce.date().nullish(),
+  hrApprovedByUserId: zod.number().nullish(),
+  hrApprovedAt: zod.coerce.date().nullish(),
+  financeApprovedByUserId: zod.number().nullish(),
+  financeApprovedAt: zod.coerce.date().nullish(),
+  remarks: zod.string().nullish(),
+});
+
+/**
+ * @summary Compute or recompute FnF settlement
+ */
+export const ComputeFnfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ComputeFnfBody = zod.object({
+  pendingSalary: zod.number().optional(),
+  leaveEncashment: zod.number().optional(),
+  gratuity: zod.number().optional(),
+  bonusProration: zod.number().optional(),
+  noticePeriodLop: zod.number().optional(),
+  otherDeductions: zod.number().optional(),
+  remarks: zod.string().optional(),
+});
+
+export const ComputeFnfResponse = zod.object({
+  id: zod.number(),
+  exitRequestId: zod.number(),
+  pendingSalary: zod.string(),
+  leaveEncashment: zod.string(),
+  gratuity: zod.string(),
+  bonusProration: zod.string(),
+  noticePeriodLop: zod.string(),
+  otherDeductions: zod.string(),
+  totalPayable: zod.string(),
+  computedByUserId: zod.number().nullish(),
+  computedAt: zod.coerce.date().nullish(),
+  hrApprovedByUserId: zod.number().nullish(),
+  hrApprovedAt: zod.coerce.date().nullish(),
+  financeApprovedByUserId: zod.number().nullish(),
+  financeApprovedAt: zod.coerce.date().nullish(),
+  remarks: zod.string().nullish(),
+});
+
+/**
+ * @summary Approve FnF (HR Manager or Finance Head)
+ */
+export const ApproveFnfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveFnfBody = zod.object({
+  approverRole: zod.enum(["hr", "finance"]),
+  remarks: zod.string().optional(),
+});
+
+export const ApproveFnfResponse = zod.object({
+  id: zod.number(),
+  exitRequestId: zod.number(),
+  pendingSalary: zod.string(),
+  leaveEncashment: zod.string(),
+  gratuity: zod.string(),
+  bonusProration: zod.string(),
+  noticePeriodLop: zod.string(),
+  otherDeductions: zod.string(),
+  totalPayable: zod.string(),
+  computedByUserId: zod.number().nullish(),
+  computedAt: zod.coerce.date().nullish(),
+  hrApprovedByUserId: zod.number().nullish(),
+  hrApprovedAt: zod.coerce.date().nullish(),
+  financeApprovedByUserId: zod.number().nullish(),
+  financeApprovedAt: zod.coerce.date().nullish(),
+  remarks: zod.string().nullish(),
+});
+
+/**
+ * @summary Get exit interview for an exit request
+ */
+export const GetExitInterviewParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetExitInterviewResponse = zod.object({
+  id: zod.number(),
+  exitRequestId: zod.number(),
+  employeeId: zod.number(),
+  questions: zod.array(zod.object({}).passthrough()).optional(),
+  responses: zod.array(zod.object({}).passthrough()).optional(),
+  submittedAt: zod.coerce.date().nullish(),
+});
+
+/**
+ * @summary Submit exit interview responses
+ */
+export const SubmitExitInterviewParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SubmitExitInterviewBody = zod.object({
+  responses: zod.array(zod.object({}).passthrough()),
+});
+
+export const SubmitExitInterviewResponse = zod.object({
+  id: zod.number(),
+  exitRequestId: zod.number(),
+  employeeId: zod.number(),
+  questions: zod.array(zod.object({}).passthrough()).optional(),
+  responses: zod.array(zod.object({}).passthrough()).optional(),
+  submittedAt: zod.coerce.date().nullish(),
+});
+
+/**
+ * @summary Executive dashboard KPIs — headcount, attrition, attendance, open positions, pending approvals
+ */
+export const GetDashboardAnalyticsResponse = zod.object({
+  totalHeadcount: zod.number().optional(),
+  newJoinersThisMonth: zod.number().optional(),
+  attritionRate: zod.number().optional(),
+  attendanceTodayRate: zod.number().optional(),
+  openPositions: zod.number().optional(),
+  pendingApprovals: zod.number().optional(),
+  separatedThisMonth: zod.number().optional(),
+  byDepartment: zod
+    .array(
+      zod.object({
+        departmentName: zod.string().optional(),
+        headcount: zod.number().optional(),
+      }),
+    )
+    .optional(),
+  headcountTrend: zod
+    .array(
+      zod.object({
+        month: zod.string().optional(),
+        headcount: zod.number().optional(),
+        joiners: zod.number().optional(),
+        leavers: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Employee directory report
+ */
+export const GetEmployeeDirectoryReportQueryParams = zod.object({
+  departmentId: zod.coerce.number().optional(),
+  designationId: zod.coerce.number().optional(),
+  employmentType: zod.coerce.string().optional(),
+  status: zod.coerce.string().optional(),
+  location: zod.coerce.string().optional(),
+  format: zod.enum(["json", "csv"]).optional(),
+});
+
+export const GetEmployeeDirectoryReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary Attendance summary report
+ */
+export const GetAttendanceSummaryReportQueryParams = zod.object({
+  fromDate: zod.coerce.string().optional(),
+  toDate: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const GetAttendanceSummaryReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary Leave utilization report
+ */
+export const GetLeaveUtilizationReportQueryParams = zod.object({
+  fromDate: zod.coerce.string().optional(),
+  toDate: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+  leaveType: zod.coerce.string().optional(),
+});
+
+export const GetLeaveUtilizationReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary Payroll register report
+ */
+export const GetPayrollRegisterReportQueryParams = zod.object({
+  month: zod.coerce.string().optional(),
+  year: zod.coerce.number().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetPayrollRegisterReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary Headcount report by department, type, and date range
+ */
+export const GetHeadcountReportQueryParams = zod.object({
+  fromDate: zod.coerce.string().optional(),
+  toDate: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetHeadcountReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary Attrition report
+ */
+export const GetAttritionReportQueryParams = zod.object({
+  fromDate: zod.coerce.string().optional(),
+  toDate: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetAttritionReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary Performance summary report
+ */
+export const GetPerformanceSummaryReportQueryParams = zod.object({
+  cycleId: zod.coerce.number().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetPerformanceSummaryReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary Recruitment pipeline report
+ */
+export const GetRecruitmentPipelineReportQueryParams = zod.object({
+  fromDate: zod.coerce.string().optional(),
+  toDate: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetRecruitmentPipelineReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});
+
+/**
+ * @summary List configured report schedules
+ */
+export const ListReportSchedulesResponseItem = zod.object({
+  id: zod.number(),
+  reportType: zod.string(),
+  name: zod.string(),
+  frequency: zod.string(),
+  recipients: zod.array(zod.string()),
+  filters: zod.object({}).passthrough(),
+  isActive: zod.boolean(),
+  lastRunAt: zod.coerce.date().nullish(),
+  createdByUserId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListReportSchedulesResponse = zod.array(
+  ListReportSchedulesResponseItem,
+);
+
+/**
+ * @summary Create a report schedule
+ */
+export const CreateReportScheduleBody = zod.object({
+  reportType: zod.string(),
+  name: zod.string(),
+  frequency: zod.string(),
+  recipients: zod.array(zod.string()),
+  filters: zod.object({}).passthrough().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update a report schedule
+ */
+export const UpdateReportScheduleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateReportScheduleBody = zod.object({
+  reportType: zod.string(),
+  name: zod.string(),
+  frequency: zod.string(),
+  recipients: zod.array(zod.string()),
+  filters: zod.object({}).passthrough().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateReportScheduleResponse = zod.object({
+  id: zod.number(),
+  reportType: zod.string(),
+  name: zod.string(),
+  frequency: zod.string(),
+  recipients: zod.array(zod.string()),
+  filters: zod.object({}).passthrough(),
+  isActive: zod.boolean(),
+  lastRunAt: zod.coerce.date().nullish(),
+  createdByUserId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a report schedule
+ */
+export const DeleteReportScheduleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List saved custom report templates
+ */
+export const ListSavedReportTemplatesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  reportType: zod.string(),
+  selectedFields: zod.array(zod.string()),
+  filters: zod.object({}).passthrough(),
+  createdByUserId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListSavedReportTemplatesResponse = zod.array(
+  ListSavedReportTemplatesResponseItem,
+);
+
+/**
+ * @summary Save a custom report template
+ */
+export const CreateSavedReportTemplateBody = zod.object({
+  name: zod.string(),
+  reportType: zod.string(),
+  selectedFields: zod.array(zod.string()),
+  filters: zod.object({}).passthrough().optional(),
+});
+
+/**
+ * @summary Delete a saved report template
+ */
+export const DeleteSavedReportTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Run a custom report with specified fields and filters
+ */
+export const RunCustomReportBody = zod.object({
+  reportType: zod.string(),
+  selectedFields: zod.array(zod.string()),
+  filters: zod.object({}).passthrough().optional(),
+});
+
+export const RunCustomReportResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+});

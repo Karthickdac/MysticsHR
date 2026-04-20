@@ -251,7 +251,7 @@ export default function DocumentsPage() {
   const [editTemplate, setEditTemplate] = useState<DocumentTemplate | null>(null);
   const [showGenerate, setShowGenerate] = useState(false);
 
-  const { data: templates = [] } = useListDocumentTemplates({ query: { enabled: isHr } });
+  const { data: templates = [] } = useListDocumentTemplates({ query: { enabled: isHr } as any });
   const { data: issued = [] } = useListIssuedDocuments({});
 
   const createTemplate = useCreateDocumentTemplate();

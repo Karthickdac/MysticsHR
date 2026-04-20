@@ -22,6 +22,8 @@ import {
   Home,
   Ticket,
   FileBadge,
+  TrendingDown,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,9 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
     { name: "ESS Portal", href: "/ess", icon: Home, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Helpdesk", href: "/helpdesk", icon: Ticket, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Documents", href: "/documents", icon: FileBadge, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Exit & Offboarding", href: "/exit", icon: TrendingDown, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Analytics", href: "/analytics", icon: BarChart3, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
+    { name: "Reports", href: "/reports", icon: FileText, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
     { name: "Departments", href: "/departments", icon: Building2, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Designations", href: "/designations", icon: Briefcase, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Users", href: "/users", icon: ShieldCheck, roles: ["super_admin", "hr_manager"] },

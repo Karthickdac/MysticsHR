@@ -4335,10 +4335,486 @@ paths:
                 type: string
                 format: binary
 
-  # ──────────────────────────────────────────────
-  # PERFORMANCE + ESS SCHEMA ADDITIONS
-  # (appended to components.schemas section via tag in existing file)
-  # ──────────────────────────────────────────────
+  # ─── EXIT MANAGEMENT ──────────────────────────────────────────────────────────
+  /exit/requests:
+    get:
+      operationId: listExitRequests
+      tags: [exit]
+      summary: List exit requests (HR sees all; employees see own)
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: exitType, schema: { type: string } }
+        - { in: query, name: employeeId, schema: { type: integer } }
+      responses:
+        "200":
+          description: List of exit requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExitRequest" }
+    post:
+      operationId: createExitRequest
+      tags: [exit]
+      summary: Submit a resignation or initiate exit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateExitRequestBody" }
+      responses:
+        "201":
+          description: Exit request created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExitRequest" }
+
+  /exit/requests/{id}:
+    get:
+      operationId: getExitRequest
+      tags: [exit]
+      summary: Get exit request detail
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Exit request detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExitRequestDetail" }
+    put:
+      operationId: updateExitRequest
+      tags: [exit]
+      summary: Update exit request status or details (HR)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateExitRequestBody" }
+      responses:
+        "200":
+          description: Updated exit request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExitRequest" }
+
+  /exit/requests/{id}/clearance-tasks:
+    get:
+      operationId: listClearanceTasks
+      tags: [exit]
+      summary: List clearance tasks for an exit request
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: List of clearance tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ClearanceTask" }
+
+  /exit/clearance-tasks/{taskId}:
+    put:
+      operationId: updateClearanceTask
+      tags: [exit]
+      summary: Complete or update a clearance task
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateClearanceTaskBody" }
+      responses:
+        "200":
+          description: Updated clearance task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClearanceTask" }
+
+  /exit/requests/{id}/fnf:
+    get:
+      operationId: getFnfComputation
+      tags: [exit]
+      summary: Get FnF computation for an exit request
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: FnF computation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FnfComputation" }
+    post:
+      operationId: computeFnf
+      tags: [exit]
+      summary: Compute or recompute FnF settlement
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComputeFnfBody" }
+      responses:
+        "200":
+          description: FnF computation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FnfComputation" }
+
+  /exit/requests/{id}/fnf/approve:
+    post:
+      operationId: approveFnf
+      tags: [exit]
+      summary: Approve FnF (HR Manager or Finance Head)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApproveFnfBody" }
+      responses:
+        "200":
+          description: Approval recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FnfComputation" }
+
+  /exit/requests/{id}/interview:
+    get:
+      operationId: getExitInterview
+      tags: [exit]
+      summary: Get exit interview for an exit request
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Exit interview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExitInterview" }
+    post:
+      operationId: submitExitInterview
+      tags: [exit]
+      summary: Submit exit interview responses
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitExitInterviewBody" }
+      responses:
+        "200":
+          description: Interview submitted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExitInterview" }
+
+  # ─── ANALYTICS DASHBOARD ──────────────────────────────────────────────────────
+  /analytics/dashboard:
+    get:
+      operationId: getDashboardAnalytics
+      tags: [analytics]
+      summary: Executive dashboard KPIs — headcount, attrition, attendance, open positions, pending approvals
+      responses:
+        "200":
+          description: Dashboard KPI data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardAnalytics" }
+
+  # ─── REPORTS ──────────────────────────────────────────────────────────────────
+  /reports/employee-directory:
+    get:
+      operationId: getEmployeeDirectoryReport
+      tags: [reports]
+      summary: Employee directory report
+      parameters:
+        - { in: query, name: departmentId, schema: { type: integer } }
+        - { in: query, name: designationId, schema: { type: integer } }
+        - { in: query, name: employmentType, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: location, schema: { type: string } }
+        - { in: query, name: format, schema: { type: string, enum: [json, csv] } }
+      responses:
+        "200":
+          description: Employee directory data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/attendance-summary:
+    get:
+      operationId: getAttendanceSummaryReport
+      tags: [reports]
+      summary: Attendance summary report
+      parameters:
+        - { in: query, name: fromDate, schema: { type: string } }
+        - { in: query, name: toDate, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+        - { in: query, name: employeeId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Attendance summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/leave-utilization:
+    get:
+      operationId: getLeaveUtilizationReport
+      tags: [reports]
+      summary: Leave utilization report
+      parameters:
+        - { in: query, name: fromDate, schema: { type: string } }
+        - { in: query, name: toDate, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+        - { in: query, name: leaveType, schema: { type: string } }
+      responses:
+        "200":
+          description: Leave utilization data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/payroll-register:
+    get:
+      operationId: getPayrollRegisterReport
+      tags: [reports]
+      summary: Payroll register report
+      parameters:
+        - { in: query, name: month, schema: { type: string } }
+        - { in: query, name: year, schema: { type: integer } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Payroll register data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/headcount:
+    get:
+      operationId: getHeadcountReport
+      tags: [reports]
+      summary: Headcount report by department, type, and date range
+      parameters:
+        - { in: query, name: fromDate, schema: { type: string } }
+        - { in: query, name: toDate, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Headcount analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/attrition:
+    get:
+      operationId: getAttritionReport
+      tags: [reports]
+      summary: Attrition report
+      parameters:
+        - { in: query, name: fromDate, schema: { type: string } }
+        - { in: query, name: toDate, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Attrition analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/performance-summary:
+    get:
+      operationId: getPerformanceSummaryReport
+      tags: [reports]
+      summary: Performance summary report
+      parameters:
+        - { in: query, name: cycleId, schema: { type: integer } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Performance summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/recruitment-pipeline:
+    get:
+      operationId: getRecruitmentPipelineReport
+      tags: [reports]
+      summary: Recruitment pipeline report
+      parameters:
+        - { in: query, name: fromDate, schema: { type: string } }
+        - { in: query, name: toDate, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Recruitment pipeline data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  # ─── REPORT SCHEDULES ─────────────────────────────────────────────────────────
+  /report-schedules:
+    get:
+      operationId: listReportSchedules
+      tags: [reports]
+      summary: List configured report schedules
+      responses:
+        "200":
+          description: Report schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReportSchedule" }
+    post:
+      operationId: createReportSchedule
+      tags: [reports]
+      summary: Create a report schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReportScheduleBody" }
+      responses:
+        "201":
+          description: Schedule created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportSchedule" }
+
+  /report-schedules/{id}:
+    put:
+      operationId: updateReportSchedule
+      tags: [reports]
+      summary: Update a report schedule
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReportScheduleBody" }
+      responses:
+        "200":
+          description: Updated schedule
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportSchedule" }
+    delete:
+      operationId: deleteReportSchedule
+      tags: [reports]
+      summary: Delete a report schedule
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Deleted
+
+  # ─── CUSTOM REPORT TEMPLATES ──────────────────────────────────────────────────
+  /report-templates:
+    get:
+      operationId: listSavedReportTemplates
+      tags: [reports]
+      summary: List saved custom report templates
+      responses:
+        "200":
+          description: Saved report templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SavedReportTemplate" }
+    post:
+      operationId: createSavedReportTemplate
+      tags: [reports]
+      summary: Save a custom report template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSavedReportTemplateBody" }
+      responses:
+        "201":
+          description: Template saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SavedReportTemplate" }
+
+  /report-templates/{id}:
+    delete:
+      operationId: deleteSavedReportTemplate
+      tags: [reports]
+      summary: Delete a saved report template
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Deleted
+
+  /reports/custom:
+    post:
+      operationId: runCustomReport
+      tags: [reports]
+      summary: Run a custom report with specified fields and filters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RunCustomReportBody" }
+      responses:
+        "200":
+          description: Custom report results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  # ──────────────────────────────────────────────────────────────────────────────
 
 components:
   schemas:
@@ -6960,3 +7436,239 @@ components:
         fieldValues:
           type: object
           additionalProperties: true
+
+    ExitRequest:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ['string', 'null'] }
+        employeeCode: { type: ['string', 'null'] }
+        departmentName: { type: ['string', 'null'] }
+        exitType:
+          type: string
+          enum: [Resignation, Termination, Retirement, "Contract Expiry"]
+        status:
+          type: string
+          enum: [Submitted, "HR Reviewing", "Notice Period", "Clearance Pending", "FnF Pending", "FnF Approved", Separated, Rejected, Withdrawn]
+        reason: { type: string }
+        requestedLwd: { type: ['string', 'null'] }
+        actualLwd: { type: ['string', 'null'] }
+        noticePeriodDays: { type: ['integer', 'null'] }
+        noticePeriodWaived: { type: boolean }
+        noticePeriodBuyout: { type: boolean }
+        hrRemarks: { type: ['string', 'null'] }
+        initiatedByUserId: { type: ['integer', 'null'] }
+        approvedByUserId: { type: ['integer', 'null'] }
+        approvedAt: { type: ['string', 'null'], format: date-time }
+        separatedAt: { type: ['string', 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, employeeId, exitType, status, reason, requestedLwd, noticePeriodWaived, noticePeriodBuyout, createdAt]
+
+    ExitRequestDetail:
+      allOf:
+        - $ref: "#/components/schemas/ExitRequest"
+        - type: object
+          properties:
+            clearanceTasks:
+              type: array
+              items: { $ref: "#/components/schemas/ClearanceTask" }
+            fnfComputation:
+              allOf:
+                - $ref: "#/components/schemas/FnfComputation"
+              nullable: true
+            exitInterview:
+              allOf:
+                - $ref: "#/components/schemas/ExitInterview"
+              nullable: true
+
+    CreateExitRequestBody:
+      type: object
+      required: [exitType, reason, requestedLwd]
+      properties:
+        exitType:
+          type: string
+          enum: [Resignation, Termination, Retirement, "Contract Expiry"]
+        reason: { type: string }
+        requestedLwd: { type: string }
+        employeeId: { type: integer }
+
+    UpdateExitRequestBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Submitted, "HR Reviewing", "Notice Period", "Clearance Pending", "FnF Pending", "FnF Approved", Separated, Rejected, Withdrawn]
+        actualLwd: { type: string }
+        noticePeriodDays: { type: integer }
+        noticePeriodWaived: { type: boolean }
+        noticePeriodBuyout: { type: boolean }
+        hrRemarks: { type: string }
+
+    ClearanceTask:
+      type: object
+      properties:
+        id: { type: integer }
+        exitRequestId: { type: integer }
+        department: { type: string }
+        taskName: { type: string }
+        description: { type: ['string', 'null'] }
+        assignedToUserId: { type: ['integer', 'null'] }
+        assigneeName: { type: ['string', 'null'] }
+        dueDate: { type: ['string', 'null'] }
+        status:
+          type: string
+          enum: [Pending, Completed, Waived]
+        completedAt: { type: ['string', 'null'], format: date-time }
+        remarks: { type: ['string', 'null'] }
+      required: [id, exitRequestId, department, taskName, status]
+
+    UpdateClearanceTaskBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Pending, Completed, Waived]
+        remarks: { type: string }
+
+    FnfComputation:
+      type: object
+      properties:
+        id: { type: integer }
+        exitRequestId: { type: integer }
+        pendingSalary: { type: string }
+        leaveEncashment: { type: string }
+        gratuity: { type: string }
+        bonusProration: { type: string }
+        noticePeriodLop: { type: string }
+        otherDeductions: { type: string }
+        totalPayable: { type: string }
+        computedByUserId: { type: ['integer', 'null'] }
+        computedAt: { type: ['string', 'null'], format: date-time }
+        hrApprovedByUserId: { type: ['integer', 'null'] }
+        hrApprovedAt: { type: ['string', 'null'], format: date-time }
+        financeApprovedByUserId: { type: ['integer', 'null'] }
+        financeApprovedAt: { type: ['string', 'null'], format: date-time }
+        remarks: { type: ['string', 'null'] }
+      required: [id, exitRequestId, pendingSalary, leaveEncashment, gratuity, bonusProration, noticePeriodLop, otherDeductions, totalPayable]
+
+    ComputeFnfBody:
+      type: object
+      properties:
+        pendingSalary: { type: number }
+        leaveEncashment: { type: number }
+        gratuity: { type: number }
+        bonusProration: { type: number }
+        noticePeriodLop: { type: number }
+        otherDeductions: { type: number }
+        remarks: { type: string }
+
+    ApproveFnfBody:
+      type: object
+      required: [approverRole]
+      properties:
+        approverRole:
+          type: string
+          enum: [hr, finance]
+        remarks: { type: string }
+
+    ExitInterview:
+      type: object
+      properties:
+        id: { type: integer }
+        exitRequestId: { type: integer }
+        employeeId: { type: integer }
+        questions: { type: array, items: { type: object } }
+        responses: { type: array, items: { type: object } }
+        submittedAt: { type: ['string', 'null'], format: date-time }
+      required: [id, exitRequestId, employeeId]
+
+    SubmitExitInterviewBody:
+      type: object
+      required: [responses]
+      properties:
+        responses:
+          type: array
+          items: { type: object }
+
+    DashboardAnalytics:
+      type: object
+      properties:
+        totalHeadcount: { type: integer }
+        newJoinersThisMonth: { type: integer }
+        attritionRate: { type: number }
+        attendanceTodayRate: { type: number }
+        openPositions: { type: integer }
+        pendingApprovals: { type: integer }
+        separatedThisMonth: { type: integer }
+        byDepartment:
+          type: array
+          items:
+            type: object
+            properties:
+              departmentName: { type: string }
+              headcount: { type: integer }
+        headcountTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              month: { type: string }
+              headcount: { type: integer }
+              joiners: { type: integer }
+              leavers: { type: integer }
+
+    ReportSchedule:
+      type: object
+      properties:
+        id: { type: integer }
+        reportType: { type: string }
+        name: { type: string }
+        frequency: { type: string }
+        recipients: { type: array, items: { type: string } }
+        filters: { type: object }
+        isActive: { type: boolean }
+        lastRunAt: { type: ['string', 'null'], format: date-time }
+        createdByUserId: { type: ['integer', 'null'] }
+        createdAt: { type: string, format: date-time }
+      required: [id, reportType, name, frequency, recipients, filters, isActive, createdAt]
+
+    CreateReportScheduleBody:
+      type: object
+      required: [reportType, name, frequency, recipients]
+      properties:
+        reportType: { type: string }
+        name: { type: string }
+        frequency: { type: string }
+        recipients: { type: array, items: { type: string } }
+        filters: { type: object }
+        isActive: { type: boolean }
+
+    SavedReportTemplate:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        reportType: { type: string }
+        selectedFields: { type: array, items: { type: string } }
+        filters: { type: object }
+        createdByUserId: { type: ['integer', 'null'] }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, reportType, selectedFields, filters, createdAt]
+
+    CreateSavedReportTemplateBody:
+      type: object
+      required: [name, reportType, selectedFields]
+      properties:
+        name: { type: string }
+        reportType: { type: string }
+        selectedFields: { type: array, items: { type: string } }
+        filters: { type: object }
+
+    RunCustomReportBody:
+      type: object
+      required: [reportType, selectedFields]
+      properties:
+        reportType: { type: string }
+        selectedFields: { type: array, items: { type: string } }
+        filters: { type: object }
