@@ -1651,6 +1651,379 @@ export interface PermissionOverrideBody {
   justification: string;
 }
 
+export interface SalaryComponent {
+  id: number;
+  salaryStructureId: number;
+  componentType: string;
+  componentName: string;
+  amount: string;
+  /** @nullable */
+  percentageOfBasic?: string | null;
+  isEarning: boolean;
+  sequence: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface SalaryStructure {
+  id: number;
+  employeeId: number;
+  name: string;
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+  grossCtc: string;
+  annualCtc: string;
+  isActive: boolean;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+}
+
+export type SalaryStructureDetail = SalaryStructure & {
+  components?: SalaryComponent[];
+};
+
+export type CreateSalaryStructureBodyComponentsItem = {
+  componentType: string;
+  componentName: string;
+  amount: string;
+  /** @nullable */
+  percentageOfBasic?: string | null;
+  isEarning: boolean;
+  sequence?: number;
+};
+
+export interface CreateSalaryStructureBody {
+  employeeId: number;
+  name: string;
+  effectiveFrom: string;
+  grossCtc: string;
+  annualCtc: string;
+  /** @nullable */
+  notes?: string | null;
+  components: CreateSalaryStructureBodyComponentsItem[];
+}
+
+export type UpdateSalaryStructureBodyComponentsItem = {
+  componentType?: string;
+  componentName?: string;
+  amount?: string;
+  /** @nullable */
+  percentageOfBasic?: string | null;
+  isEarning?: boolean;
+  sequence?: number;
+  isActive?: boolean;
+};
+
+export interface UpdateSalaryStructureBody {
+  name?: string;
+  effectiveFrom?: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+  grossCtc?: string;
+  annualCtc?: string;
+  isActive?: boolean;
+  /** @nullable */
+  notes?: string | null;
+  components?: UpdateSalaryStructureBodyComponentsItem[];
+}
+
+export interface LoanRepayment {
+  id: number;
+  employeeId: number;
+  loanType: string;
+  principalAmount: string;
+  monthlyDeduction: string;
+  outstandingAmount: string;
+  isActive: boolean;
+  startDate: string;
+  /** @nullable */
+  endDate?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+}
+
+export interface CreateLoanBody {
+  employeeId: number;
+  loanType: string;
+  principalAmount: string;
+  monthlyDeduction: string;
+  startDate: string;
+  /** @nullable */
+  endDate?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export type TaxDeclarationRegime =
+  (typeof TaxDeclarationRegime)[keyof typeof TaxDeclarationRegime];
+
+export const TaxDeclarationRegime = {
+  Old: "Old",
+  New: "New",
+} as const;
+
+export interface TaxDeclaration {
+  id: number;
+  employeeId: number;
+  financialYear: string;
+  regime: TaxDeclarationRegime;
+  investmentDeclarations?: unknown;
+  declarationDate: string;
+  isCurrent: boolean;
+  createdAt: string;
+  /** @nullable */
+  employeeName?: string | null;
+}
+
+export type CreateTaxDeclarationBodyRegime =
+  (typeof CreateTaxDeclarationBodyRegime)[keyof typeof CreateTaxDeclarationBodyRegime];
+
+export const CreateTaxDeclarationBodyRegime = {
+  Old: "Old",
+  New: "New",
+} as const;
+
+export interface CreateTaxDeclarationBody {
+  employeeId: number;
+  financialYear: string;
+  regime: CreateTaxDeclarationBodyRegime;
+  investmentDeclarations?: unknown;
+  declarationDate: string;
+}
+
+export interface PayrollLock {
+  id: number;
+  year: number;
+  month: number;
+  isLocked: boolean;
+  /** @nullable */
+  lockedById?: number | null;
+  /** @nullable */
+  lockedAt?: string | null;
+  /** @nullable */
+  unlockedById?: number | null;
+  /** @nullable */
+  unlockedAt?: string | null;
+  createdAt: string;
+}
+
+export type PayrollLockExceptionStatus =
+  (typeof PayrollLockExceptionStatus)[keyof typeof PayrollLockExceptionStatus];
+
+export const PayrollLockExceptionStatus = {
+  Pending: "Pending",
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface PayrollLockException {
+  id: number;
+  payrollLockId: number;
+  /** @nullable */
+  requestedById?: number | null;
+  reason: string;
+  exceptionType: string;
+  status: PayrollLockExceptionStatus;
+  /** @nullable */
+  approvedById?: number | null;
+  /** @nullable */
+  approvalRemarks?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  createdAt: string;
+  /** @nullable */
+  requesterName?: string | null;
+  /** @nullable */
+  lockYear?: number | null;
+  /** @nullable */
+  lockMonth?: number | null;
+}
+
+export type CreateLockExceptionBodyExceptionType =
+  (typeof CreateLockExceptionBodyExceptionType)[keyof typeof CreateLockExceptionBodyExceptionType];
+
+export const CreateLockExceptionBodyExceptionType = {
+  edit_salary: "edit_salary",
+  edit_attendance: "edit_attendance",
+  edit_leave_balance: "edit_leave_balance",
+  edit_bank_account: "edit_bank_account",
+} as const;
+
+export interface CreateLockExceptionBody {
+  payrollLockId: number;
+  reason: string;
+  exceptionType: CreateLockExceptionBodyExceptionType;
+}
+
+export type SalaryRevisionStatus =
+  (typeof SalaryRevisionStatus)[keyof typeof SalaryRevisionStatus];
+
+export const SalaryRevisionStatus = {
+  Pending: "Pending",
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface SalaryRevision {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  oldStructureId?: number | null;
+  /** @nullable */
+  newStructureId?: number | null;
+  effectiveDate: string;
+  reason: string;
+  status: SalaryRevisionStatus;
+  /** @nullable */
+  requestedById?: number | null;
+  /** @nullable */
+  approvedById?: number | null;
+  /** @nullable */
+  approvalRemarks?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  createdAt: string;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+}
+
+export interface CreateSalaryRevisionBody {
+  employeeId: number;
+  /** @nullable */
+  oldStructureId?: number | null;
+  newStructureId: number;
+  effectiveDate: string;
+  reason: string;
+}
+
+export type PayrollRunStatus =
+  (typeof PayrollRunStatus)[keyof typeof PayrollRunStatus];
+
+export const PayrollRunStatus = {
+  Draft: "Draft",
+  Processing: "Processing",
+  Computed: "Computed",
+  Approved: "Approved",
+  Locked: "Locked",
+} as const;
+
+export interface PayrollRun {
+  id: number;
+  periodYear: number;
+  periodMonth: number;
+  status: PayrollRunStatus;
+  totalEmployees: number;
+  totalGross: string;
+  totalDeductions: string;
+  totalNet: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  runAt?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  createdAt: string;
+  /** @nullable */
+  initiatorName?: string | null;
+}
+
+export interface CreatePayrollRunBody {
+  periodYear: number;
+  periodMonth: number;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface PayrollRecord {
+  id: number;
+  payrollRunId: number;
+  employeeId: number;
+  workingDays: string;
+  presentDays: string;
+  lopDays: string;
+  grossEarnings: string;
+  totalDeductions: string;
+  netPay: string;
+  tds?: string;
+  pfEmployee?: string;
+  professionalTax?: string;
+  loanDeduction?: string;
+  /** @nullable */
+  taxRegime?: string | null;
+  status: string;
+  basic?: string;
+  hra?: string;
+  createdAt: string;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+}
+
+export interface PayslipSummary {
+  id: number;
+  payrollRecordId: number;
+  employeeId: number;
+  periodYear: number;
+  periodMonth: number;
+  generatedAt: string;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  netPay?: string | null;
+}
+
+export interface PayslipDetail {
+  id: number;
+  payrollRecordId: number;
+  employeeId: number;
+  periodYear: number;
+  periodMonth: number;
+  payslipData?: unknown;
+  /** @nullable */
+  htmlContent?: string | null;
+  generatedAt: string;
+}
+
+export type StatutoryReportRecordsItem = { [key: string]: unknown };
+
+export type StatutoryReportSummary = { [key: string]: unknown };
+
+export interface StatutoryReport {
+  period: string;
+  records: StatutoryReportRecordsItem[];
+  summary: StatutoryReportSummary;
+}
+
+export type ActionBodyAction =
+  (typeof ActionBodyAction)[keyof typeof ActionBodyAction];
+
+export const ActionBodyAction = {
+  approve: "approve",
+  reject: "reject",
+} as const;
+
+export interface ActionBody {
+  action: ActionBodyAction;
+  /** @nullable */
+  approvalRemarks?: string | null;
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -1970,3 +2343,84 @@ export type GetPermissionRegisterParams = {
    */
   month?: string;
 };
+
+export type ListSalaryStructuresParams = {
+  employeeId?: number;
+  isActive?: string;
+};
+
+export type ListLoansParams = {
+  employeeId?: number;
+  isActive?: string;
+};
+
+export type UpdateLoanBody = {
+  outstandingAmount?: string;
+  monthlyDeduction?: string;
+  isActive?: boolean;
+  /** @nullable */
+  notes?: string | null;
+};
+
+export type ListTaxDeclarationsParams = {
+  employeeId?: number;
+  financialYear?: string;
+};
+
+export type ListPayrollLocksParams = {
+  year?: number;
+  month?: number;
+};
+
+export type ListSalaryRevisionsParams = {
+  employeeId?: number;
+  status?: string;
+};
+
+export type ComputePayrollRun200 = {
+  message?: string;
+  totalEmployees?: number;
+  totalGross?: number;
+  totalNet?: number;
+};
+
+export type ApprovePayrollRun200 = {
+  message?: string;
+};
+
+export type FinalizePayrollRun200 = {
+  message?: string;
+};
+
+export type ListPayslipsParams = {
+  employeeId?: number;
+  year?: number;
+  month?: number;
+};
+
+export type GetPfEcrReportParams = {
+  year: string;
+  month: string;
+};
+
+export type GetEsiReportParams = {
+  year: string;
+  month: string;
+};
+
+export type GetPtReportParams = {
+  year: string;
+  month: string;
+};
+
+export type GetTdsSummaryReportParams = {
+  year: string;
+  month: string;
+};
+
+export type GetBankTransferReportParams = {
+  year: string;
+  month: string;
+};
+
+export type GetForm16Report200 = { [key: string]: unknown };

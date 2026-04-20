@@ -31,6 +31,13 @@ import LeaveCalendarPage from "@/pages/leave/calendar";
 import LeaveApprovalsPage from "@/pages/leave/approvals";
 import LeavePoliciesPage from "@/pages/leave/policies";
 import PermissionsPage from "@/pages/permissions/index";
+import PayrollDashboardPage from "@/pages/payroll/index";
+import SalaryStructuresPage from "@/pages/payroll/salary-structures";
+import PayrollRunDetailPage from "@/pages/payroll/runs";
+import PayslipsPage from "@/pages/payroll/payslips";
+import TaxDeclarationPage from "@/pages/payroll/tax-declaration";
+import StatutoryReportsPage from "@/pages/payroll/reports";
+import SalaryRevisionsPage from "@/pages/payroll/salary-revisions";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -428,6 +435,62 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
                 <PermissionsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/payroll/salary-structures">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "payroll_admin"]}>
+                <SalaryStructuresPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/payroll/runs/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "payroll_admin"]}>
+                <PayrollRunDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/payroll/payslips">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "payroll_admin", "employee"]}>
+                <PayslipsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/payroll/tax-declaration">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "payroll_admin", "employee"]}>
+                <TaxDeclarationPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/payroll/reports">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "payroll_admin"]}>
+                <StatutoryReportsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/payroll/salary-revisions">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "payroll_admin"]}>
+                <SalaryRevisionsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/payroll">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "payroll_admin", "employee"]}>
+                <PayrollDashboardPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

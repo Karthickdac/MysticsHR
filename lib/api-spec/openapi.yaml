@@ -34,6 +34,8 @@ tags:
     description: Audit log access
   - name: dashboard
     description: Dashboard and analytics
+  - name: payroll
+    description: Payroll management — salary structures, runs, payslips, TDS, statutory reports
 
 paths:
   /healthz:
@@ -2842,6 +2844,689 @@ paths:
               schema:
                 $ref: "#/components/schemas/PermissionRegister"
 
+  # ──────────────────────────────────────────────
+  # PAYROLL
+  # ──────────────────────────────────────────────
+
+  /payroll/salary-structures:
+    get:
+      operationId: listSalaryStructures
+      tags: [payroll]
+      summary: List salary structures
+      parameters:
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+        - name: isActive
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of salary structures
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalaryStructure"
+    post:
+      operationId: createSalaryStructure
+      tags: [payroll]
+      summary: Create a salary structure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSalaryStructureBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryStructure"
+
+  /payroll/salary-structures/{id}:
+    get:
+      operationId: getSalaryStructure
+      tags: [payroll]
+      summary: Get salary structure with components
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Salary structure detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryStructureDetail"
+    put:
+      operationId: updateSalaryStructure
+      tags: [payroll]
+      summary: Update a salary structure
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSalaryStructureBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryStructure"
+
+  /payroll/loans:
+    get:
+      operationId: listLoans
+      tags: [payroll]
+      summary: List loan repayments
+      parameters:
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+        - name: isActive
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Loan list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LoanRepayment"
+    post:
+      operationId: createLoan
+      tags: [payroll]
+      summary: Create a loan repayment record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoanBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoanRepayment"
+
+  /payroll/loans/{id}:
+    patch:
+      operationId: updateLoan
+      tags: [payroll]
+      summary: Update loan outstanding/deduction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                outstandingAmount: { type: string }
+                monthlyDeduction: { type: string }
+                isActive: { type: boolean }
+                notes: { type: ["string", "null"] }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoanRepayment"
+
+  /payroll/tax-declarations:
+    get:
+      operationId: listTaxDeclarations
+      tags: [payroll]
+      summary: List tax regime declarations
+      parameters:
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+        - name: financialYear
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaxDeclaration"
+    post:
+      operationId: createTaxDeclaration
+      tags: [payroll]
+      summary: Submit or update tax regime declaration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaxDeclarationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxDeclaration"
+
+  /payroll/locks:
+    get:
+      operationId: listPayrollLocks
+      tags: [payroll]
+      summary: List payroll lock records
+      parameters:
+        - name: year
+          in: query
+          schema: { type: integer }
+        - name: month
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Lock list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollLock"
+
+  /payroll/locks/{year}/{month}/lock:
+    post:
+      operationId: lockPayroll
+      tags: [payroll]
+      summary: Lock payroll for a period
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: month
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Lock created/updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollLock"
+
+  /payroll/locks/{year}/{month}/unlock:
+    post:
+      operationId: unlockPayroll
+      tags: [payroll]
+      summary: Unlock payroll for a period (Super Admin only)
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: month
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollLock"
+
+  /payroll/lock-exceptions:
+    get:
+      operationId: listLockExceptions
+      tags: [payroll]
+      summary: List payroll lock exception requests
+      responses:
+        "200":
+          description: Exception list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollLockException"
+    post:
+      operationId: createLockException
+      tags: [payroll]
+      summary: Raise a payroll lock exception request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLockExceptionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollLockException"
+
+  /payroll/lock-exceptions/{id}/action:
+    post:
+      operationId: actionLockException
+      tags: [payroll]
+      summary: Approve or reject a lock exception (Super Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollLockException"
+
+  /payroll/salary-revisions:
+    get:
+      operationId: listSalaryRevisions
+      tags: [payroll]
+      summary: List salary revisions
+      parameters:
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalaryRevision"
+    post:
+      operationId: createSalaryRevision
+      tags: [payroll]
+      summary: Create a salary revision request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSalaryRevisionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryRevision"
+
+  /payroll/salary-revisions/{id}/action:
+    post:
+      operationId: actionSalaryRevision
+      tags: [payroll]
+      summary: Approve or reject a salary revision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryRevision"
+
+  /payroll/runs:
+    get:
+      operationId: listPayrollRuns
+      tags: [payroll]
+      summary: List payroll runs
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollRun"
+    post:
+      operationId: createPayrollRun
+      tags: [payroll]
+      summary: Initiate a new payroll run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePayrollRunBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollRun"
+
+  /payroll/runs/{id}:
+    get:
+      operationId: getPayrollRun
+      tags: [payroll]
+      summary: Get a payroll run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Run detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollRun"
+
+  /payroll/runs/{id}/compute:
+    post:
+      operationId: computePayrollRun
+      tags: [payroll]
+      summary: Trigger payroll computation for a run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Computed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  totalEmployees: { type: integer }
+                  totalGross: { type: number }
+                  totalNet: { type: number }
+
+  /payroll/runs/{id}/approve:
+    post:
+      operationId: approvePayrollRun
+      tags: [payroll]
+      summary: Approve a payroll run and generate payslips
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+
+  /payroll/runs/{id}/finalize:
+    post:
+      operationId: finalizePayrollRun
+      tags: [payroll]
+      summary: Finalize a payroll run (marks as Locked/Paid)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Finalized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+
+  /payroll/runs/{id}/records:
+    get:
+      operationId: getPayrollRunRecords
+      tags: [payroll]
+      summary: Get per-employee records for a payroll run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Records list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollRecord"
+
+  /payroll/payslips:
+    get:
+      operationId: listPayslips
+      tags: [payroll]
+      summary: List payslips (employee sees own, HR sees all)
+      parameters:
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+        - name: year
+          in: query
+          schema: { type: integer }
+        - name: month
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Payslip list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayslipSummary"
+
+  /payroll/payslips/{id}:
+    get:
+      operationId: getPayslip
+      tags: [payroll]
+      summary: Get full payslip data (including HTML)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Payslip detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayslipDetail"
+
+  /payroll/reports/pf-ecr:
+    get:
+      operationId: getPfEcrReport
+      tags: [payroll]
+      summary: PF ECR File report
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema: { type: string }
+        - name: month
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: PF ECR data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatutoryReport"
+
+  /payroll/reports/esi:
+    get:
+      operationId: getEsiReport
+      tags: [payroll]
+      summary: ESI Contribution Report
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema: { type: string }
+        - name: month
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: ESI data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatutoryReport"
+
+  /payroll/reports/pt:
+    get:
+      operationId: getPtReport
+      tags: [payroll]
+      summary: Professional Tax Register
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema: { type: string }
+        - name: month
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: PT data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatutoryReport"
+
+  /payroll/reports/tds-summary:
+    get:
+      operationId: getTdsSummaryReport
+      tags: [payroll]
+      summary: TDS Summary Report
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema: { type: string }
+        - name: month
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: TDS data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatutoryReport"
+
+  /payroll/reports/bank-transfer:
+    get:
+      operationId: getBankTransferReport
+      tags: [payroll]
+      summary: Bank Transfer File export
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema: { type: string }
+        - name: month
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Bank transfer data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatutoryReport"
+
+  /payroll/reports/form-16/{employeeId}/{year}:
+    get:
+      operationId: getForm16Report
+      tags: [payroll]
+      summary: Form 16 generation for an employee FY
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: year
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Form 16 data
+          content:
+            application/json:
+              schema:
+                type: object
+
 components:
   schemas:
     ShiftTemplate:
@@ -4739,3 +5424,313 @@ components:
         month: { type: integer }
         newLimitMinutes: { type: integer }
         justification: { type: string }
+
+    # ─── PAYROLL SCHEMAS ───────────────────────────────────────────────────────
+
+    SalaryComponent:
+      type: object
+      properties:
+        id: { type: integer }
+        salaryStructureId: { type: integer }
+        componentType: { type: string }
+        componentName: { type: string }
+        amount: { type: string }
+        percentageOfBasic: { type: ["string", "null"] }
+        isEarning: { type: boolean }
+        sequence: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required: [id, salaryStructureId, componentType, componentName, amount, isEarning, sequence, isActive, createdAt]
+
+    SalaryStructure:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        name: { type: string }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+        grossCtc: { type: string }
+        annualCtc: { type: string }
+        isActive: { type: boolean }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+      required: [id, employeeId, name, effectiveFrom, grossCtc, annualCtc, isActive, createdAt]
+
+    SalaryStructureDetail:
+      allOf:
+        - $ref: "#/components/schemas/SalaryStructure"
+        - type: object
+          properties:
+            components:
+              type: array
+              items:
+                $ref: "#/components/schemas/SalaryComponent"
+
+    CreateSalaryStructureBody:
+      type: object
+      required: [employeeId, name, effectiveFrom, grossCtc, annualCtc, components]
+      properties:
+        employeeId: { type: integer }
+        name: { type: string }
+        effectiveFrom: { type: string, format: date }
+        grossCtc: { type: string }
+        annualCtc: { type: string }
+        notes: { type: ["string", "null"] }
+        components:
+          type: array
+          items:
+            type: object
+            required: [componentType, componentName, amount, isEarning]
+            properties:
+              componentType: { type: string }
+              componentName: { type: string }
+              amount: { type: string }
+              percentageOfBasic: { type: ["string", "null"] }
+              isEarning: { type: boolean }
+              sequence: { type: integer }
+
+    UpdateSalaryStructureBody:
+      type: object
+      properties:
+        name: { type: string }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+        grossCtc: { type: string }
+        annualCtc: { type: string }
+        isActive: { type: boolean }
+        notes: { type: ["string", "null"] }
+        components:
+          type: array
+          items:
+            type: object
+            properties:
+              componentType: { type: string }
+              componentName: { type: string }
+              amount: { type: string }
+              percentageOfBasic: { type: ["string", "null"] }
+              isEarning: { type: boolean }
+              sequence: { type: integer }
+              isActive: { type: boolean }
+
+    LoanRepayment:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        loanType: { type: string }
+        principalAmount: { type: string }
+        monthlyDeduction: { type: string }
+        outstandingAmount: { type: string }
+        isActive: { type: boolean }
+        startDate: { type: string, format: date }
+        endDate: { type: ["string", "null"], format: date }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+      required: [id, employeeId, loanType, principalAmount, monthlyDeduction, outstandingAmount, isActive, startDate, createdAt]
+
+    CreateLoanBody:
+      type: object
+      required: [employeeId, loanType, principalAmount, monthlyDeduction, startDate]
+      properties:
+        employeeId: { type: integer }
+        loanType: { type: string }
+        principalAmount: { type: string }
+        monthlyDeduction: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: ["string", "null"], format: date }
+        notes: { type: ["string", "null"] }
+
+    TaxDeclaration:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        financialYear: { type: string }
+        regime: { type: string, enum: [Old, New] }
+        investmentDeclarations: {}
+        declarationDate: { type: string, format: date }
+        isCurrent: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        employeeName: { type: ["string", "null"] }
+      required: [id, employeeId, financialYear, regime, declarationDate, isCurrent, createdAt]
+
+    CreateTaxDeclarationBody:
+      type: object
+      required: [employeeId, financialYear, regime, declarationDate]
+      properties:
+        employeeId: { type: integer }
+        financialYear: { type: string }
+        regime: { type: string, enum: [Old, New] }
+        investmentDeclarations: {}
+        declarationDate: { type: string, format: date }
+
+    PayrollLock:
+      type: object
+      properties:
+        id: { type: integer }
+        year: { type: integer }
+        month: { type: integer }
+        isLocked: { type: boolean }
+        lockedById: { type: ["integer", "null"] }
+        lockedAt: { type: ["string", "null"], format: date-time }
+        unlockedById: { type: ["integer", "null"] }
+        unlockedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, year, month, isLocked, createdAt]
+
+    PayrollLockException:
+      type: object
+      properties:
+        id: { type: integer }
+        payrollLockId: { type: integer }
+        requestedById: { type: ["integer", "null"] }
+        reason: { type: string }
+        exceptionType: { type: string }
+        status: { type: string, enum: [Pending, Approved, Rejected] }
+        approvedById: { type: ["integer", "null"] }
+        approvalRemarks: { type: ["string", "null"] }
+        approvedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        requesterName: { type: ["string", "null"] }
+        lockYear: { type: ["integer", "null"] }
+        lockMonth: { type: ["integer", "null"] }
+      required: [id, payrollLockId, reason, exceptionType, status, createdAt]
+
+    CreateLockExceptionBody:
+      type: object
+      required: [payrollLockId, reason, exceptionType]
+      properties:
+        payrollLockId: { type: integer }
+        reason: { type: string }
+        exceptionType: { type: string, enum: [edit_salary, edit_attendance, edit_leave_balance, edit_bank_account] }
+
+    SalaryRevision:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        oldStructureId: { type: ["integer", "null"] }
+        newStructureId: { type: ["integer", "null"] }
+        effectiveDate: { type: string, format: date }
+        reason: { type: string }
+        status: { type: string, enum: [Pending, Approved, Rejected] }
+        requestedById: { type: ["integer", "null"] }
+        approvedById: { type: ["integer", "null"] }
+        approvalRemarks: { type: ["string", "null"] }
+        approvedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+      required: [id, employeeId, effectiveDate, reason, status, createdAt]
+
+    CreateSalaryRevisionBody:
+      type: object
+      required: [employeeId, newStructureId, effectiveDate, reason]
+      properties:
+        employeeId: { type: integer }
+        oldStructureId: { type: ["integer", "null"] }
+        newStructureId: { type: integer }
+        effectiveDate: { type: string, format: date }
+        reason: { type: string }
+
+    PayrollRun:
+      type: object
+      properties:
+        id: { type: integer }
+        periodYear: { type: integer }
+        periodMonth: { type: integer }
+        status: { type: string, enum: [Draft, Processing, Computed, Approved, Locked] }
+        totalEmployees: { type: integer }
+        totalGross: { type: string }
+        totalDeductions: { type: string }
+        totalNet: { type: string }
+        notes: { type: ["string", "null"] }
+        runAt: { type: ["string", "null"], format: date-time }
+        approvedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        initiatorName: { type: ["string", "null"] }
+      required: [id, periodYear, periodMonth, status, totalEmployees, totalGross, totalDeductions, totalNet, createdAt]
+
+    CreatePayrollRunBody:
+      type: object
+      required: [periodYear, periodMonth]
+      properties:
+        periodYear: { type: integer }
+        periodMonth: { type: integer }
+        notes: { type: ["string", "null"] }
+
+    PayrollRecord:
+      type: object
+      properties:
+        id: { type: integer }
+        payrollRunId: { type: integer }
+        employeeId: { type: integer }
+        workingDays: { type: string }
+        presentDays: { type: string }
+        lopDays: { type: string }
+        grossEarnings: { type: string }
+        totalDeductions: { type: string }
+        netPay: { type: string }
+        tds: { type: string }
+        pfEmployee: { type: string }
+        professionalTax: { type: string }
+        loanDeduction: { type: string }
+        taxRegime: { type: ["string", "null"] }
+        status: { type: string }
+        basic: { type: string }
+        hra: { type: string }
+        createdAt: { type: string, format: date-time }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+      required: [id, payrollRunId, employeeId, workingDays, presentDays, lopDays, grossEarnings, totalDeductions, netPay, status, createdAt]
+
+    PayslipSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        payrollRecordId: { type: integer }
+        employeeId: { type: integer }
+        periodYear: { type: integer }
+        periodMonth: { type: integer }
+        generatedAt: { type: string, format: date-time }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+        netPay: { type: ["string", "null"] }
+      required: [id, payrollRecordId, employeeId, periodYear, periodMonth, generatedAt]
+
+    PayslipDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        payrollRecordId: { type: integer }
+        employeeId: { type: integer }
+        periodYear: { type: integer }
+        periodMonth: { type: integer }
+        payslipData: {}
+        htmlContent: { type: ["string", "null"] }
+        generatedAt: { type: string, format: date-time }
+      required: [id, payrollRecordId, employeeId, periodYear, periodMonth, generatedAt]
+
+    StatutoryReport:
+      type: object
+      properties:
+        period: { type: string }
+        records:
+          type: array
+          items:
+            type: object
+        summary:
+          type: object
+      required: [period, records, summary]
+
+    ActionBody:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [approve, reject] }
+        approvalRemarks: { type: ["string", "null"] }

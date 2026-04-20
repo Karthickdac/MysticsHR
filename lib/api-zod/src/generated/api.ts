@@ -3650,3 +3650,675 @@ export const OverridePermissionLimitResponse = zod.object({
     }),
   ),
 });
+
+/**
+ * @summary List salary structures
+ */
+export const ListSalaryStructuresQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  isActive: zod.coerce.string().optional(),
+});
+
+export const ListSalaryStructuresResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  effectiveFrom: zod.coerce.date(),
+  effectiveTo: zod.coerce.date().nullish(),
+  grossCtc: zod.string(),
+  annualCtc: zod.string(),
+  isActive: zod.boolean(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+});
+export const ListSalaryStructuresResponse = zod.array(
+  ListSalaryStructuresResponseItem,
+);
+
+/**
+ * @summary Create a salary structure
+ */
+export const CreateSalaryStructureBody = zod.object({
+  employeeId: zod.number(),
+  name: zod.string(),
+  effectiveFrom: zod.coerce.date(),
+  grossCtc: zod.string(),
+  annualCtc: zod.string(),
+  notes: zod.string().nullish(),
+  components: zod.array(
+    zod.object({
+      componentType: zod.string(),
+      componentName: zod.string(),
+      amount: zod.string(),
+      percentageOfBasic: zod.string().nullish(),
+      isEarning: zod.boolean(),
+      sequence: zod.number().optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get salary structure with components
+ */
+export const GetSalaryStructureParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetSalaryStructureResponse = zod
+  .object({
+    id: zod.number(),
+    employeeId: zod.number(),
+    name: zod.string(),
+    effectiveFrom: zod.coerce.date(),
+    effectiveTo: zod.coerce.date().nullish(),
+    grossCtc: zod.string(),
+    annualCtc: zod.string(),
+    isActive: zod.boolean(),
+    notes: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    employeeName: zod.string().nullish(),
+    employeeCode: zod.string().nullish(),
+  })
+  .and(
+    zod.object({
+      components: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            salaryStructureId: zod.number(),
+            componentType: zod.string(),
+            componentName: zod.string(),
+            amount: zod.string(),
+            percentageOfBasic: zod.string().nullish(),
+            isEarning: zod.boolean(),
+            sequence: zod.number(),
+            isActive: zod.boolean(),
+            createdAt: zod.coerce.date(),
+          }),
+        )
+        .optional(),
+    }),
+  );
+
+/**
+ * @summary Update a salary structure
+ */
+export const UpdateSalaryStructureParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateSalaryStructureBody = zod.object({
+  name: zod.string().optional(),
+  effectiveFrom: zod.coerce.date().optional(),
+  effectiveTo: zod.coerce.date().nullish(),
+  grossCtc: zod.string().optional(),
+  annualCtc: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  notes: zod.string().nullish(),
+  components: zod
+    .array(
+      zod.object({
+        componentType: zod.string().optional(),
+        componentName: zod.string().optional(),
+        amount: zod.string().optional(),
+        percentageOfBasic: zod.string().nullish(),
+        isEarning: zod.boolean().optional(),
+        sequence: zod.number().optional(),
+        isActive: zod.boolean().optional(),
+      }),
+    )
+    .optional(),
+});
+
+export const UpdateSalaryStructureResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  effectiveFrom: zod.coerce.date(),
+  effectiveTo: zod.coerce.date().nullish(),
+  grossCtc: zod.string(),
+  annualCtc: zod.string(),
+  isActive: zod.boolean(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+});
+
+/**
+ * @summary List loan repayments
+ */
+export const ListLoansQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  isActive: zod.coerce.string().optional(),
+});
+
+export const ListLoansResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  loanType: zod.string(),
+  principalAmount: zod.string(),
+  monthlyDeduction: zod.string(),
+  outstandingAmount: zod.string(),
+  isActive: zod.boolean(),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+});
+export const ListLoansResponse = zod.array(ListLoansResponseItem);
+
+/**
+ * @summary Create a loan repayment record
+ */
+export const CreateLoanBody = zod.object({
+  employeeId: zod.number(),
+  loanType: zod.string(),
+  principalAmount: zod.string(),
+  monthlyDeduction: zod.string(),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Update loan outstanding/deduction
+ */
+export const UpdateLoanParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateLoanBody = zod.object({
+  outstandingAmount: zod.string().optional(),
+  monthlyDeduction: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  notes: zod.string().nullish(),
+});
+
+export const UpdateLoanResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  loanType: zod.string(),
+  principalAmount: zod.string(),
+  monthlyDeduction: zod.string(),
+  outstandingAmount: zod.string(),
+  isActive: zod.boolean(),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+});
+
+/**
+ * @summary List tax regime declarations
+ */
+export const ListTaxDeclarationsQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  financialYear: zod.coerce.string().optional(),
+});
+
+export const ListTaxDeclarationsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  financialYear: zod.string(),
+  regime: zod.enum(["Old", "New"]),
+  investmentDeclarations: zod.unknown().optional(),
+  declarationDate: zod.coerce.date(),
+  isCurrent: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+});
+export const ListTaxDeclarationsResponse = zod.array(
+  ListTaxDeclarationsResponseItem,
+);
+
+/**
+ * @summary Submit or update tax regime declaration
+ */
+export const CreateTaxDeclarationBody = zod.object({
+  employeeId: zod.number(),
+  financialYear: zod.string(),
+  regime: zod.enum(["Old", "New"]),
+  investmentDeclarations: zod.unknown().optional(),
+  declarationDate: zod.coerce.date(),
+});
+
+/**
+ * @summary List payroll lock records
+ */
+export const ListPayrollLocksQueryParams = zod.object({
+  year: zod.coerce.number().optional(),
+  month: zod.coerce.number().optional(),
+});
+
+export const ListPayrollLocksResponseItem = zod.object({
+  id: zod.number(),
+  year: zod.number(),
+  month: zod.number(),
+  isLocked: zod.boolean(),
+  lockedById: zod.number().nullish(),
+  lockedAt: zod.coerce.date().nullish(),
+  unlockedById: zod.number().nullish(),
+  unlockedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListPayrollLocksResponse = zod.array(ListPayrollLocksResponseItem);
+
+/**
+ * @summary Lock payroll for a period
+ */
+export const LockPayrollParams = zod.object({
+  year: zod.coerce.number(),
+  month: zod.coerce.number(),
+});
+
+export const LockPayrollResponse = zod.object({
+  id: zod.number(),
+  year: zod.number(),
+  month: zod.number(),
+  isLocked: zod.boolean(),
+  lockedById: zod.number().nullish(),
+  lockedAt: zod.coerce.date().nullish(),
+  unlockedById: zod.number().nullish(),
+  unlockedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Unlock payroll for a period (Super Admin only)
+ */
+export const UnlockPayrollParams = zod.object({
+  year: zod.coerce.number(),
+  month: zod.coerce.number(),
+});
+
+export const UnlockPayrollResponse = zod.object({
+  id: zod.number(),
+  year: zod.number(),
+  month: zod.number(),
+  isLocked: zod.boolean(),
+  lockedById: zod.number().nullish(),
+  lockedAt: zod.coerce.date().nullish(),
+  unlockedById: zod.number().nullish(),
+  unlockedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List payroll lock exception requests
+ */
+export const ListLockExceptionsResponseItem = zod.object({
+  id: zod.number(),
+  payrollLockId: zod.number(),
+  requestedById: zod.number().nullish(),
+  reason: zod.string(),
+  exceptionType: zod.string(),
+  status: zod.enum(["Pending", "Approved", "Rejected"]),
+  approvedById: zod.number().nullish(),
+  approvalRemarks: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  requesterName: zod.string().nullish(),
+  lockYear: zod.number().nullish(),
+  lockMonth: zod.number().nullish(),
+});
+export const ListLockExceptionsResponse = zod.array(
+  ListLockExceptionsResponseItem,
+);
+
+/**
+ * @summary Raise a payroll lock exception request
+ */
+export const CreateLockExceptionBody = zod.object({
+  payrollLockId: zod.number(),
+  reason: zod.string(),
+  exceptionType: zod.enum([
+    "edit_salary",
+    "edit_attendance",
+    "edit_leave_balance",
+    "edit_bank_account",
+  ]),
+});
+
+/**
+ * @summary Approve or reject a lock exception (Super Admin)
+ */
+export const ActionLockExceptionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ActionLockExceptionBody = zod.object({
+  action: zod.enum(["approve", "reject"]),
+  approvalRemarks: zod.string().nullish(),
+});
+
+export const ActionLockExceptionResponse = zod.object({
+  id: zod.number(),
+  payrollLockId: zod.number(),
+  requestedById: zod.number().nullish(),
+  reason: zod.string(),
+  exceptionType: zod.string(),
+  status: zod.enum(["Pending", "Approved", "Rejected"]),
+  approvedById: zod.number().nullish(),
+  approvalRemarks: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  requesterName: zod.string().nullish(),
+  lockYear: zod.number().nullish(),
+  lockMonth: zod.number().nullish(),
+});
+
+/**
+ * @summary List salary revisions
+ */
+export const ListSalaryRevisionsQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+});
+
+export const ListSalaryRevisionsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  oldStructureId: zod.number().nullish(),
+  newStructureId: zod.number().nullish(),
+  effectiveDate: zod.coerce.date(),
+  reason: zod.string(),
+  status: zod.enum(["Pending", "Approved", "Rejected"]),
+  requestedById: zod.number().nullish(),
+  approvedById: zod.number().nullish(),
+  approvalRemarks: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+});
+export const ListSalaryRevisionsResponse = zod.array(
+  ListSalaryRevisionsResponseItem,
+);
+
+/**
+ * @summary Create a salary revision request
+ */
+export const CreateSalaryRevisionBody = zod.object({
+  employeeId: zod.number(),
+  oldStructureId: zod.number().nullish(),
+  newStructureId: zod.number(),
+  effectiveDate: zod.coerce.date(),
+  reason: zod.string(),
+});
+
+/**
+ * @summary Approve or reject a salary revision
+ */
+export const ActionSalaryRevisionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ActionSalaryRevisionBody = zod.object({
+  action: zod.enum(["approve", "reject"]),
+  approvalRemarks: zod.string().nullish(),
+});
+
+export const ActionSalaryRevisionResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  oldStructureId: zod.number().nullish(),
+  newStructureId: zod.number().nullish(),
+  effectiveDate: zod.coerce.date(),
+  reason: zod.string(),
+  status: zod.enum(["Pending", "Approved", "Rejected"]),
+  requestedById: zod.number().nullish(),
+  approvedById: zod.number().nullish(),
+  approvalRemarks: zod.string().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+});
+
+/**
+ * @summary List payroll runs
+ */
+export const ListPayrollRunsResponseItem = zod.object({
+  id: zod.number(),
+  periodYear: zod.number(),
+  periodMonth: zod.number(),
+  status: zod.enum(["Draft", "Processing", "Computed", "Approved", "Locked"]),
+  totalEmployees: zod.number(),
+  totalGross: zod.string(),
+  totalDeductions: zod.string(),
+  totalNet: zod.string(),
+  notes: zod.string().nullish(),
+  runAt: zod.coerce.date().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  initiatorName: zod.string().nullish(),
+});
+export const ListPayrollRunsResponse = zod.array(ListPayrollRunsResponseItem);
+
+/**
+ * @summary Initiate a new payroll run
+ */
+export const CreatePayrollRunBody = zod.object({
+  periodYear: zod.number(),
+  periodMonth: zod.number(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Get a payroll run
+ */
+export const GetPayrollRunParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPayrollRunResponse = zod.object({
+  id: zod.number(),
+  periodYear: zod.number(),
+  periodMonth: zod.number(),
+  status: zod.enum(["Draft", "Processing", "Computed", "Approved", "Locked"]),
+  totalEmployees: zod.number(),
+  totalGross: zod.string(),
+  totalDeductions: zod.string(),
+  totalNet: zod.string(),
+  notes: zod.string().nullish(),
+  runAt: zod.coerce.date().nullish(),
+  approvedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  initiatorName: zod.string().nullish(),
+});
+
+/**
+ * @summary Trigger payroll computation for a run
+ */
+export const ComputePayrollRunParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ComputePayrollRunResponse = zod.object({
+  message: zod.string().optional(),
+  totalEmployees: zod.number().optional(),
+  totalGross: zod.number().optional(),
+  totalNet: zod.number().optional(),
+});
+
+/**
+ * @summary Approve a payroll run and generate payslips
+ */
+export const ApprovePayrollRunParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApprovePayrollRunResponse = zod.object({
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Finalize a payroll run (marks as Locked/Paid)
+ */
+export const FinalizePayrollRunParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const FinalizePayrollRunResponse = zod.object({
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Get per-employee records for a payroll run
+ */
+export const GetPayrollRunRecordsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPayrollRunRecordsResponseItem = zod.object({
+  id: zod.number(),
+  payrollRunId: zod.number(),
+  employeeId: zod.number(),
+  workingDays: zod.string(),
+  presentDays: zod.string(),
+  lopDays: zod.string(),
+  grossEarnings: zod.string(),
+  totalDeductions: zod.string(),
+  netPay: zod.string(),
+  tds: zod.string().optional(),
+  pfEmployee: zod.string().optional(),
+  professionalTax: zod.string().optional(),
+  loanDeduction: zod.string().optional(),
+  taxRegime: zod.string().nullish(),
+  status: zod.string(),
+  basic: zod.string().optional(),
+  hra: zod.string().optional(),
+  createdAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+});
+export const GetPayrollRunRecordsResponse = zod.array(
+  GetPayrollRunRecordsResponseItem,
+);
+
+/**
+ * @summary List payslips (employee sees own, HR sees all)
+ */
+export const ListPayslipsQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  year: zod.coerce.number().optional(),
+  month: zod.coerce.number().optional(),
+});
+
+export const ListPayslipsResponseItem = zod.object({
+  id: zod.number(),
+  payrollRecordId: zod.number(),
+  employeeId: zod.number(),
+  periodYear: zod.number(),
+  periodMonth: zod.number(),
+  generatedAt: zod.coerce.date(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  netPay: zod.string().nullish(),
+});
+export const ListPayslipsResponse = zod.array(ListPayslipsResponseItem);
+
+/**
+ * @summary Get full payslip data (including HTML)
+ */
+export const GetPayslipParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPayslipResponse = zod.object({
+  id: zod.number(),
+  payrollRecordId: zod.number(),
+  employeeId: zod.number(),
+  periodYear: zod.number(),
+  periodMonth: zod.number(),
+  payslipData: zod.unknown().optional(),
+  htmlContent: zod.string().nullish(),
+  generatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary PF ECR File report
+ */
+export const GetPfEcrReportQueryParams = zod.object({
+  year: zod.coerce.string(),
+  month: zod.coerce.string(),
+});
+
+export const GetPfEcrReportResponse = zod.object({
+  period: zod.string(),
+  records: zod.array(zod.object({}).passthrough()),
+  summary: zod.object({}).passthrough(),
+});
+
+/**
+ * @summary ESI Contribution Report
+ */
+export const GetEsiReportQueryParams = zod.object({
+  year: zod.coerce.string(),
+  month: zod.coerce.string(),
+});
+
+export const GetEsiReportResponse = zod.object({
+  period: zod.string(),
+  records: zod.array(zod.object({}).passthrough()),
+  summary: zod.object({}).passthrough(),
+});
+
+/**
+ * @summary Professional Tax Register
+ */
+export const GetPtReportQueryParams = zod.object({
+  year: zod.coerce.string(),
+  month: zod.coerce.string(),
+});
+
+export const GetPtReportResponse = zod.object({
+  period: zod.string(),
+  records: zod.array(zod.object({}).passthrough()),
+  summary: zod.object({}).passthrough(),
+});
+
+/**
+ * @summary TDS Summary Report
+ */
+export const GetTdsSummaryReportQueryParams = zod.object({
+  year: zod.coerce.string(),
+  month: zod.coerce.string(),
+});
+
+export const GetTdsSummaryReportResponse = zod.object({
+  period: zod.string(),
+  records: zod.array(zod.object({}).passthrough()),
+  summary: zod.object({}).passthrough(),
+});
+
+/**
+ * @summary Bank Transfer File export
+ */
+export const GetBankTransferReportQueryParams = zod.object({
+  year: zod.coerce.string(),
+  month: zod.coerce.string(),
+});
+
+export const GetBankTransferReportResponse = zod.object({
+  period: zod.string(),
+  records: zod.array(zod.object({}).passthrough()),
+  summary: zod.object({}).passthrough(),
+});
+
+/**
+ * @summary Form 16 generation for an employee FY
+ */
+export const GetForm16ReportParams = zod.object({
+  employeeId: zod.coerce.number(),
+  year: zod.coerce.number(),
+});
+
+export const GetForm16ReportResponse = zod.object({}).passthrough();

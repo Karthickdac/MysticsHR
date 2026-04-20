@@ -17,6 +17,7 @@ import {
   CalendarCheck,
   Umbrella,
   Timer,
+  Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
     { name: "Attendance", href: "/attendance", icon: CalendarCheck, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Leave", href: "/leave", icon: Umbrella, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Permissions", href: "/permissions", icon: Timer, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Payroll", href: "/payroll", icon: Banknote, roles: ["super_admin", "hr_manager", "hr_executive", "payroll_admin", "employee"] },
     { name: "Departments", href: "/departments", icon: Building2, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Designations", href: "/designations", icon: Briefcase, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Users", href: "/users", icon: ShieldCheck, roles: ["super_admin", "hr_manager"] },
