@@ -7,6 +7,7 @@ import {
   fnfComputationsTable,
   exitInterviewsTable,
   employeesTable,
+  employeeProfilesTable,
   hrmsUsersTable,
   departmentsTable,
   leaveBalancesTable,
@@ -193,8 +194,15 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
     const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, empId));
     if (!emp) { res.status(404).json({ error: "Employee not found" }); return; }
 
-    // Compute notice period using contractual terms: employment-type defaults, then tenure-based fallback
-    const noticePeriodDays = computeNoticePeriodDays(emp.dateOfJoining, emp.employmentType, null);
+    // Fetch contractual notice period from employee profile (takes precedence over employment-type defaults)
+    const [empProfile] = await db.select({ noticePeriodDays: employeeProfilesTable.noticePeriodDays })
+      .from(employeeProfilesTable)
+      .where(eq(employeeProfilesTable.employeeId, empId))
+      .limit(1);
+    const contractualNoticePeriodDays = empProfile?.noticePeriodDays ?? null;
+
+    // Compute notice period: contractual profile value → employment-type default → tenure heuristic
+    const noticePeriodDays = computeNoticePeriodDays(emp.dateOfJoining, emp.employmentType, contractualNoticePeriodDays);
 
     // Enforce minimum LWD = today + noticePeriodDays (HR Manager / Super Admin may override)
     const canOverrideNotice = u.role === "hr_manager" || u.role === "super_admin";
@@ -205,16 +213,23 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
       if (requestedLwd < minLwdStr) {
         res.status(400).json({
           error: `Last working date must be at least ${noticePeriodDays} day(s) from today (minimum: ${minLwdStr})`,
+          noticePeriodDays,
+          minimumLwd: minLwdStr,
         });
         return;
       }
     }
+
+    // System auto-computes actualLwd = requestedLwd (employee is assumed to serve full notice).
+    // HR may override actualLwd later via PATCH if notice is waived or bought out.
+    const computedActualLwd = requestedLwd;
 
     const [exitReq] = await db.insert(exitRequestsTable).values({
       employeeId: empId,
       exitType,
       reason,
       requestedLwd,
+      actualLwd: computedActualLwd,
       noticePeriodDays,
       status: "Submitted",
       initiatedByUserId: u.id,

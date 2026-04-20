@@ -189,12 +189,17 @@ router.get("/reports/employee-directory", requireHrmsUser, requireRole(...MANAGE
 // ─── ATTENDANCE SUMMARY REPORT ─────────────────────────────────────────────────
 router.get("/reports/attendance-summary", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
-    const { fromDate, toDate, departmentId, employeeId } = req.query as Record<string, string>;
+    const { fromDate, toDate, departmentId, employeeId, designationId, employmentType, location, employeeStatus } = req.query as Record<string, string>;
 
     const conds: SQL<unknown>[] = [];
     if (fromDate) conds.push(gte(attendanceRecordsTable.attendanceDate, fromDate));
     if (toDate) conds.push(lte(attendanceRecordsTable.attendanceDate, toDate));
     if (employeeId) conds.push(eq(attendanceRecordsTable.employeeId, Number(employeeId)));
+    if (departmentId) conds.push(eq(employeesTable.departmentId, Number(departmentId)));
+    if (designationId) conds.push(eq(employeesTable.designationId, Number(designationId)));
+    if (employmentType) conds.push(sql`${employeesTable.employmentType} = ${employmentType}`);
+    if (location) conds.push(eq(employeesTable.location, location));
+    if (employeeStatus) conds.push(sql`${employeesTable.status} = ${employeeStatus}`);
 
     const rows = await db.select({
       employeeId: attendanceRecordsTable.employeeId,
@@ -205,14 +210,15 @@ router.get("/reports/attendance-summary", requireHrmsUser, requireRole(...MANAGE
       firstName: employeesTable.firstName,
       lastName: employeesTable.lastName,
       employeeCode: employeesTable.employeeId,
+      employmentType: employeesTable.employmentType,
+      location: employeesTable.location,
       department: departmentsTable.name,
+      designation: designationsTable.title,
     }).from(attendanceRecordsTable)
       .leftJoin(employeesTable, eq(attendanceRecordsTable.employeeId, employeesTable.id))
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
-      .where(and(
-        ...(conds.length ? conds : [sql`1=1`]),
-        ...(departmentId ? [eq(employeesTable.departmentId, Number(departmentId))] : []),
-      ))
+      .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
+      .where(conds.length ? and(...conds) : undefined)
       .orderBy(desc(attendanceRecordsTable.attendanceDate));
 
     const data = rows.map(r => ({
@@ -227,11 +233,18 @@ router.get("/reports/attendance-summary", requireHrmsUser, requireRole(...MANAGE
 // ─── LEAVE UTILIZATION REPORT ─────────────────────────────────────────────────
 router.get("/reports/leave-utilization", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
-    const { fromDate, toDate, departmentId, leaveType } = req.query as Record<string, string>;
+    const { fromDate, toDate, departmentId, leaveType, designationId, employmentType, location, leaveStatus } = req.query as Record<string, string>;
 
-    const conds: SQL<unknown>[] = [eq(leaveApplicationsTable.status, "Approved")];
+    const conds: SQL<unknown>[] = [];
+    if (leaveStatus) conds.push(sql`${leaveApplicationsTable.status} = ${leaveStatus}`);
+    else conds.push(eq(leaveApplicationsTable.status, "Approved"));
     if (fromDate) conds.push(gte(leaveApplicationsTable.fromDate, fromDate));
     if (toDate) conds.push(lte(leaveApplicationsTable.toDate, toDate));
+    if (departmentId) conds.push(eq(employeesTable.departmentId, Number(departmentId)));
+    if (designationId) conds.push(eq(employeesTable.designationId, Number(designationId)));
+    if (employmentType) conds.push(sql`${employeesTable.employmentType} = ${employmentType}`);
+    if (location) conds.push(eq(employeesTable.location, location));
+    if (leaveType) conds.push(eq(leaveTypesTable.name, leaveType));
 
     const rows = await db.select({
       employeeId: leaveApplicationsTable.employeeId,
@@ -243,16 +256,16 @@ router.get("/reports/leave-utilization", requireHrmsUser, requireRole(...MANAGER
       status: leaveApplicationsTable.status,
       firstName: employeesTable.firstName,
       lastName: employeesTable.lastName,
+      employmentType: employeesTable.employmentType,
+      location: employeesTable.location,
       department: departmentsTable.name,
+      designation: designationsTable.title,
     }).from(leaveApplicationsTable)
       .leftJoin(employeesTable, eq(leaveApplicationsTable.employeeId, employeesTable.id))
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+      .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
       .leftJoin(leaveTypesTable, eq(leaveApplicationsTable.leaveTypeId, leaveTypesTable.id))
-      .where(and(
-        ...conds,
-        ...(departmentId ? [eq(employeesTable.departmentId, Number(departmentId))] : []),
-        ...(leaveType ? [eq(leaveTypesTable.name, leaveType)] : []),
-      ))
+      .where(and(...conds))
       .orderBy(desc(leaveApplicationsTable.fromDate));
 
     const data = rows.map(r => ({
@@ -267,19 +280,25 @@ router.get("/reports/leave-utilization", requireHrmsUser, requireRole(...MANAGER
 // ─── PAYROLL REGISTER REPORT ──────────────────────────────────────────────────
 router.get("/reports/payroll-register", requireHrmsUser, requireRole(...HR_ROLES, "payroll_admin"), async (req, res) => {
   try {
-    const { month, year, departmentId } = req.query as Record<string, string>;
+    const { month, year, departmentId, designationId, employmentType, location } = req.query as Record<string, string>;
 
-    const conds: SQL<unknown>[] = [];
-    if (month) conds.push(eq(payrollRunsTable.periodMonth, Number(month)));
-    if (year) conds.push(eq(payrollRunsTable.periodYear, Number(year)));
+    const runConds: SQL<unknown>[] = [];
+    if (month) runConds.push(eq(payrollRunsTable.periodMonth, Number(month)));
+    if (year) runConds.push(eq(payrollRunsTable.periodYear, Number(year)));
 
     const runs = await db.select().from(payrollRunsTable)
-      .where(conds.length ? and(...conds) : undefined)
+      .where(runConds.length ? and(...runConds) : undefined)
       .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth));
 
     if (runs.length === 0) { res.json({ data: [], total: 0 }); return; }
 
     const runId = runs[0].id;
+    const recConds: SQL<unknown>[] = [eq(payrollRecordsTable.payrollRunId, runId)];
+    if (departmentId) recConds.push(eq(employeesTable.departmentId, Number(departmentId)));
+    if (designationId) recConds.push(eq(employeesTable.designationId, Number(designationId)));
+    if (employmentType) recConds.push(sql`${employeesTable.employmentType} = ${employmentType}`);
+    if (location) recConds.push(eq(employeesTable.location, location));
+
     const rows = await db.select({
       employeeId: payrollRecordsTable.employeeId,
       grossSalary: payrollRecordsTable.grossEarnings,
@@ -290,14 +309,15 @@ router.get("/reports/payroll-register", requireHrmsUser, requireRole(...HR_ROLES
       firstName: employeesTable.firstName,
       lastName: employeesTable.lastName,
       employeeCode: employeesTable.employeeId,
+      employmentType: employeesTable.employmentType,
+      location: employeesTable.location,
       department: departmentsTable.name,
+      designation: designationsTable.title,
     }).from(payrollRecordsTable)
       .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
-      .where(and(
-        eq(payrollRecordsTable.payrollRunId, runId),
-        ...(departmentId ? [eq(employeesTable.departmentId, Number(departmentId))] : []),
-      ))
+      .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
+      .where(and(...recConds))
       .orderBy(employeesTable.firstName);
 
     const data = rows.map(r => ({
@@ -312,20 +332,25 @@ router.get("/reports/payroll-register", requireHrmsUser, requireRole(...HR_ROLES
 // ─── HEADCOUNT REPORT ────────────────────────────────────────────────────────
 router.get("/reports/headcount", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
-    const { fromDate, toDate, departmentId } = req.query as Record<string, string>;
+    const { fromDate, toDate, departmentId, employmentType, location, employeeStatus } = req.query as Record<string, string>;
 
     const conds: SQL<unknown>[] = [eq(employeesTable.isActive, true)];
     if (departmentId) conds.push(eq(employeesTable.departmentId, Number(departmentId)));
     if (toDate) conds.push(lte(employeesTable.dateOfJoining, toDate));
+    if (fromDate) conds.push(gte(employeesTable.dateOfJoining, fromDate));
+    if (employmentType) conds.push(sql`${employeesTable.employmentType} = ${employmentType}`);
+    if (location) conds.push(eq(employeesTable.location, location));
+    if (employeeStatus) conds.push(sql`${employeesTable.status} = ${employeeStatus}`);
 
     const byDept = await db.select({
       department: departmentsTable.name,
       employmentType: employeesTable.employmentType,
+      location: employeesTable.location,
       count: sql<number>`count(${employeesTable.id})::int`,
     }).from(employeesTable)
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
       .where(and(...conds))
-      .groupBy(departmentsTable.name, employeesTable.employmentType);
+      .groupBy(departmentsTable.name, employeesTable.employmentType, employeesTable.location);
 
     const data = byDept.map(r => ({
       department: r.department ?? "Unassigned",
@@ -340,11 +365,16 @@ router.get("/reports/headcount", requireHrmsUser, requireRole(...MANAGER_ROLES),
 // ─── ATTRITION REPORT ─────────────────────────────────────────────────────────
 router.get("/reports/attrition", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
-    const { fromDate, toDate, departmentId } = req.query as Record<string, string>;
+    const { fromDate, toDate, departmentId, designationId, employmentType, location, exitType } = req.query as Record<string, string>;
 
     const conds: SQL<unknown>[] = [eq(exitRequestsTable.status, "Separated")];
     if (fromDate) conds.push(gte(exitRequestsTable.separatedAt, new Date(fromDate)));
     if (toDate) conds.push(lte(exitRequestsTable.separatedAt, new Date(toDate)));
+    if (departmentId) conds.push(eq(employeesTable.departmentId, Number(departmentId)));
+    if (designationId) conds.push(eq(employeesTable.designationId, Number(designationId)));
+    if (employmentType) conds.push(sql`${employeesTable.employmentType} = ${employmentType}`);
+    if (location) conds.push(eq(employeesTable.location, location));
+    if (exitType) conds.push(sql`${exitRequestsTable.exitType} = ${exitType}`);
 
     const rows = await db.select({
       id: exitRequestsTable.id,
@@ -358,14 +388,15 @@ router.get("/reports/attrition", requireHrmsUser, requireRole(...MANAGER_ROLES),
       lastName: employeesTable.lastName,
       employeeCode: employeesTable.employeeId,
       dateOfJoining: employeesTable.dateOfJoining,
+      employmentType: employeesTable.employmentType,
+      location: employeesTable.location,
       department: departmentsTable.name,
+      designation: designationsTable.title,
     }).from(exitRequestsTable)
       .leftJoin(employeesTable, eq(exitRequestsTable.employeeId, employeesTable.id))
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
-      .where(and(
-        ...conds,
-        ...(departmentId ? [eq(employeesTable.departmentId, Number(departmentId))] : []),
-      ))
+      .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
+      .where(and(...conds))
       .orderBy(desc(exitRequestsTable.separatedAt));
 
     const data = rows.map(r => ({
