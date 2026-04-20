@@ -83,7 +83,7 @@ export interface Designation {
   /** @nullable */
   departmentId?: number | null;
   /** @nullable */
-  level?: string | null;
+  level?: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -95,7 +95,7 @@ export interface CreateDesignationBody {
   /** @nullable */
   departmentId?: number | null;
   /** @nullable */
-  level?: string | null;
+  level?: number | null;
 }
 
 export interface UpdateDesignationBody {
@@ -106,7 +106,7 @@ export interface UpdateDesignationBody {
   /** @nullable */
   departmentId?: number | null;
   /** @nullable */
-  level?: string | null;
+  level?: number | null;
   /** @nullable */
   isActive?: boolean | null;
 }

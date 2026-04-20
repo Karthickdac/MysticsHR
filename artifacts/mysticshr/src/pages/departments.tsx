@@ -52,8 +52,8 @@ export default function DepartmentsPage() {
       }
       await qc.invalidateQueries({ queryKey: getListDepartmentsQueryKey() });
       setShowForm(false);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to save");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save");
     }
   }
 

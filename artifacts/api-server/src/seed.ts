@@ -5,12 +5,28 @@ import {
   employeesTable,
   hrmsUsersTable,
   auditLogsTable,
+  rolesTable,
 } from "@workspace/db/schema";
-import { sql } from "drizzle-orm";
 
 async function seed() {
   console.log("Seeding database...");
 
+  // ── Roles ──────────────────────────────────────────────────────────────
+  await db
+    .insert(rolesTable)
+    .values([
+      { slug: "super_admin", label: "Super Admin", description: "Full access to all HRMS modules and system configuration", level: 100 },
+      { slug: "hr_manager", label: "HR Manager", description: "Access to all HR operations including employee, payroll, and reporting", level: 80 },
+      { slug: "payroll_admin", label: "Payroll Admin", description: "Access to payroll processing and related reports", level: 70 },
+      { slug: "hr_executive", label: "HR Executive", description: "Day-to-day HR operations including employee management and attendance", level: 60 },
+      { slug: "hod", label: "Head of Department", description: "View and manage employees within own department", level: 50 },
+      { slug: "employee", label: "Employee", description: "Self-service portal access: own profile, leaves, payslips", level: 10 },
+    ])
+    .onConflictDoNothing();
+
+  console.log("Roles seeded.");
+
+  // ── Departments ────────────────────────────────────────────────────────
   const [engDept, hrDept, financeDept, techDept, marketingDept] = await db
     .insert(departmentsTable)
     .values([
@@ -25,6 +41,7 @@ async function seed() {
 
   console.log("Departments seeded.");
 
+  // ── Designations ───────────────────────────────────────────────────────
   const [swDes, srSwDes, hrExecDes, hrMgrDes, payDes, techLeadDes, mktDes, finDes] = await db
     .insert(designationsTable)
     .values([
@@ -42,6 +59,7 @@ async function seed() {
 
   console.log("Designations seeded.");
 
+  // ── Employees ──────────────────────────────────────────────────────────
   const [emp1, emp2, emp3, emp4, emp5, emp6, emp7, emp8] = await db
     .insert(employeesTable)
     .values([
@@ -163,6 +181,66 @@ async function seed() {
 
   console.log("Employees seeded.");
 
+  // ── HRMS Users — one per role (all 6 roles covered) ───────────────────
+  // NOTE: clerkUserId values prefixed with "demo_" are placeholder IDs.
+  // In production, link real Clerk user IDs after first sign-in.
+  await db
+    .insert(hrmsUsersTable)
+    .values([
+      {
+        clerkUserId: "demo_super_admin_001",
+        employeeId: emp1?.id,
+        email: "arjun.sharma@automystics.com",
+        name: "Arjun Sharma",
+        role: "super_admin",
+        isActive: true,
+      },
+      {
+        clerkUserId: "demo_hr_manager_002",
+        employeeId: emp2?.id,
+        email: "priya.v@automystics.com",
+        name: "Priya Venkataraman",
+        role: "hr_manager",
+        isActive: true,
+      },
+      {
+        clerkUserId: "demo_payroll_admin_003",
+        employeeId: emp3?.id,
+        email: "ravi.kumar@automystics.com",
+        name: "Ravi Kumar",
+        role: "payroll_admin",
+        isActive: true,
+      },
+      {
+        clerkUserId: "demo_hr_executive_004",
+        employeeId: emp4?.id,
+        email: "meena.r@automystics.com",
+        name: "Meena Rajesh",
+        role: "hr_executive",
+        isActive: true,
+      },
+      {
+        clerkUserId: "demo_hod_005",
+        employeeId: emp5?.id,
+        email: "suresh.b@automystics.com",
+        name: "Suresh Babu",
+        role: "hod",
+        isActive: true,
+      },
+      {
+        clerkUserId: "demo_employee_006",
+        employeeId: emp6?.id,
+        email: "kavitha.n@automystics.com",
+        name: "Kavitha Nair",
+        role: "employee",
+        isActive: true,
+      },
+    ])
+    .onConflictDoNothing();
+
+  console.log("HRMS users seeded (all 6 roles).");
+
+  // ── Audit logs ─────────────────────────────────────────────────────────
   await db
     .insert(auditLogsTable)
     .values([

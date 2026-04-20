@@ -1,18 +1,42 @@
 import { Router } from "express";
-import { requireHrmsUser, requireRole, getCurrentHrmsUser } from "../lib/auth";
+import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
-import { departmentsTable } from "@workspace/db/schema";
-import { eq, isNull } from "drizzle-orm";
+import { departmentsTable, employeesTable } from "@workspace/db/schema";
+import { eq, isNull, sql } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/departments", requireHrmsUser, async (req, res) => {
   try {
     const rows = await db
-      .select()
+      .select({
+        id: departmentsTable.id,
+        name: departmentsTable.name,
+        code: departmentsTable.code,
+        description: departmentsTable.description,
+        headId: departmentsTable.headId,
+        isActive: departmentsTable.isActive,
+        employeeCount: sql<number>`count(${employeesTable.id})::int`,
+        createdAt: departmentsTable.createdAt,
+        updatedAt: departmentsTable.updatedAt,
+      })
       .from(departmentsTable)
+      .leftJoin(
+        employeesTable,
+        sql`${employeesTable.departmentId} = ${departmentsTable.id} AND ${employeesTable.deletedAt} IS NULL AND ${employeesTable.status} != 'Separated'`
+      )
       .where(isNull(departmentsTable.deletedAt))
+      .groupBy(
+        departmentsTable.id,
+        departmentsTable.name,
+        departmentsTable.code,
+        departmentsTable.description,
+        departmentsTable.headId,
+        departmentsTable.isActive,
+        departmentsTable.createdAt,
+        departmentsTable.updatedAt
+      )
       .orderBy(departmentsTable.name);
     res.json(rows);
   } catch (err) {
@@ -37,7 +61,7 @@ router.post(
         .values({ name, code, description, headId })
         .returning();
       await logAudit({ user: req.hrmsUser, action: "CREATE", module: "Departments", recordId: dept.id, ipAddress: req.ip });
-      res.status(201).json(dept);
+      res.status(201).json({ ...dept, employeeCount: 0 });
     } catch (err: unknown) {
       const e = err as { code?: string };
       if (e?.code === "23505") {
@@ -54,11 +78,35 @@ router.get("/departments/:id", requireHrmsUser, async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [dept] = await db
-      .select()
+      .select({
+        id: departmentsTable.id,
+        name: departmentsTable.name,
+        code: departmentsTable.code,
+        description: departmentsTable.description,
+        headId: departmentsTable.headId,
+        isActive: departmentsTable.isActive,
+        employeeCount: sql<number>`count(${employeesTable.id})::int`,
+        createdAt: departmentsTable.createdAt,
+        updatedAt: departmentsTable.updatedAt,
+      })
       .from(departmentsTable)
+      .leftJoin(
+        employeesTable,
+        sql`${employeesTable.departmentId} = ${departmentsTable.id} AND ${employeesTable.deletedAt} IS NULL AND ${employeesTable.status} != 'Separated'`
+      )
       .where(eq(departmentsTable.id, id))
+      .groupBy(
+        departmentsTable.id,
+        departmentsTable.name,
+        departmentsTable.code,
+        departmentsTable.description,
+        departmentsTable.headId,
+        departmentsTable.isActive,
+        departmentsTable.createdAt,
+        departmentsTable.updatedAt
+      )
       .limit(1);
-    if (!dept || dept.deletedAt) {
+    if (!dept) {
       res.status(404).json({ error: "Department not found" });
       return;
     }
@@ -87,7 +135,7 @@ router.patch(
         return;
       }
       await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "Departments", recordId: id, ipAddress: req.ip });
-      res.json(dept);
+      res.json({ ...dept, employeeCount: 0 });
     } catch (err: unknown) {
       const e = err as { code?: string };
       if (e?.code === "23505") {

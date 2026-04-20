@@ -727,7 +727,7 @@ components:
         departmentId:
           type: ["integer", "null"]
         level:
-          type: ["string", "null"]
+          type: ["integer", "null"]
         isActive:
           type: boolean
         createdAt:
@@ -754,7 +754,7 @@ components:
         departmentId:
           type: ["integer", "null"]
         level:
-          type: ["string", "null"]
+          type: ["integer", "null"]
       required:
         - title
         - code
@@ -769,7 +769,7 @@ components:
         departmentId:
           type: ["integer", "null"]
         level:
-          type: ["string", "null"]
+          type: ["integer", "null"]
         isActive:
           type: ["boolean", "null"]
 

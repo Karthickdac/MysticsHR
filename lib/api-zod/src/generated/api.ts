@@ -166,7 +166,7 @@ export const ListDesignationsResponseItem = zod.object({
   title: zod.string(),
   code: zod.string(),
   departmentId: zod.number().nullish(),
-  level: zod.string().nullish(),
+  level: zod.number().nullish(),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -180,7 +180,7 @@ export const CreateDesignationBody = zod.object({
   title: zod.string(),
   code: zod.string(),
   departmentId: zod.number().nullish(),
-  level: zod.string().nullish(),
+  level: zod.number().nullish(),
 });
 
 /**
@@ -195,7 +195,7 @@ export const GetDesignationResponse = zod.object({
   title: zod.string(),
   code: zod.string(),
   departmentId: zod.number().nullish(),
-  level: zod.string().nullish(),
+  level: zod.number().nullish(),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -212,7 +212,7 @@ export const UpdateDesignationBody = zod.object({
   title: zod.string().nullish(),
   code: zod.string().nullish(),
   departmentId: zod.number().nullish(),
-  level: zod.string().nullish(),
+  level: zod.number().nullish(),
   isActive: zod.boolean().nullish(),
 });
 
@@ -221,7 +221,7 @@ export const UpdateDesignationResponse = zod.object({
   title: zod.string(),
   code: zod.string(),
   departmentId: zod.number().nullish(),
-  level: zod.string().nullish(),
+  level: zod.number().nullish(),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),

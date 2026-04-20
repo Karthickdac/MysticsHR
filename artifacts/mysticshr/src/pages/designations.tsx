@@ -51,7 +51,7 @@ export default function DesignationsPage() {
       title: form.title,
       code: form.code,
       departmentId: form.departmentId ? parseInt(form.departmentId, 10) : undefined,
-      level: form.level || "1",
+      level: parseInt(form.level || "1", 10),
     };
     try {
       if (editingId) {
@@ -61,8 +61,8 @@ export default function DesignationsPage() {
       }
       await qc.invalidateQueries({ queryKey: getListDesignationsQueryKey() });
       setShowForm(false);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to save");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save");
     }
   }
 
