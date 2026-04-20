@@ -618,11 +618,11 @@ async function processConfiguredEscalations() {
       }
 
       if (config.transactionType === "exit") {
+        // Valid terminal statuses (exit_status enum): Separated, Rejected, Withdrawn, FnF Approved
         const stalled = await db.select({ id: exitRequestsTable.id })
           .from(exitRequestsTable)
           .where(and(
-            ne(exitRequestsTable.status, "Separated"),
-            ne(exitRequestsTable.status, "Clearance Complete"),
+            inArray(exitRequestsTable.status, ["Submitted", "HR Reviewing", "Notice Period", "Clearance Pending", "FnF Pending"]),
             lte(exitRequestsTable.updatedAt, threshold),
           ));
         if (stalled.length === 0) continue;
@@ -635,6 +635,31 @@ async function processConfiguredEscalations() {
             recipientEmployeeDbId: user.employeeId,
             variables: {
               status: `${stalled.length} exit(s) pending >SLA (${hours}h)`,
+              recipientName: user.name,
+            },
+          }).catch(() => {});
+        }
+      }
+
+      if (config.transactionType === "payroll") {
+        // Payroll runs awaiting finalization (Computed or Approved but not yet Locked)
+        const pendingRuns = await db.select({ id: payrollRunsTable.id, month: payrollRunsTable.month, year: payrollRunsTable.year })
+          .from(payrollRunsTable)
+          .where(and(
+            inArray(payrollRunsTable.status, ["Computed", "Approved"]),
+            lte(payrollRunsTable.updatedAt, threshold),
+          ));
+        if (pendingRuns.length === 0) continue;
+
+        for (const user of recipientUsers) {
+          if (!user.email) continue;
+          const periodStr = pendingRuns.map(r => `${r.month}/${r.year}`).join(", ");
+          await dispatchNotification({
+            eventType: "payroll_locked", module: "payroll",
+            recipientEmail: user.email, recipientName: user.name,
+            recipientEmployeeDbId: user.employeeId,
+            variables: {
+              period: periodStr, month: String(pendingRuns[0]?.month ?? ""), year: String(pendingRuns[0]?.year ?? ""),
               recipientName: user.name,
             },
           }).catch(() => {});

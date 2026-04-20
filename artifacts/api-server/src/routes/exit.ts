@@ -359,10 +359,11 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
     await logAudit({ user: u, action: "update_exit_request", module: "exit", recordId: id });
 
     // Notify employee of status change
-    if (status === "Clearance Pending" || status === "Clearance Complete" || status === "Separated") {
+    // "FnF Pending" is the real clearance-complete event (all clearance tasks done → FnF initiated)
+    if (status === "Clearance Pending" || status === "FnF Pending" || status === "Separated") {
       const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
         .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, existing.employeeId)).limit(1);
-      const isCompletion = status === "Clearance Complete" || status === "Separated";
+      const isCompletion = status === "FnF Pending" || status === "Separated";
       import("../lib/notification-service").then(async ({ dispatchNotification }) => {
         const eventType = isCompletion ? "exit_clearance_done" : "exit_initiated";
         // Notify the employee
