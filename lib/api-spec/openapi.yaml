@@ -18,6 +18,8 @@ tags:
     description: Employee management
   - name: users
     description: User management
+  - name: roles
+    description: Role definitions
   - name: audit-logs
     description: Audit log access
   - name: dashboard
@@ -523,6 +525,45 @@ paths:
                 $ref: "#/components/schemas/HrmsUser"
 
   # ──────────────────────────────────────────────
+  # ROLES
+  # ──────────────────────────────────────────────
+  /roles:
+    get:
+      operationId: listRoles
+      tags: [roles]
+      summary: List all system roles
+      responses:
+        "200":
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+
+  /roles/{id}:
+    get:
+      operationId: getRole
+      tags: [roles]
+      summary: Get a role by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        "404":
+          description: Role not found
+
+  # ──────────────────────────────────────────────
   # AUDIT LOGS
   # ──────────────────────────────────────────────
   /audit-logs:
@@ -1001,6 +1042,36 @@ components:
           type: ["boolean", "null"]
         employeeId:
           type: ["integer", "null"]
+
+    # ──────────────────────────────────────────────
+    # ROLES
+    # ──────────────────────────────────────────────
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        label:
+          type: string
+        description:
+          type: ["string", "null"]
+        level:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - slug
+        - label
+        - level
+        - createdAt
+        - updatedAt
 
     # ──────────────────────────────────────────────
     # AUDIT LOGS

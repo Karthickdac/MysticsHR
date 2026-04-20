@@ -35,6 +35,7 @@ import type {
   ListAuditLogsParams,
   ListDesignationsParams,
   ListEmployeesParams,
+  Role,
   StatusCount,
   UpdateDepartmentBody,
   UpdateDesignationBody,
@@ -2246,6 +2247,148 @@ export const useUpdateUser = <
 > => {
   return useMutation(getUpdateUserMutationOptions(options));
 };
+
+/**
+ * @summary List all system roles
+ */
+export const getListRolesUrl = () => {
+  return `/api/roles`;
+};
+
+export const listRoles = async (options?: RequestInit): Promise<Role[]> => {
+  return customFetch<Role[]>(getListRolesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListRolesQueryKey = () => {
+  return [`/api/roles`] as const;
+};
+
+export const getListRolesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listRoles>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listRoles>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListRolesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listRoles>>> = ({
+    signal,
+  }) => listRoles({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listRoles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListRolesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listRoles>>
+>;
+export type ListRolesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all system roles
+ */
+
+export function useListRoles<
+  TData = Awaited<ReturnType<typeof listRoles>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listRoles>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListRolesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a role by ID
+ */
+export const getGetRoleUrl = (id: number) => {
+  return `/api/roles/${id}`;
+};
+
+export const getRole = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Role> => {
+  return customFetch<Role>(getGetRoleUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRoleQueryKey = (id: number) => {
+  return [`/api/roles/${id}`] as const;
+};
+
+export const getGetRoleQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRole>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getRole>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRoleQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRole>>> = ({
+    signal,
+  }) => getRole(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getRole>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetRoleQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRole>>
+>;
+export type GetRoleQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a role by ID
+ */
+
+export function useGetRole<
+  TData = Awaited<ReturnType<typeof getRole>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getRole>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRoleQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List audit log entries

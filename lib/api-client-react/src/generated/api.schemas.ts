@@ -250,6 +250,17 @@ export interface UpdateUserBody {
   employeeId?: number | null;
 }
 
+export interface Role {
+  id: number;
+  slug: string;
+  label: string;
+  /** @nullable */
+  description?: string | null;
+  level: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AuditLog {
   id: number;
   /** @nullable */

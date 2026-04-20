@@ -5,6 +5,7 @@ import dashboardRouter from "./dashboard";
 import departmentsRouter from "./departments";
 import designationsRouter from "./designations";
 import employeesRouter from "./employees";
+import rolesRouter from "./roles";
 import usersRouter from "./users";
 import auditLogsRouter from "./audit-logs";
 
@@ -16,6 +17,7 @@ router.use(dashboardRouter);
 router.use(departmentsRouter);
 router.use(designationsRouter);
 router.use(employeesRouter);
+router.use(rolesRouter);
 router.use(usersRouter);
 router.use(auditLogsRouter);
 

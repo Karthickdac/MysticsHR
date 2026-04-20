@@ -515,6 +515,37 @@ export const UpdateUserResponse = zod.object({
 });
 
 /**
+ * @summary List all system roles
+ */
+export const ListRolesResponseItem = zod.object({
+  id: zod.number(),
+  slug: zod.string(),
+  label: zod.string(),
+  description: zod.string().nullish(),
+  level: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListRolesResponse = zod.array(ListRolesResponseItem);
+
+/**
+ * @summary Get a role by ID
+ */
+export const GetRoleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetRoleResponse = zod.object({
+  id: zod.number(),
+  slug: zod.string(),
+  label: zod.string(),
+  description: zod.string().nullish(),
+  level: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List audit log entries
  */
 export const listAuditLogsQueryLimitDefault = 50;

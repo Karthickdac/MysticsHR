@@ -3,40 +3,43 @@ import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { departmentsTable, employeesTable } from "@workspace/db/schema";
-import { eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 const router = Router();
+
+const deptSelect = {
+  id: departmentsTable.id,
+  name: departmentsTable.name,
+  code: departmentsTable.code,
+  description: departmentsTable.description,
+  headId: departmentsTable.headId,
+  isActive: departmentsTable.isActive,
+  employeeCount: sql<number>`count(${employeesTable.id})::int`,
+  createdAt: departmentsTable.createdAt,
+  updatedAt: departmentsTable.updatedAt,
+};
+
+const deptGroupBy = [
+  departmentsTable.id,
+  departmentsTable.name,
+  departmentsTable.code,
+  departmentsTable.description,
+  departmentsTable.headId,
+  departmentsTable.isActive,
+  departmentsTable.createdAt,
+  departmentsTable.updatedAt,
+] as const;
+
+const activeEmployeesJoin = sql`${employeesTable.departmentId} = ${departmentsTable.id} AND ${employeesTable.deletedAt} IS NULL AND ${employeesTable.status} != 'Separated'`;
 
 router.get("/departments", requireHrmsUser, async (req, res) => {
   try {
     const rows = await db
-      .select({
-        id: departmentsTable.id,
-        name: departmentsTable.name,
-        code: departmentsTable.code,
-        description: departmentsTable.description,
-        headId: departmentsTable.headId,
-        isActive: departmentsTable.isActive,
-        employeeCount: sql<number>`count(${employeesTable.id})::int`,
-        createdAt: departmentsTable.createdAt,
-        updatedAt: departmentsTable.updatedAt,
-      })
+      .select(deptSelect)
       .from(departmentsTable)
-      .leftJoin(
-        employeesTable,
-        sql`${employeesTable.departmentId} = ${departmentsTable.id} AND ${employeesTable.deletedAt} IS NULL AND ${employeesTable.status} != 'Separated'`
-      )
+      .leftJoin(employeesTable, activeEmployeesJoin)
       .where(isNull(departmentsTable.deletedAt))
-      .groupBy(
-        departmentsTable.id,
-        departmentsTable.name,
-        departmentsTable.code,
-        departmentsTable.description,
-        departmentsTable.headId,
-        departmentsTable.isActive,
-        departmentsTable.createdAt,
-        departmentsTable.updatedAt
-      )
+      .groupBy(...deptGroupBy)
       .orderBy(departmentsTable.name);
     res.json(rows);
   } catch (err) {
@@ -78,33 +81,11 @@ router.get("/departments/:id", requireHrmsUser, async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [dept] = await db
-      .select({
-        id: departmentsTable.id,
-        name: departmentsTable.name,
-        code: departmentsTable.code,
-        description: departmentsTable.description,
-        headId: departmentsTable.headId,
-        isActive: departmentsTable.isActive,
-        employeeCount: sql<number>`count(${employeesTable.id})::int`,
-        createdAt: departmentsTable.createdAt,
-        updatedAt: departmentsTable.updatedAt,
-      })
+      .select(deptSelect)
       .from(departmentsTable)
-      .leftJoin(
-        employeesTable,
-        sql`${employeesTable.departmentId} = ${departmentsTable.id} AND ${employeesTable.deletedAt} IS NULL AND ${employeesTable.status} != 'Separated'`
-      )
-      .where(eq(departmentsTable.id, id))
-      .groupBy(
-        departmentsTable.id,
-        departmentsTable.name,
-        departmentsTable.code,
-        departmentsTable.description,
-        departmentsTable.headId,
-        departmentsTable.isActive,
-        departmentsTable.createdAt,
-        departmentsTable.updatedAt
-      )
+      .leftJoin(employeesTable, activeEmployeesJoin)
+      .where(and(eq(departmentsTable.id, id), isNull(departmentsTable.deletedAt)))
+      .groupBy(...deptGroupBy)
       .limit(1);
     if (!dept) {
       res.status(404).json({ error: "Department not found" });
@@ -128,7 +109,7 @@ router.patch(
       const [dept] = await db
         .update(departmentsTable)
         .set({ name, code, description, headId, isActive, updatedAt: new Date() })
-        .where(eq(departmentsTable.id, id))
+        .where(and(eq(departmentsTable.id, id), isNull(departmentsTable.deletedAt)))
         .returning();
       if (!dept) {
         res.status(404).json({ error: "Department not found" });
@@ -158,7 +139,7 @@ router.delete(
       const [dept] = await db
         .update(departmentsTable)
         .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
-        .where(eq(departmentsTable.id, id))
+        .where(and(eq(departmentsTable.id, id), isNull(departmentsTable.deletedAt)))
         .returning();
       if (!dept) {
         res.status(404).json({ error: "Department not found" });

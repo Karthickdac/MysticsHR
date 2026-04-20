@@ -3,7 +3,7 @@ import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { designationsTable } from "@workspace/db/schema";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -13,17 +13,15 @@ router.get("/designations", requireHrmsUser, async (req, res) => {
       ? parseInt(String(req.query.departmentId), 10)
       : undefined;
 
-    const rows = departmentId
-      ? await db
-          .select()
-          .from(designationsTable)
-          .where(eq(designationsTable.departmentId, departmentId))
-          .orderBy(designationsTable.title)
-      : await db
-          .select()
-          .from(designationsTable)
-          .where(isNull(designationsTable.deletedAt))
-          .orderBy(designationsTable.title);
+    const where = departmentId
+      ? and(isNull(designationsTable.deletedAt), eq(designationsTable.departmentId, departmentId))
+      : isNull(designationsTable.deletedAt);
+
+    const rows = await db
+      .select()
+      .from(designationsTable)
+      .where(where)
+      .orderBy(designationsTable.title);
 
     res.json(rows);
   } catch (err) {
@@ -67,9 +65,9 @@ router.get("/designations/:id", requireHrmsUser, async (req, res) => {
     const [desig] = await db
       .select()
       .from(designationsTable)
-      .where(eq(designationsTable.id, id))
+      .where(and(eq(designationsTable.id, id), isNull(designationsTable.deletedAt)))
       .limit(1);
-    if (!desig || desig.deletedAt) {
+    if (!desig) {
       res.status(404).json({ error: "Designation not found" });
       return;
     }
@@ -91,7 +89,7 @@ router.patch(
       const [desig] = await db
         .update(designationsTable)
         .set({ title, code, departmentId, level, isActive, updatedAt: new Date() })
-        .where(eq(designationsTable.id, id))
+        .where(and(eq(designationsTable.id, id), isNull(designationsTable.deletedAt)))
         .returning();
       if (!desig) {
         res.status(404).json({ error: "Designation not found" });
@@ -121,7 +119,7 @@ router.delete(
       const [desig] = await db
         .update(designationsTable)
         .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
-        .where(eq(designationsTable.id, id))
+        .where(and(eq(designationsTable.id, id), isNull(designationsTable.deletedAt)))
         .returning();
       if (!desig) {
         res.status(404).json({ error: "Designation not found" });
