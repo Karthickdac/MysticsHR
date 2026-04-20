@@ -138,6 +138,19 @@ router.post(
         .where(eq(onboardingChecklistsTable.id, checklist.id))
         .returning();
       await logAudit({ user: req.hrmsUser, action: "SEND_WELCOME_EMAIL", module: "OnboardingChecklist", recordId: checklist.id, ipAddress: req.ip });
+      // Dispatch onboarding_access notification to the new employee
+      const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, employeeId)).limit(1);
+      if (empUser?.email) {
+        import("../lib/notification-service").then(({ dispatchNotification }) => {
+          dispatchNotification({
+            eventType: "onboarding_access", module: "onboarding",
+            recipientEmail: empUser.email, recipientName: empUser.name ?? "",
+            variables: { recipientName: empUser.name ?? "" },
+            entityType: "onboarding_checklist", entityId: checklist.id,
+          }).catch(() => {});
+        }).catch(() => {});
+      }
       res.json({ welcomeEmailSentAt: updated.welcomeEmailSentAt, message: "Welcome email trigger recorded" });
     } catch (err) {
       console.error(err);
@@ -583,6 +596,19 @@ router.get("/employees/:id/id-card", requireHrmsUser, requireRole(...HR_READ_ROL
       .where(eq(onboardingChecklistsTable.id, checklist.id));
 
     await logAudit({ user: req.hrmsUser, action: "GENERATE_ID_CARD", module: "Onboarding", recordId: id, ipAddress: req.ip });
+
+    // Dispatch id_card_generated notification to the employee
+    if (emp.email) {
+      const empName = `${emp.firstName} ${emp.lastName}`;
+      import("../lib/notification-service").then(({ dispatchNotification }) => {
+        dispatchNotification({
+          eventType: "id_card_generated", module: "onboarding",
+          recipientEmail: emp.email, recipientName: empName,
+          variables: { recipientName: empName, employeeId: String(emp.employeeId ?? "") },
+          entityType: "onboarding_checklist", entityId: checklist.id,
+        }).catch(() => {});
+      }).catch(() => {});
+    }
 
     res.set("Content-Type", "application/pdf");
     res.set("Content-Disposition", `attachment; filename="idcard_${emp.employeeId}.pdf"`);
