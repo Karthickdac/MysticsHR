@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "MysticsHR"
+version = "1.0.0"
+id = "artifacts/mysticshr"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19153
+
+[services.development]
+run = "pnpm --filter @workspace/mysticshr run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mysticshr", "run", "build" ]
+publicDir = "artifacts/mysticshr/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19153"
+BASE_PATH = "/"

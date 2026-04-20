@@ -3,13 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MysticsHR API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: departments
+    description: Department management
+  - name: designations
+    description: Designation management
+  - name: employees
+    description: Employee management
+  - name: users
+    description: User management
+  - name: audit-logs
+    description: Audit log access
+  - name: dashboard
+    description: Dashboard and analytics
+
 paths:
   /healthz:
     get:
@@ -24,6 +37,526 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ──────────────────────────────────────────────
+  # DASHBOARD
+  # ──────────────────────────────────────────────
+  /dashboard/kpis:
+    get:
+      operationId: getDashboardKpis
+      tags: [dashboard]
+      summary: Get executive KPI dashboard metrics
+      responses:
+        "200":
+          description: KPI metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardKpis"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getDashboardRecentActivity
+      tags: [dashboard]
+      summary: Get recent HR activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Recent activity list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/headcount-by-department:
+    get:
+      operationId: getDashboardHeadcountByDepartment
+      tags: [dashboard]
+      summary: Headcount grouped by department
+      responses:
+        "200":
+          description: Headcount per department
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HeadcountByDepartment"
+
+  /dashboard/employee-status-breakdown:
+    get:
+      operationId: getDashboardEmployeeStatusBreakdown
+      tags: [dashboard]
+      summary: Employee count by status
+      responses:
+        "200":
+          description: Status breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusCount"
+
+  # ──────────────────────────────────────────────
+  # DEPARTMENTS
+  # ──────────────────────────────────────────────
+  /departments:
+    get:
+      operationId: listDepartments
+      tags: [departments]
+      summary: List all departments
+      responses:
+        "200":
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Department"
+    post:
+      operationId: createDepartment
+      tags: [departments]
+      summary: Create a department
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDepartmentBody"
+      responses:
+        "201":
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Department"
+
+  /departments/{id}:
+    get:
+      operationId: getDepartment
+      tags: [departments]
+      summary: Get a department by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Department
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Department"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateDepartment
+      tags: [departments]
+      summary: Update a department
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDepartmentBody"
+      responses:
+        "200":
+          description: Updated department
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Department"
+    delete:
+      operationId: deleteDepartment
+      tags: [departments]
+      summary: Delete a department
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ──────────────────────────────────────────────
+  # DESIGNATIONS
+  # ──────────────────────────────────────────────
+  /designations:
+    get:
+      operationId: listDesignations
+      tags: [designations]
+      summary: List all designations
+      parameters:
+        - name: departmentId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of designations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Designation"
+    post:
+      operationId: createDesignation
+      tags: [designations]
+      summary: Create a designation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDesignationBody"
+      responses:
+        "201":
+          description: Designation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Designation"
+
+  /designations/{id}:
+    get:
+      operationId: getDesignation
+      tags: [designations]
+      summary: Get a designation by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Designation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Designation"
+    patch:
+      operationId: updateDesignation
+      tags: [designations]
+      summary: Update a designation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDesignationBody"
+      responses:
+        "200":
+          description: Updated designation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Designation"
+    delete:
+      operationId: deleteDesignation
+      tags: [designations]
+      summary: Delete a designation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ──────────────────────────────────────────────
+  # EMPLOYEES
+  # ──────────────────────────────────────────────
+  /employees:
+    get:
+      operationId: listEmployees
+      tags: [employees]
+      summary: List all employees
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: departmentId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeListResponse"
+    post:
+      operationId: createEmployee
+      tags: [employees]
+      summary: Create an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeBody"
+      responses:
+        "201":
+          description: Employee created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+
+  /employees/{id}:
+    get:
+      operationId: getEmployee
+      tags: [employees]
+      summary: Get an employee by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateEmployee
+      tags: [employees]
+      summary: Update an employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeBody"
+      responses:
+        "200":
+          description: Updated employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+    delete:
+      operationId: deleteEmployee
+      tags: [employees]
+      summary: Soft-delete (deactivate) an employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deactivated
+
+  /employees/{id}/status:
+    patch:
+      operationId: updateEmployeeStatus
+      tags: [employees]
+      summary: Update employee status (lifecycle transition)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeStatusBody"
+      responses:
+        "200":
+          description: Updated employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+
+  # ──────────────────────────────────────────────
+  # USERS (HRMS accounts linked to employees)
+  # ──────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all HRMS users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HrmsUser"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create an HRMS user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HrmsUser"
+
+  /users/me:
+    get:
+      operationId: getCurrentUser
+      tags: [users]
+      summary: Get the current authenticated user's profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HrmsUser"
+        "404":
+          description: User not found / not set up yet
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HrmsUser"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user (role or status)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HrmsUser"
+
+  # ──────────────────────────────────────────────
+  # AUDIT LOGS
+  # ──────────────────────────────────────────────
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit-logs]
+      summary: List audit log entries
+      parameters:
+        - name: module
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +567,491 @@ components:
       required:
         - status
 
+    # ──────────────────────────────────────────────
+    # DASHBOARD
+    # ──────────────────────────────────────────────
+    DashboardKpis:
+      type: object
+      properties:
+        totalHeadcount:
+          type: integer
+        newJoinersThisMonth:
+          type: integer
+        attritionRate:
+          type: number
+        attendanceRateToday:
+          type: number
+        openPositions:
+          type: integer
+        pendingApprovals:
+          type: integer
+        activeEmployees:
+          type: integer
+        onLeaveToday:
+          type: integer
+      required:
+        - totalHeadcount
+        - newJoinersThisMonth
+        - attritionRate
+        - attendanceRateToday
+        - openPositions
+        - pendingApprovals
+        - activeEmployees
+        - onLeaveToday
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        module:
+          type: string
+        actorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - description
+        - module
+        - actorName
+        - createdAt
+
+    HeadcountByDepartment:
+      type: object
+      properties:
+        departmentId:
+          type: integer
+        departmentName:
+          type: string
+        count:
+          type: integer
+      required:
+        - departmentId
+        - departmentName
+        - count
+
+    StatusCount:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+      required:
+        - status
+        - count
+
+    # ──────────────────────────────────────────────
+    # DEPARTMENTS
+    # ──────────────────────────────────────────────
+    Department:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: ["string", "null"]
+        headId:
+          type: ["integer", "null"]
+        isActive:
+          type: boolean
+        employeeCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - code
+        - isActive
+        - employeeCount
+        - createdAt
+        - updatedAt
+
+    CreateDepartmentBody:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: ["string", "null"]
+        headId:
+          type: ["integer", "null"]
+      required:
+        - name
+        - code
+
+    UpdateDepartmentBody:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        code:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        headId:
+          type: ["integer", "null"]
+        isActive:
+          type: ["boolean", "null"]
+
+    # ──────────────────────────────────────────────
+    # DESIGNATIONS
+    # ──────────────────────────────────────────────
+    Designation:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        code:
+          type: string
+        departmentId:
+          type: ["integer", "null"]
+        level:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - code
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateDesignationBody:
+      type: object
+      properties:
+        title:
+          type: string
+        code:
+          type: string
+        departmentId:
+          type: ["integer", "null"]
+        level:
+          type: ["string", "null"]
+      required:
+        - title
+        - code
+
+    UpdateDesignationBody:
+      type: object
+      properties:
+        title:
+          type: ["string", "null"]
+        code:
+          type: ["string", "null"]
+        departmentId:
+          type: ["integer", "null"]
+        level:
+          type: ["string", "null"]
+        isActive:
+          type: ["boolean", "null"]
+
+    # ──────────────────────────────────────────────
+    # EMPLOYEES
+    # ──────────────────────────────────────────────
+    Employee:
+      type: object
+      properties:
+        id:
+          type: integer
+        employeeId:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        dateOfBirth:
+          type: ["string", "null"]
+          format: date
+        gender:
+          type: ["string", "null"]
+        departmentId:
+          type: ["integer", "null"]
+        departmentName:
+          type: ["string", "null"]
+        designationId:
+          type: ["integer", "null"]
+        designationTitle:
+          type: ["string", "null"]
+        employmentType:
+          type: string
+        status:
+          type: string
+        dateOfJoining:
+          type: ["string", "null"]
+          format: date
+        ctc:
+          type: ["number", "null"]
+        managerId:
+          type: ["integer", "null"]
+        managerName:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        isDeleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - employeeId
+        - firstName
+        - lastName
+        - email
+        - employmentType
+        - status
+        - isDeleted
+        - createdAt
+        - updatedAt
+
+    EmployeeListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Employee"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - data
+        - total
+        - limit
+        - offset
+
+    CreateEmployeeBody:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        dateOfBirth:
+          type: ["string", "null"]
+        gender:
+          type: ["string", "null"]
+        departmentId:
+          type: ["integer", "null"]
+        designationId:
+          type: ["integer", "null"]
+        employmentType:
+          type: string
+        dateOfJoining:
+          type: ["string", "null"]
+        ctc:
+          type: ["number", "null"]
+        managerId:
+          type: ["integer", "null"]
+        location:
+          type: ["string", "null"]
+      required:
+        - firstName
+        - lastName
+        - email
+        - employmentType
+
+    UpdateEmployeeBody:
+      type: object
+      properties:
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        dateOfBirth:
+          type: ["string", "null"]
+        gender:
+          type: ["string", "null"]
+        departmentId:
+          type: ["integer", "null"]
+        designationId:
+          type: ["integer", "null"]
+        employmentType:
+          type: ["string", "null"]
+        dateOfJoining:
+          type: ["string", "null"]
+        ctc:
+          type: ["number", "null"]
+        managerId:
+          type: ["integer", "null"]
+        location:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+
+    UpdateEmployeeStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+        reason:
+          type: ["string", "null"]
+      required:
+        - status
+
+    # ──────────────────────────────────────────────
+    # USERS
+    # ──────────────────────────────────────────────
+    HrmsUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        employeeId:
+          type: ["integer", "null"]
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clerkUserId
+        - email
+        - name
+        - role
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateUserBody:
+      type: object
+      properties:
+        clerkUserId:
+          type: string
+        employeeId:
+          type: ["integer", "null"]
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+      required:
+        - clerkUserId
+        - email
+        - name
+        - role
+
+    UpdateUserBody:
+      type: object
+      properties:
+        role:
+          type: ["string", "null"]
+        isActive:
+          type: ["boolean", "null"]
+        employeeId:
+          type: ["integer", "null"]
+
+    # ──────────────────────────────────────────────
+    # AUDIT LOGS
+    # ──────────────────────────────────────────────
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        userEmail:
+          type: ["string", "null"]
+        action:
+          type: string
+        module:
+          type: string
+        recordId:
+          type: ["string", "null"]
+        fieldName:
+          type: ["string", "null"]
+        previousValue:
+          type: ["string", "null"]
+        newValue:
+          type: ["string", "null"]
+        ipAddress:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - action
+        - module
+        - createdAt
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - data
+        - total
+        - limit
+        - offset
