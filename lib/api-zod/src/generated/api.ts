@@ -4360,3 +4360,409 @@ export const GetForm16ReportParams = zod.object({
 });
 
 export const GetForm16ReportResponse = zod.object({}).passthrough();
+
+/**
+ * @summary List performance review cycles
+ */
+export const ListPerformanceCyclesQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+});
+
+export const ListPerformanceCyclesResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  cycleType: zod.enum(["Annual", "Semi-Annual", "Quarterly"]),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date(),
+  status: zod.enum(["Draft", "Active", "Closed"]),
+  currentStage: zod.string(),
+  description: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListPerformanceCyclesResponse = zod.array(
+  ListPerformanceCyclesResponseItem,
+);
+
+/**
+ * @summary Create a performance review cycle
+ */
+export const CreatePerformanceCycleBody = zod.object({
+  title: zod.string(),
+  cycleType: zod.enum(["Annual", "Semi-Annual", "Quarterly"]),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date(),
+  description: zod.string().nullish(),
+  status: zod.string().optional(),
+});
+
+/**
+ * @summary Get a performance cycle
+ */
+export const GetPerformanceCycleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPerformanceCycleResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  cycleType: zod.enum(["Annual", "Semi-Annual", "Quarterly"]),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date(),
+  status: zod.enum(["Draft", "Active", "Closed"]),
+  currentStage: zod.string(),
+  description: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update a performance cycle
+ */
+export const UpdatePerformanceCycleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdatePerformanceCycleBody = zod.object({
+  title: zod.string(),
+  cycleType: zod.enum(["Annual", "Semi-Annual", "Quarterly"]),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date(),
+  description: zod.string().nullish(),
+  status: zod.string().optional(),
+});
+
+export const UpdatePerformanceCycleResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  cycleType: zod.enum(["Annual", "Semi-Annual", "Quarterly"]),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date(),
+  status: zod.enum(["Draft", "Active", "Closed"]),
+  currentStage: zod.string(),
+  description: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Advance the current stage of a cycle
+ */
+export const AdvancePerformanceCycleStageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdvancePerformanceCycleStageResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  cycleType: zod.enum(["Annual", "Semi-Annual", "Quarterly"]),
+  startDate: zod.coerce.date(),
+  endDate: zod.coerce.date(),
+  status: zod.enum(["Draft", "Active", "Closed"]),
+  currentStage: zod.string(),
+  description: zod.string().nullish(),
+  createdBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List performance goals
+ */
+export const ListPerformanceGoalsQueryParams = zod.object({
+  cycleId: zod.coerce.number().optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const ListPerformanceGoalsResponseItem = zod.object({
+  id: zod.number(),
+  cycleId: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  weightage: zod.string(),
+  targetValue: zod.string().nullish(),
+  measurementMethod: zod.string().nullish(),
+  status: zod.string(),
+  progressPercent: zod.number().nullish(),
+  assignedBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListPerformanceGoalsResponse = zod.array(
+  ListPerformanceGoalsResponseItem,
+);
+
+/**
+ * @summary Assign a KRA/KPI goal to an employee
+ */
+export const CreatePerformanceGoalBody = zod.object({
+  cycleId: zod.number(),
+  employeeId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  weightage: zod.number(),
+  targetValue: zod.string().nullish(),
+  measurementMethod: zod.string().nullish(),
+  status: zod.string().optional(),
+});
+
+/**
+ * @summary Update a performance goal
+ */
+export const UpdatePerformanceGoalParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdatePerformanceGoalBody = zod.object({
+  cycleId: zod.number(),
+  employeeId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  weightage: zod.number(),
+  targetValue: zod.string().nullish(),
+  measurementMethod: zod.string().nullish(),
+  status: zod.string().optional(),
+});
+
+export const UpdatePerformanceGoalResponse = zod.object({
+  id: zod.number(),
+  cycleId: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  weightage: zod.string(),
+  targetValue: zod.string().nullish(),
+  measurementMethod: zod.string().nullish(),
+  status: zod.string(),
+  progressPercent: zod.number().nullish(),
+  assignedBy: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a performance goal
+ */
+export const DeletePerformanceGoalParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Add a progress update to a goal
+ */
+export const AddGoalProgressParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddGoalProgressBody = zod.object({
+  progressPercent: zod.number(),
+  commentary: zod.string().nullish(),
+});
+
+/**
+ * @summary List progress updates for a goal
+ */
+export const ListGoalProgressParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListGoalProgressResponseItem = zod.object({
+  id: zod.number(),
+  goalId: zod.number(),
+  progressPercent: zod.number(),
+  commentary: zod.string().nullish(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListGoalProgressResponse = zod.array(ListGoalProgressResponseItem);
+
+/**
+ * @summary List self appraisals
+ */
+export const ListSelfAppraisalsQueryParams = zod.object({
+  cycleId: zod.coerce.number().optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const ListSelfAppraisalsResponseItem = zod.object({
+  id: zod.number(),
+  goalId: zod.number(),
+  employeeId: zod.number(),
+  rating: zod.number(),
+  commentary: zod.string().nullish(),
+  submittedAt: zod.coerce.date(),
+});
+export const ListSelfAppraisalsResponse = zod.array(
+  ListSelfAppraisalsResponseItem,
+);
+
+/**
+ * @summary Submit or update a self-appraisal for a goal
+ */
+export const SubmitSelfAppraisalBody = zod.object({
+  goalId: zod.number(),
+  rating: zod.number(),
+  commentary: zod.string().nullish(),
+});
+
+/**
+ * @summary List manager evaluations
+ */
+export const ListManagerEvaluationsQueryParams = zod.object({
+  cycleId: zod.coerce.number().optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const ListManagerEvaluationsResponseItem = zod.object({
+  id: zod.number(),
+  goalId: zod.number(),
+  employeeId: zod.number(),
+  rating: zod.number(),
+  commentary: zod.string().nullish(),
+  evaluatedBy: zod.number().nullish(),
+  evaluatedAt: zod.coerce.date(),
+});
+export const ListManagerEvaluationsResponse = zod.array(
+  ListManagerEvaluationsResponseItem,
+);
+
+/**
+ * @summary Submit or update a manager evaluation for a goal
+ */
+export const SubmitManagerEvaluationBody = zod.object({
+  goalId: zod.number(),
+  employeeId: zod.number(),
+  rating: zod.number(),
+  commentary: zod.string().nullish(),
+});
+
+/**
+ * @summary Get calibration overview for a cycle
+ */
+export const GetCalibrationViewParams = zod.object({
+  cycleId: zod.coerce.number(),
+});
+
+export const GetCalibrationViewResponseItem = zod.object({
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  department: zod.string().nullish(),
+  selfScore: zod.number().nullish(),
+  managerScore: zod.number().nullish(),
+  weightedScore: zod.number().nullish(),
+  goalCount: zod.number(),
+});
+export const GetCalibrationViewResponse = zod.array(
+  GetCalibrationViewResponseItem,
+);
+
+/**
+ * @summary List appraisal outcomes
+ */
+export const ListAppraisalOutcomesQueryParams = zod.object({
+  cycleId: zod.coerce.number().optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const ListAppraisalOutcomesResponseItem = zod.object({
+  id: zod.number(),
+  cycleId: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  finalScore: zod.string().nullish(),
+  outcomLabel: zod.string().nullish(),
+  calibrationNote: zod.string().nullish(),
+  normalizedScore: zod.string().nullish(),
+  calculatedAt: zod.coerce.date(),
+});
+export const ListAppraisalOutcomesResponse = zod.array(
+  ListAppraisalOutcomesResponseItem,
+);
+
+/**
+ * @summary Compute/finalize appraisal outcomes for a cycle
+ */
+export const ComputeAppraisalOutcomesBody = zod.object({
+  cycleId: zod.number(),
+  calibrationNotes: zod.record(zod.string(), zod.string()).optional(),
+});
+
+export const ComputeAppraisalOutcomesResponseItem = zod.object({
+  id: zod.number(),
+  cycleId: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  finalScore: zod.string().nullish(),
+  outcomLabel: zod.string().nullish(),
+  calibrationNote: zod.string().nullish(),
+  normalizedScore: zod.string().nullish(),
+  calculatedAt: zod.coerce.date(),
+});
+export const ComputeAppraisalOutcomesResponse = zod.array(
+  ComputeAppraisalOutcomesResponseItem,
+);
+
+/**
+ * @summary Get own employee profile summary
+ */
+export const GetEssProfileResponse = zod.object({
+  employeeId: zod.number(),
+  name: zod.string(),
+  email: zod.string(),
+  employeeCode: zod.string().nullish(),
+  designation: zod.string().nullish(),
+  department: zod.string().nullish(),
+  dateOfJoining: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  personalEmail: zod.string().nullish(),
+  currentAddress: zod.string().nullish(),
+  emergencyContactName: zod.string().nullish(),
+  emergencyContactPhone: zod.string().nullish(),
+  emergencyContactRelation: zod.string().nullish(),
+});
+
+/**
+ * @summary Update own contact/personal info
+ */
+export const UpdateEssProfileBody = zod.object({
+  phone: zod.string().nullish(),
+  personalEmail: zod.string().nullish(),
+  currentAddress: zod.string().nullish(),
+  emergencyContactName: zod.string().nullish(),
+  emergencyContactPhone: zod.string().nullish(),
+  emergencyContactRelation: zod.string().nullish(),
+});
+
+export const UpdateEssProfileResponse = zod.object({
+  employeeId: zod.number(),
+  name: zod.string(),
+  email: zod.string(),
+  employeeCode: zod.string().nullish(),
+  designation: zod.string().nullish(),
+  department: zod.string().nullish(),
+  dateOfJoining: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  personalEmail: zod.string().nullish(),
+  currentAddress: zod.string().nullish(),
+  emergencyContactName: zod.string().nullish(),
+  emergencyContactPhone: zod.string().nullish(),
+  emergencyContactRelation: zod.string().nullish(),
+});
+
+/**
+ * @summary Get ESS dashboard summary (attendance, leave, goals, payslips)
+ */
+export const GetEssDashboardResponse = zod.object({
+  attendance: zod.object({
+    presentDays: zod.number().optional(),
+    absentDays: zod.number().optional(),
+    lateDays: zod.number().optional(),
+    month: zod.string().optional(),
+  }),
+  leaveBalances: zod.array(zod.object({}).passthrough()),
+  recentPayslip: zod.object({}).passthrough().nullish(),
+  performanceGoals: zod.array(zod.object({}).passthrough()),
+  pendingActions: zod.array(zod.object({}).passthrough()),
+});

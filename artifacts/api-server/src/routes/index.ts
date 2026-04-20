@@ -17,6 +17,7 @@ import attendanceRouter from "./attendance";
 import leaveRouter from "./leave";
 import permissionsRouter from "./permissions";
 import payrollRouter from "./payroll";
+import performanceRouter from "./performance";
 
 const router: IRouter = Router();
 
@@ -37,6 +38,7 @@ router.use(attendanceRouter);
 router.use(leaveRouter);
 router.use(permissionsRouter);
 router.use(payrollRouter);
+router.use(performanceRouter);
 router.use(auditLogsRouter);
 
 export default router;

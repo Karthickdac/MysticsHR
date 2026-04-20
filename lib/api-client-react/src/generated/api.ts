@@ -22,6 +22,7 @@ import type {
   AccrueLeaveBalancesBody,
   ActionBody,
   ActivityItem,
+  AppraisalOutcome,
   ApprovePayrollRun200,
   ApproveRequisitionBody,
   AttendanceMonthlySummary,
@@ -31,9 +32,11 @@ import type {
   AuditLogListResponse,
   BlackoutDate,
   BulkImportResult,
+  CalibrationRecord,
   CancelActionLeaveApplicationBody,
   CancelLeaveBody,
   Candidate,
+  ComputeAppraisalOutcomesBody,
   ComputePayrollRun200,
   CreateAttendanceBody,
   CreateBlackoutDateBody,
@@ -52,6 +55,8 @@ import type {
   CreateOfferBody,
   CreateOnboardingTaskBody,
   CreatePayrollRunBody,
+  CreatePerformanceCycleBody,
+  CreatePerformanceGoalBody,
   CreateRegularizationBody,
   CreateRequisitionBody,
   CreateSalaryRevisionBody,
@@ -71,6 +76,8 @@ import type {
   EmployeeListResponse,
   EmployeeProfile,
   EmployeeWorkExperience,
+  EssDashboard,
+  EssProfile,
   FinalizePayrollRun200,
   GetAttendanceParams,
   GetAttendanceRegularizationsParams,
@@ -90,6 +97,8 @@ import type {
   GetShiftsCalendarParams,
   GetShiftsTemplatesParams,
   GetTdsSummaryReportParams,
+  GoalProgress,
+  GoalProgressBody,
   HeadcountByDepartment,
   HealthStatus,
   HrmsUser,
@@ -105,6 +114,7 @@ import type {
   LeaveCalendarEntry,
   LeavePolicy,
   LeaveType,
+  ListAppraisalOutcomesParams,
   ListAuditLogsParams,
   ListBlackoutDatesParams,
   ListCandidatesParams,
@@ -114,16 +124,21 @@ import type {
   ListLeaveBalancesParams,
   ListLeaveTypesParams,
   ListLoansParams,
+  ListManagerEvaluationsParams,
   ListOffersParams,
   ListPayrollLocksParams,
   ListPayslipsParams,
+  ListPerformanceCyclesParams,
+  ListPerformanceGoalsParams,
   ListPermissionsParams,
   ListPreOnboardingRecordsParams,
   ListRequisitionsParams,
   ListSalaryRevisionsParams,
   ListSalaryStructuresParams,
+  ListSelfAppraisalsParams,
   ListTaxDeclarationsParams,
   LoanRepayment,
+  ManagerEvaluation,
   MoveCandidateStageBody,
   OfferLetter,
   OnboardingChecklist,
@@ -138,6 +153,8 @@ import type {
   PayrollSetting,
   PayslipDetail,
   PayslipSummary,
+  PerformanceCycle,
+  PerformanceGoal,
   PermissionActionBody,
   PermissionApplication,
   PermissionOverrideBody,
@@ -158,6 +175,7 @@ import type {
   SalaryStructure,
   SalaryStructureDetail,
   ScheduleInterviewBody,
+  SelfAppraisal,
   ShiftAssignment,
   ShiftCalendarEntry,
   ShiftSwap,
@@ -167,13 +185,16 @@ import type {
   StatutoryReport,
   SubmitFeedbackBody,
   SubmitLeaveApplicationBody,
+  SubmitManagerEvaluationBody,
   SubmitPermissionBody,
+  SubmitSelfAppraisalBody,
   TaxDeclaration,
   UpdateCandidateBody,
   UpdateDepartmentBody,
   UpdateDesignationBody,
   UpdateEmployeeBody,
   UpdateEmployeeStatusBody,
+  UpdateEssProfileBody,
   UpdateInterviewBody,
   UpdateLeavePolicyBody,
   UpdateLoanBody,
@@ -16343,6 +16364,1876 @@ export function useGetForm16Report<
     year,
     options,
   );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List performance review cycles
+ */
+export const getListPerformanceCyclesUrl = (
+  params?: ListPerformanceCyclesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/performance/cycles?${stringifiedParams}`
+    : `/api/performance/cycles`;
+};
+
+export const listPerformanceCycles = async (
+  params?: ListPerformanceCyclesParams,
+  options?: RequestInit,
+): Promise<PerformanceCycle[]> => {
+  return customFetch<PerformanceCycle[]>(getListPerformanceCyclesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPerformanceCyclesQueryKey = (
+  params?: ListPerformanceCyclesParams,
+) => {
+  return [`/api/performance/cycles`, ...(params ? [params] : [])] as const;
+};
+
+export const getListPerformanceCyclesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPerformanceCycles>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPerformanceCyclesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPerformanceCycles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPerformanceCyclesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPerformanceCycles>>
+  > = ({ signal }) =>
+    listPerformanceCycles(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPerformanceCycles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPerformanceCyclesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPerformanceCycles>>
+>;
+export type ListPerformanceCyclesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List performance review cycles
+ */
+
+export function useListPerformanceCycles<
+  TData = Awaited<ReturnType<typeof listPerformanceCycles>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPerformanceCyclesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPerformanceCycles>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPerformanceCyclesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a performance review cycle
+ */
+export const getCreatePerformanceCycleUrl = () => {
+  return `/api/performance/cycles`;
+};
+
+export const createPerformanceCycle = async (
+  createPerformanceCycleBody: CreatePerformanceCycleBody,
+  options?: RequestInit,
+): Promise<PerformanceCycle> => {
+  return customFetch<PerformanceCycle>(getCreatePerformanceCycleUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPerformanceCycleBody),
+  });
+};
+
+export const getCreatePerformanceCycleMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPerformanceCycle>>,
+    TError,
+    { data: BodyType<CreatePerformanceCycleBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPerformanceCycle>>,
+  TError,
+  { data: BodyType<CreatePerformanceCycleBody> },
+  TContext
+> => {
+  const mutationKey = ["createPerformanceCycle"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPerformanceCycle>>,
+    { data: BodyType<CreatePerformanceCycleBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPerformanceCycle(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePerformanceCycleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPerformanceCycle>>
+>;
+export type CreatePerformanceCycleMutationBody =
+  BodyType<CreatePerformanceCycleBody>;
+export type CreatePerformanceCycleMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a performance review cycle
+ */
+export const useCreatePerformanceCycle = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPerformanceCycle>>,
+    TError,
+    { data: BodyType<CreatePerformanceCycleBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPerformanceCycle>>,
+  TError,
+  { data: BodyType<CreatePerformanceCycleBody> },
+  TContext
+> => {
+  return useMutation(getCreatePerformanceCycleMutationOptions(options));
+};
+
+/**
+ * @summary Get a performance cycle
+ */
+export const getGetPerformanceCycleUrl = (id: number) => {
+  return `/api/performance/cycles/${id}`;
+};
+
+export const getPerformanceCycle = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PerformanceCycle> => {
+  return customFetch<PerformanceCycle>(getGetPerformanceCycleUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPerformanceCycleQueryKey = (id: number) => {
+  return [`/api/performance/cycles/${id}`] as const;
+};
+
+export const getGetPerformanceCycleQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPerformanceCycle>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPerformanceCycle>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPerformanceCycleQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPerformanceCycle>>
+  > = ({ signal }) => getPerformanceCycle(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPerformanceCycle>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPerformanceCycleQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPerformanceCycle>>
+>;
+export type GetPerformanceCycleQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a performance cycle
+ */
+
+export function useGetPerformanceCycle<
+  TData = Awaited<ReturnType<typeof getPerformanceCycle>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPerformanceCycle>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPerformanceCycleQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update a performance cycle
+ */
+export const getUpdatePerformanceCycleUrl = (id: number) => {
+  return `/api/performance/cycles/${id}`;
+};
+
+export const updatePerformanceCycle = async (
+  id: number,
+  createPerformanceCycleBody: CreatePerformanceCycleBody,
+  options?: RequestInit,
+): Promise<PerformanceCycle> => {
+  return customFetch<PerformanceCycle>(getUpdatePerformanceCycleUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPerformanceCycleBody),
+  });
+};
+
+export const getUpdatePerformanceCycleMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePerformanceCycle>>,
+    TError,
+    { id: number; data: BodyType<CreatePerformanceCycleBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePerformanceCycle>>,
+  TError,
+  { id: number; data: BodyType<CreatePerformanceCycleBody> },
+  TContext
+> => {
+  const mutationKey = ["updatePerformanceCycle"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePerformanceCycle>>,
+    { id: number; data: BodyType<CreatePerformanceCycleBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updatePerformanceCycle(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePerformanceCycleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePerformanceCycle>>
+>;
+export type UpdatePerformanceCycleMutationBody =
+  BodyType<CreatePerformanceCycleBody>;
+export type UpdatePerformanceCycleMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a performance cycle
+ */
+export const useUpdatePerformanceCycle = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePerformanceCycle>>,
+    TError,
+    { id: number; data: BodyType<CreatePerformanceCycleBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePerformanceCycle>>,
+  TError,
+  { id: number; data: BodyType<CreatePerformanceCycleBody> },
+  TContext
+> => {
+  return useMutation(getUpdatePerformanceCycleMutationOptions(options));
+};
+
+/**
+ * @summary Advance the current stage of a cycle
+ */
+export const getAdvancePerformanceCycleStageUrl = (id: number) => {
+  return `/api/performance/cycles/${id}/advance-stage`;
+};
+
+export const advancePerformanceCycleStage = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PerformanceCycle> => {
+  return customFetch<PerformanceCycle>(getAdvancePerformanceCycleStageUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAdvancePerformanceCycleStageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof advancePerformanceCycleStage>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof advancePerformanceCycleStage>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["advancePerformanceCycleStage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof advancePerformanceCycleStage>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return advancePerformanceCycleStage(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdvancePerformanceCycleStageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof advancePerformanceCycleStage>>
+>;
+
+export type AdvancePerformanceCycleStageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Advance the current stage of a cycle
+ */
+export const useAdvancePerformanceCycleStage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof advancePerformanceCycleStage>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof advancePerformanceCycleStage>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAdvancePerformanceCycleStageMutationOptions(options));
+};
+
+/**
+ * @summary List performance goals
+ */
+export const getListPerformanceGoalsUrl = (
+  params?: ListPerformanceGoalsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/performance/goals?${stringifiedParams}`
+    : `/api/performance/goals`;
+};
+
+export const listPerformanceGoals = async (
+  params?: ListPerformanceGoalsParams,
+  options?: RequestInit,
+): Promise<PerformanceGoal[]> => {
+  return customFetch<PerformanceGoal[]>(getListPerformanceGoalsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPerformanceGoalsQueryKey = (
+  params?: ListPerformanceGoalsParams,
+) => {
+  return [`/api/performance/goals`, ...(params ? [params] : [])] as const;
+};
+
+export const getListPerformanceGoalsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPerformanceGoals>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPerformanceGoalsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPerformanceGoals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPerformanceGoalsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPerformanceGoals>>
+  > = ({ signal }) =>
+    listPerformanceGoals(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPerformanceGoals>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPerformanceGoalsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPerformanceGoals>>
+>;
+export type ListPerformanceGoalsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List performance goals
+ */
+
+export function useListPerformanceGoals<
+  TData = Awaited<ReturnType<typeof listPerformanceGoals>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPerformanceGoalsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPerformanceGoals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPerformanceGoalsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Assign a KRA/KPI goal to an employee
+ */
+export const getCreatePerformanceGoalUrl = () => {
+  return `/api/performance/goals`;
+};
+
+export const createPerformanceGoal = async (
+  createPerformanceGoalBody: CreatePerformanceGoalBody,
+  options?: RequestInit,
+): Promise<PerformanceGoal> => {
+  return customFetch<PerformanceGoal>(getCreatePerformanceGoalUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPerformanceGoalBody),
+  });
+};
+
+export const getCreatePerformanceGoalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPerformanceGoal>>,
+    TError,
+    { data: BodyType<CreatePerformanceGoalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPerformanceGoal>>,
+  TError,
+  { data: BodyType<CreatePerformanceGoalBody> },
+  TContext
+> => {
+  const mutationKey = ["createPerformanceGoal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPerformanceGoal>>,
+    { data: BodyType<CreatePerformanceGoalBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPerformanceGoal(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePerformanceGoalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPerformanceGoal>>
+>;
+export type CreatePerformanceGoalMutationBody =
+  BodyType<CreatePerformanceGoalBody>;
+export type CreatePerformanceGoalMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Assign a KRA/KPI goal to an employee
+ */
+export const useCreatePerformanceGoal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPerformanceGoal>>,
+    TError,
+    { data: BodyType<CreatePerformanceGoalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPerformanceGoal>>,
+  TError,
+  { data: BodyType<CreatePerformanceGoalBody> },
+  TContext
+> => {
+  return useMutation(getCreatePerformanceGoalMutationOptions(options));
+};
+
+/**
+ * @summary Update a performance goal
+ */
+export const getUpdatePerformanceGoalUrl = (id: number) => {
+  return `/api/performance/goals/${id}`;
+};
+
+export const updatePerformanceGoal = async (
+  id: number,
+  createPerformanceGoalBody: CreatePerformanceGoalBody,
+  options?: RequestInit,
+): Promise<PerformanceGoal> => {
+  return customFetch<PerformanceGoal>(getUpdatePerformanceGoalUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPerformanceGoalBody),
+  });
+};
+
+export const getUpdatePerformanceGoalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePerformanceGoal>>,
+    TError,
+    { id: number; data: BodyType<CreatePerformanceGoalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePerformanceGoal>>,
+  TError,
+  { id: number; data: BodyType<CreatePerformanceGoalBody> },
+  TContext
+> => {
+  const mutationKey = ["updatePerformanceGoal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePerformanceGoal>>,
+    { id: number; data: BodyType<CreatePerformanceGoalBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updatePerformanceGoal(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePerformanceGoalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePerformanceGoal>>
+>;
+export type UpdatePerformanceGoalMutationBody =
+  BodyType<CreatePerformanceGoalBody>;
+export type UpdatePerformanceGoalMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a performance goal
+ */
+export const useUpdatePerformanceGoal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePerformanceGoal>>,
+    TError,
+    { id: number; data: BodyType<CreatePerformanceGoalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePerformanceGoal>>,
+  TError,
+  { id: number; data: BodyType<CreatePerformanceGoalBody> },
+  TContext
+> => {
+  return useMutation(getUpdatePerformanceGoalMutationOptions(options));
+};
+
+/**
+ * @summary Delete a performance goal
+ */
+export const getDeletePerformanceGoalUrl = (id: number) => {
+  return `/api/performance/goals/${id}`;
+};
+
+export const deletePerformanceGoal = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeletePerformanceGoalUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeletePerformanceGoalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePerformanceGoal>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePerformanceGoal>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deletePerformanceGoal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePerformanceGoal>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deletePerformanceGoal(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePerformanceGoalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePerformanceGoal>>
+>;
+
+export type DeletePerformanceGoalMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a performance goal
+ */
+export const useDeletePerformanceGoal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePerformanceGoal>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deletePerformanceGoal>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeletePerformanceGoalMutationOptions(options));
+};
+
+/**
+ * @summary Add a progress update to a goal
+ */
+export const getAddGoalProgressUrl = (id: number) => {
+  return `/api/performance/goals/${id}/progress`;
+};
+
+export const addGoalProgress = async (
+  id: number,
+  goalProgressBody: GoalProgressBody,
+  options?: RequestInit,
+): Promise<GoalProgress> => {
+  return customFetch<GoalProgress>(getAddGoalProgressUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(goalProgressBody),
+  });
+};
+
+export const getAddGoalProgressMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addGoalProgress>>,
+    TError,
+    { id: number; data: BodyType<GoalProgressBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addGoalProgress>>,
+  TError,
+  { id: number; data: BodyType<GoalProgressBody> },
+  TContext
+> => {
+  const mutationKey = ["addGoalProgress"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addGoalProgress>>,
+    { id: number; data: BodyType<GoalProgressBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addGoalProgress(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddGoalProgressMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addGoalProgress>>
+>;
+export type AddGoalProgressMutationBody = BodyType<GoalProgressBody>;
+export type AddGoalProgressMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add a progress update to a goal
+ */
+export const useAddGoalProgress = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addGoalProgress>>,
+    TError,
+    { id: number; data: BodyType<GoalProgressBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addGoalProgress>>,
+  TError,
+  { id: number; data: BodyType<GoalProgressBody> },
+  TContext
+> => {
+  return useMutation(getAddGoalProgressMutationOptions(options));
+};
+
+/**
+ * @summary List progress updates for a goal
+ */
+export const getListGoalProgressUrl = (id: number) => {
+  return `/api/performance/goals/${id}/progress`;
+};
+
+export const listGoalProgress = async (
+  id: number,
+  options?: RequestInit,
+): Promise<GoalProgress[]> => {
+  return customFetch<GoalProgress[]>(getListGoalProgressUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListGoalProgressQueryKey = (id: number) => {
+  return [`/api/performance/goals/${id}/progress`] as const;
+};
+
+export const getListGoalProgressQueryOptions = <
+  TData = Awaited<ReturnType<typeof listGoalProgress>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listGoalProgress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListGoalProgressQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listGoalProgress>>
+  > = ({ signal }) => listGoalProgress(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listGoalProgress>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListGoalProgressQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listGoalProgress>>
+>;
+export type ListGoalProgressQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List progress updates for a goal
+ */
+
+export function useListGoalProgress<
+  TData = Awaited<ReturnType<typeof listGoalProgress>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listGoalProgress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListGoalProgressQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List self appraisals
+ */
+export const getListSelfAppraisalsUrl = (params?: ListSelfAppraisalsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/performance/self-appraisals?${stringifiedParams}`
+    : `/api/performance/self-appraisals`;
+};
+
+export const listSelfAppraisals = async (
+  params?: ListSelfAppraisalsParams,
+  options?: RequestInit,
+): Promise<SelfAppraisal[]> => {
+  return customFetch<SelfAppraisal[]>(getListSelfAppraisalsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListSelfAppraisalsQueryKey = (
+  params?: ListSelfAppraisalsParams,
+) => {
+  return [
+    `/api/performance/self-appraisals`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListSelfAppraisalsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSelfAppraisals>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSelfAppraisalsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSelfAppraisals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListSelfAppraisalsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSelfAppraisals>>
+  > = ({ signal }) => listSelfAppraisals(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSelfAppraisals>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSelfAppraisalsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSelfAppraisals>>
+>;
+export type ListSelfAppraisalsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List self appraisals
+ */
+
+export function useListSelfAppraisals<
+  TData = Awaited<ReturnType<typeof listSelfAppraisals>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListSelfAppraisalsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSelfAppraisals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSelfAppraisalsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit or update a self-appraisal for a goal
+ */
+export const getSubmitSelfAppraisalUrl = () => {
+  return `/api/performance/self-appraisals`;
+};
+
+export const submitSelfAppraisal = async (
+  submitSelfAppraisalBody: SubmitSelfAppraisalBody,
+  options?: RequestInit,
+): Promise<SelfAppraisal> => {
+  return customFetch<SelfAppraisal>(getSubmitSelfAppraisalUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitSelfAppraisalBody),
+  });
+};
+
+export const getSubmitSelfAppraisalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitSelfAppraisal>>,
+    TError,
+    { data: BodyType<SubmitSelfAppraisalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitSelfAppraisal>>,
+  TError,
+  { data: BodyType<SubmitSelfAppraisalBody> },
+  TContext
+> => {
+  const mutationKey = ["submitSelfAppraisal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitSelfAppraisal>>,
+    { data: BodyType<SubmitSelfAppraisalBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitSelfAppraisal(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitSelfAppraisalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitSelfAppraisal>>
+>;
+export type SubmitSelfAppraisalMutationBody = BodyType<SubmitSelfAppraisalBody>;
+export type SubmitSelfAppraisalMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit or update a self-appraisal for a goal
+ */
+export const useSubmitSelfAppraisal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitSelfAppraisal>>,
+    TError,
+    { data: BodyType<SubmitSelfAppraisalBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitSelfAppraisal>>,
+  TError,
+  { data: BodyType<SubmitSelfAppraisalBody> },
+  TContext
+> => {
+  return useMutation(getSubmitSelfAppraisalMutationOptions(options));
+};
+
+/**
+ * @summary List manager evaluations
+ */
+export const getListManagerEvaluationsUrl = (
+  params?: ListManagerEvaluationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/performance/manager-evaluations?${stringifiedParams}`
+    : `/api/performance/manager-evaluations`;
+};
+
+export const listManagerEvaluations = async (
+  params?: ListManagerEvaluationsParams,
+  options?: RequestInit,
+): Promise<ManagerEvaluation[]> => {
+  return customFetch<ManagerEvaluation[]>(
+    getListManagerEvaluationsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListManagerEvaluationsQueryKey = (
+  params?: ListManagerEvaluationsParams,
+) => {
+  return [
+    `/api/performance/manager-evaluations`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListManagerEvaluationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listManagerEvaluations>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListManagerEvaluationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listManagerEvaluations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListManagerEvaluationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listManagerEvaluations>>
+  > = ({ signal }) =>
+    listManagerEvaluations(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listManagerEvaluations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListManagerEvaluationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listManagerEvaluations>>
+>;
+export type ListManagerEvaluationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List manager evaluations
+ */
+
+export function useListManagerEvaluations<
+  TData = Awaited<ReturnType<typeof listManagerEvaluations>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListManagerEvaluationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listManagerEvaluations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListManagerEvaluationsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit or update a manager evaluation for a goal
+ */
+export const getSubmitManagerEvaluationUrl = () => {
+  return `/api/performance/manager-evaluations`;
+};
+
+export const submitManagerEvaluation = async (
+  submitManagerEvaluationBody: SubmitManagerEvaluationBody,
+  options?: RequestInit,
+): Promise<ManagerEvaluation> => {
+  return customFetch<ManagerEvaluation>(getSubmitManagerEvaluationUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitManagerEvaluationBody),
+  });
+};
+
+export const getSubmitManagerEvaluationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitManagerEvaluation>>,
+    TError,
+    { data: BodyType<SubmitManagerEvaluationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitManagerEvaluation>>,
+  TError,
+  { data: BodyType<SubmitManagerEvaluationBody> },
+  TContext
+> => {
+  const mutationKey = ["submitManagerEvaluation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitManagerEvaluation>>,
+    { data: BodyType<SubmitManagerEvaluationBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitManagerEvaluation(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitManagerEvaluationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitManagerEvaluation>>
+>;
+export type SubmitManagerEvaluationMutationBody =
+  BodyType<SubmitManagerEvaluationBody>;
+export type SubmitManagerEvaluationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit or update a manager evaluation for a goal
+ */
+export const useSubmitManagerEvaluation = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitManagerEvaluation>>,
+    TError,
+    { data: BodyType<SubmitManagerEvaluationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitManagerEvaluation>>,
+  TError,
+  { data: BodyType<SubmitManagerEvaluationBody> },
+  TContext
+> => {
+  return useMutation(getSubmitManagerEvaluationMutationOptions(options));
+};
+
+/**
+ * @summary Get calibration overview for a cycle
+ */
+export const getGetCalibrationViewUrl = (cycleId: number) => {
+  return `/api/performance/calibration/${cycleId}`;
+};
+
+export const getCalibrationView = async (
+  cycleId: number,
+  options?: RequestInit,
+): Promise<CalibrationRecord[]> => {
+  return customFetch<CalibrationRecord[]>(getGetCalibrationViewUrl(cycleId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCalibrationViewQueryKey = (cycleId: number) => {
+  return [`/api/performance/calibration/${cycleId}`] as const;
+};
+
+export const getGetCalibrationViewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCalibrationView>>,
+  TError = ErrorType<unknown>,
+>(
+  cycleId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCalibrationView>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCalibrationViewQueryKey(cycleId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCalibrationView>>
+  > = ({ signal }) =>
+    getCalibrationView(cycleId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!cycleId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCalibrationView>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCalibrationViewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCalibrationView>>
+>;
+export type GetCalibrationViewQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get calibration overview for a cycle
+ */
+
+export function useGetCalibrationView<
+  TData = Awaited<ReturnType<typeof getCalibrationView>>,
+  TError = ErrorType<unknown>,
+>(
+  cycleId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCalibrationView>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCalibrationViewQueryOptions(cycleId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List appraisal outcomes
+ */
+export const getListAppraisalOutcomesUrl = (
+  params?: ListAppraisalOutcomesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/performance/outcomes?${stringifiedParams}`
+    : `/api/performance/outcomes`;
+};
+
+export const listAppraisalOutcomes = async (
+  params?: ListAppraisalOutcomesParams,
+  options?: RequestInit,
+): Promise<AppraisalOutcome[]> => {
+  return customFetch<AppraisalOutcome[]>(getListAppraisalOutcomesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAppraisalOutcomesQueryKey = (
+  params?: ListAppraisalOutcomesParams,
+) => {
+  return [`/api/performance/outcomes`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAppraisalOutcomesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAppraisalOutcomes>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAppraisalOutcomesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAppraisalOutcomes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAppraisalOutcomesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAppraisalOutcomes>>
+  > = ({ signal }) =>
+    listAppraisalOutcomes(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAppraisalOutcomes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAppraisalOutcomesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAppraisalOutcomes>>
+>;
+export type ListAppraisalOutcomesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List appraisal outcomes
+ */
+
+export function useListAppraisalOutcomes<
+  TData = Awaited<ReturnType<typeof listAppraisalOutcomes>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAppraisalOutcomesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAppraisalOutcomes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAppraisalOutcomesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Compute/finalize appraisal outcomes for a cycle
+ */
+export const getComputeAppraisalOutcomesUrl = () => {
+  return `/api/performance/outcomes`;
+};
+
+export const computeAppraisalOutcomes = async (
+  computeAppraisalOutcomesBody: ComputeAppraisalOutcomesBody,
+  options?: RequestInit,
+): Promise<AppraisalOutcome[]> => {
+  return customFetch<AppraisalOutcome[]>(getComputeAppraisalOutcomesUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(computeAppraisalOutcomesBody),
+  });
+};
+
+export const getComputeAppraisalOutcomesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof computeAppraisalOutcomes>>,
+    TError,
+    { data: BodyType<ComputeAppraisalOutcomesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof computeAppraisalOutcomes>>,
+  TError,
+  { data: BodyType<ComputeAppraisalOutcomesBody> },
+  TContext
+> => {
+  const mutationKey = ["computeAppraisalOutcomes"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof computeAppraisalOutcomes>>,
+    { data: BodyType<ComputeAppraisalOutcomesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return computeAppraisalOutcomes(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ComputeAppraisalOutcomesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof computeAppraisalOutcomes>>
+>;
+export type ComputeAppraisalOutcomesMutationBody =
+  BodyType<ComputeAppraisalOutcomesBody>;
+export type ComputeAppraisalOutcomesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Compute/finalize appraisal outcomes for a cycle
+ */
+export const useComputeAppraisalOutcomes = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof computeAppraisalOutcomes>>,
+    TError,
+    { data: BodyType<ComputeAppraisalOutcomesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof computeAppraisalOutcomes>>,
+  TError,
+  { data: BodyType<ComputeAppraisalOutcomesBody> },
+  TContext
+> => {
+  return useMutation(getComputeAppraisalOutcomesMutationOptions(options));
+};
+
+/**
+ * @summary Get own employee profile summary
+ */
+export const getGetEssProfileUrl = () => {
+  return `/api/ess/me`;
+};
+
+export const getEssProfile = async (
+  options?: RequestInit,
+): Promise<EssProfile> => {
+  return customFetch<EssProfile>(getGetEssProfileUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEssProfileQueryKey = () => {
+  return [`/api/ess/me`] as const;
+};
+
+export const getGetEssProfileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEssProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEssProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEssProfileQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getEssProfile>>> = ({
+    signal,
+  }) => getEssProfile({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEssProfile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEssProfileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEssProfile>>
+>;
+export type GetEssProfileQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get own employee profile summary
+ */
+
+export function useGetEssProfile<
+  TData = Awaited<ReturnType<typeof getEssProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEssProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEssProfileQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update own contact/personal info
+ */
+export const getUpdateEssProfileUrl = () => {
+  return `/api/ess/me`;
+};
+
+export const updateEssProfile = async (
+  updateEssProfileBody: UpdateEssProfileBody,
+  options?: RequestInit,
+): Promise<EssProfile> => {
+  return customFetch<EssProfile>(getUpdateEssProfileUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateEssProfileBody),
+  });
+};
+
+export const getUpdateEssProfileMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEssProfile>>,
+    TError,
+    { data: BodyType<UpdateEssProfileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateEssProfile>>,
+  TError,
+  { data: BodyType<UpdateEssProfileBody> },
+  TContext
+> => {
+  const mutationKey = ["updateEssProfile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateEssProfile>>,
+    { data: BodyType<UpdateEssProfileBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateEssProfile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateEssProfileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateEssProfile>>
+>;
+export type UpdateEssProfileMutationBody = BodyType<UpdateEssProfileBody>;
+export type UpdateEssProfileMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update own contact/personal info
+ */
+export const useUpdateEssProfile = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEssProfile>>,
+    TError,
+    { data: BodyType<UpdateEssProfileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateEssProfile>>,
+  TError,
+  { data: BodyType<UpdateEssProfileBody> },
+  TContext
+> => {
+  return useMutation(getUpdateEssProfileMutationOptions(options));
+};
+
+/**
+ * @summary Get ESS dashboard summary (attendance, leave, goals, payslips)
+ */
+export const getGetEssDashboardUrl = () => {
+  return `/api/ess/dashboard`;
+};
+
+export const getEssDashboard = async (
+  options?: RequestInit,
+): Promise<EssDashboard> => {
+  return customFetch<EssDashboard>(getGetEssDashboardUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEssDashboardQueryKey = () => {
+  return [`/api/ess/dashboard`] as const;
+};
+
+export const getGetEssDashboardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEssDashboard>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEssDashboard>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEssDashboardQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getEssDashboard>>> = ({
+    signal,
+  }) => getEssDashboard({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEssDashboard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEssDashboardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEssDashboard>>
+>;
+export type GetEssDashboardQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get ESS dashboard summary (attendance, leave, goals, payslips)
+ */
+
+export function useGetEssDashboard<
+  TData = Awaited<ReturnType<typeof getEssDashboard>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEssDashboard>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEssDashboardQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

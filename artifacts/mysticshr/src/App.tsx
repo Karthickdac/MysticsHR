@@ -38,6 +38,12 @@ import PayslipsPage from "@/pages/payroll/payslips";
 import TaxDeclarationPage from "@/pages/payroll/tax-declaration";
 import StatutoryReportsPage from "@/pages/payroll/reports";
 import SalaryRevisionsPage from "@/pages/payroll/salary-revisions";
+import PerformancePage from "@/pages/performance/index";
+import GoalsPage from "@/pages/performance/goals";
+import AppraisalsPage from "@/pages/performance/appraisals";
+import EvaluationsPage from "@/pages/performance/evaluations";
+import CalibrationPage from "@/pages/performance/calibration";
+import EssPortalPage from "@/pages/ess/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -491,6 +497,54 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "payroll_admin", "employee"]}>
                 <PayrollDashboardPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/performance/goals">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <GoalsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/performance/appraisals">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <AppraisalsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/performance/evaluations">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <EvaluationsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/performance/calibration">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <CalibrationPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/performance">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <PerformancePage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/ess">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <EssPortalPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

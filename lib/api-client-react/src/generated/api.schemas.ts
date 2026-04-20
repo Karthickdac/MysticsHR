@@ -2036,6 +2036,246 @@ export interface ActionBody {
   approvalRemarks?: string | null;
 }
 
+export type PerformanceCycleCycleType =
+  (typeof PerformanceCycleCycleType)[keyof typeof PerformanceCycleCycleType];
+
+export const PerformanceCycleCycleType = {
+  Annual: "Annual",
+  "Semi-Annual": "Semi-Annual",
+  Quarterly: "Quarterly",
+} as const;
+
+export type PerformanceCycleStatus =
+  (typeof PerformanceCycleStatus)[keyof typeof PerformanceCycleStatus];
+
+export const PerformanceCycleStatus = {
+  Draft: "Draft",
+  Active: "Active",
+  Closed: "Closed",
+} as const;
+
+export interface PerformanceCycle {
+  id: number;
+  title: string;
+  cycleType: PerformanceCycleCycleType;
+  startDate: string;
+  endDate: string;
+  status: PerformanceCycleStatus;
+  currentStage: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+}
+
+export type CreatePerformanceCycleBodyCycleType =
+  (typeof CreatePerformanceCycleBodyCycleType)[keyof typeof CreatePerformanceCycleBodyCycleType];
+
+export const CreatePerformanceCycleBodyCycleType = {
+  Annual: "Annual",
+  "Semi-Annual": "Semi-Annual",
+  Quarterly: "Quarterly",
+} as const;
+
+export interface CreatePerformanceCycleBody {
+  title: string;
+  cycleType: CreatePerformanceCycleBodyCycleType;
+  startDate: string;
+  endDate: string;
+  /** @nullable */
+  description?: string | null;
+  status?: string;
+}
+
+export interface PerformanceGoal {
+  id: number;
+  cycleId: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  weightage: string;
+  /** @nullable */
+  targetValue?: string | null;
+  /** @nullable */
+  measurementMethod?: string | null;
+  status: string;
+  /** @nullable */
+  progressPercent?: number | null;
+  /** @nullable */
+  assignedBy?: number | null;
+  createdAt: string;
+}
+
+export interface CreatePerformanceGoalBody {
+  cycleId: number;
+  employeeId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  weightage: number;
+  /** @nullable */
+  targetValue?: string | null;
+  /** @nullable */
+  measurementMethod?: string | null;
+  status?: string;
+}
+
+export interface GoalProgress {
+  id: number;
+  goalId: number;
+  progressPercent: number;
+  /** @nullable */
+  commentary?: string | null;
+  updatedAt: string;
+}
+
+export interface GoalProgressBody {
+  progressPercent: number;
+  /** @nullable */
+  commentary?: string | null;
+}
+
+export interface SelfAppraisal {
+  id: number;
+  goalId: number;
+  employeeId: number;
+  rating: number;
+  /** @nullable */
+  commentary?: string | null;
+  submittedAt: string;
+}
+
+export interface SubmitSelfAppraisalBody {
+  goalId: number;
+  rating: number;
+  /** @nullable */
+  commentary?: string | null;
+}
+
+export interface ManagerEvaluation {
+  id: number;
+  goalId: number;
+  employeeId: number;
+  rating: number;
+  /** @nullable */
+  commentary?: string | null;
+  /** @nullable */
+  evaluatedBy?: number | null;
+  evaluatedAt: string;
+}
+
+export interface SubmitManagerEvaluationBody {
+  goalId: number;
+  employeeId: number;
+  rating: number;
+  /** @nullable */
+  commentary?: string | null;
+}
+
+export interface CalibrationRecord {
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  department?: string | null;
+  /** @nullable */
+  selfScore?: number | null;
+  /** @nullable */
+  managerScore?: number | null;
+  /** @nullable */
+  weightedScore?: number | null;
+  goalCount: number;
+}
+
+export interface AppraisalOutcome {
+  id: number;
+  cycleId: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  finalScore?: string | null;
+  /** @nullable */
+  outcomLabel?: string | null;
+  /** @nullable */
+  calibrationNote?: string | null;
+  /** @nullable */
+  normalizedScore?: string | null;
+  calculatedAt: string;
+}
+
+export interface EssProfile {
+  employeeId: number;
+  name: string;
+  email: string;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  designation?: string | null;
+  /** @nullable */
+  department?: string | null;
+  /** @nullable */
+  dateOfJoining?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  personalEmail?: string | null;
+  /** @nullable */
+  currentAddress?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelation?: string | null;
+}
+
+export interface UpdateEssProfileBody {
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  personalEmail?: string | null;
+  /** @nullable */
+  currentAddress?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelation?: string | null;
+}
+
+export type EssDashboardAttendance = {
+  presentDays?: number;
+  absentDays?: number;
+  lateDays?: number;
+  month?: string;
+};
+
+export type EssDashboardLeaveBalancesItem = { [key: string]: unknown };
+
+export type EssDashboardRecentPayslip = { [key: string]: unknown } | null;
+
+export type EssDashboardPerformanceGoalsItem = { [key: string]: unknown };
+
+export type EssDashboardPendingActionsItem = { [key: string]: unknown };
+
+export interface EssDashboard {
+  attendance: EssDashboardAttendance;
+  leaveBalances: EssDashboardLeaveBalancesItem[];
+  recentPayslip?: EssDashboardRecentPayslip;
+  performanceGoals: EssDashboardPerformanceGoalsItem[];
+  pendingActions: EssDashboardPendingActionsItem[];
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -2441,3 +2681,36 @@ export type GetBankTransferReportParams = {
 };
 
 export type GetForm16Report200 = { [key: string]: unknown };
+
+export type ListPerformanceCyclesParams = {
+  status?: string;
+};
+
+export type ListPerformanceGoalsParams = {
+  cycleId?: number;
+  employeeId?: number;
+};
+
+export type ListSelfAppraisalsParams = {
+  cycleId?: number;
+  employeeId?: number;
+};
+
+export type ListManagerEvaluationsParams = {
+  cycleId?: number;
+  employeeId?: number;
+};
+
+export type ListAppraisalOutcomesParams = {
+  cycleId?: number;
+  employeeId?: number;
+};
+
+export type ComputeAppraisalOutcomesBodyCalibrationNotes = {
+  [key: string]: string;
+};
+
+export type ComputeAppraisalOutcomesBody = {
+  cycleId: number;
+  calibrationNotes?: ComputeAppraisalOutcomesBodyCalibrationNotes;
+};

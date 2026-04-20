@@ -192,6 +192,19 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Shift calendar endpoint generates per-day entries from active shift assignments, merged with attendance status for that day
 - Monthly summary aggregates counts per status per employee; CSV export on frontend
 
+## Performance Management & ESS Portal (Task #7)
+
+- 6 DB tables: `performance_cycles`, `performance_goals`, `goal_progress`, `self_appraisals`, `manager_evaluations`, `appraisal_outcomes`
+- Backend routes: `routes/performance.ts` — cycles CRUD, advance-stage, goal CRUD, progress updates, self-appraisals (upsert), manager evaluations (upsert), calibration view with weighted scoring, outcome computation, ESS `/me` profile and dashboard
+- Cycle stages: Goal Setting → Mid Review → Self Appraisal → Manager Evaluation → Calibration → Completed (advance-stage API increments stage)
+- Cycle types: Annual, Semi-Annual, Quarterly; statuses: Draft, Active, Closed
+- Goals (KRA/KPI): cycleId, employeeId, title, weightage (%), targetValue, measurementMethod, status; latest progress percent joined on list
+- Calibration view aggregates self/manager scores per goal weighted by goal weightage; outcome labels: Outstanding, Exceeds Expectations, Meets Expectations, Needs Improvement, Unsatisfactory
+- `computeAppraisalOutcomes` deletes and re-inserts outcomes for the cycle using manager rating (or self rating fallback) × goal weightage
+- ESS portal: GET/PUT `/ess/me` (employee profile + emergency contact self-update), GET `/ess/dashboard` (attendance summary, leave balances, active goals, recent payslip)
+- Frontend pages: `/performance` (cycles dashboard + quick-nav), `/performance/goals` (KRA/KPI list with progress bars + assign modal), `/performance/appraisals` (self-rating with star UI), `/performance/evaluations` (manager ratings for team), `/performance/calibration` (score matrix + outcome computation), `/ess` (3-tab hub: Dashboard / My Profile / Services)
+- Role gates: HR creates cycles, HOD+ assigns goals, all roles access ESS, HR-only calibration
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

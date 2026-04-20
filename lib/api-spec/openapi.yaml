@@ -8,6 +8,10 @@ servers:
   - url: /api
     description: Base API path
 tags:
+  - name: performance
+    description: Performance management — cycles, goals, appraisals, calibration, outcomes
+  - name: ess
+    description: Employee Self-Service portal — profile, dashboard, and self-service actions
   - name: health
     description: Health operations
   - name: departments
@@ -3576,6 +3580,416 @@ paths:
               schema:
                 type: object
 
+  # ──────────────────────────────────────────────
+  # PERFORMANCE MANAGEMENT
+  # ──────────────────────────────────────────────
+  /performance/cycles:
+    get:
+      operationId: listPerformanceCycles
+      tags: [performance]
+      summary: List performance review cycles
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Performance cycles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PerformanceCycle"
+    post:
+      operationId: createPerformanceCycle
+      tags: [performance]
+      summary: Create a performance review cycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePerformanceCycleBody"
+      responses:
+        "201":
+          description: Created cycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceCycle"
+
+  /performance/cycles/{id}:
+    get:
+      operationId: getPerformanceCycle
+      tags: [performance]
+      summary: Get a performance cycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Performance cycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceCycle"
+    put:
+      operationId: updatePerformanceCycle
+      tags: [performance]
+      summary: Update a performance cycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePerformanceCycleBody"
+      responses:
+        "200":
+          description: Updated cycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceCycle"
+
+  /performance/cycles/{id}/advance-stage:
+    post:
+      operationId: advancePerformanceCycleStage
+      tags: [performance]
+      summary: Advance the current stage of a cycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated cycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceCycle"
+
+  /performance/goals:
+    get:
+      operationId: listPerformanceGoals
+      tags: [performance]
+      summary: List performance goals
+      parameters:
+        - name: cycleId
+          in: query
+          schema: { type: integer }
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Performance goals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PerformanceGoal"
+    post:
+      operationId: createPerformanceGoal
+      tags: [performance]
+      summary: Assign a KRA/KPI goal to an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePerformanceGoalBody"
+      responses:
+        "201":
+          description: Created goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceGoal"
+
+  /performance/goals/{id}:
+    put:
+      operationId: updatePerformanceGoal
+      tags: [performance]
+      summary: Update a performance goal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePerformanceGoalBody"
+      responses:
+        "200":
+          description: Updated goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceGoal"
+    delete:
+      operationId: deletePerformanceGoal
+      tags: [performance]
+      summary: Delete a performance goal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /performance/goals/{id}/progress:
+    post:
+      operationId: addGoalProgress
+      tags: [performance]
+      summary: Add a progress update to a goal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalProgressBody"
+      responses:
+        "201":
+          description: Progress recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalProgress"
+    get:
+      operationId: listGoalProgress
+      tags: [performance]
+      summary: List progress updates for a goal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Progress list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GoalProgress"
+
+  /performance/self-appraisals:
+    get:
+      operationId: listSelfAppraisals
+      tags: [performance]
+      summary: List self appraisals
+      parameters:
+        - name: cycleId
+          in: query
+          schema: { type: integer }
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Self appraisals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SelfAppraisal"
+    post:
+      operationId: submitSelfAppraisal
+      tags: [performance]
+      summary: Submit or update a self-appraisal for a goal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitSelfAppraisalBody"
+      responses:
+        "201":
+          description: Self appraisal submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelfAppraisal"
+
+  /performance/manager-evaluations:
+    get:
+      operationId: listManagerEvaluations
+      tags: [performance]
+      summary: List manager evaluations
+      parameters:
+        - name: cycleId
+          in: query
+          schema: { type: integer }
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Manager evaluations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ManagerEvaluation"
+    post:
+      operationId: submitManagerEvaluation
+      tags: [performance]
+      summary: Submit or update a manager evaluation for a goal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitManagerEvaluationBody"
+      responses:
+        "201":
+          description: Manager evaluation submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManagerEvaluation"
+
+  /performance/calibration/{cycleId}:
+    get:
+      operationId: getCalibrationView
+      tags: [performance]
+      summary: Get calibration overview for a cycle
+      parameters:
+        - name: cycleId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Calibration data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalibrationRecord"
+
+  /performance/outcomes:
+    get:
+      operationId: listAppraisalOutcomes
+      tags: [performance]
+      summary: List appraisal outcomes
+      parameters:
+        - name: cycleId
+          in: query
+          schema: { type: integer }
+        - name: employeeId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Appraisal outcomes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppraisalOutcome"
+    post:
+      operationId: computeAppraisalOutcomes
+      tags: [performance]
+      summary: Compute/finalize appraisal outcomes for a cycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cycleId]
+              properties:
+                cycleId: { type: integer }
+                calibrationNotes:
+                  type: object
+                  additionalProperties: { type: string }
+      responses:
+        "200":
+          description: Outcomes computed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppraisalOutcome"
+
+  # ──────────────────────────────────────────────
+  # ESS PORTAL
+  # ──────────────────────────────────────────────
+  /ess/me:
+    get:
+      operationId: getEssProfile
+      tags: [ess]
+      summary: Get own employee profile summary
+      responses:
+        "200":
+          description: ESS profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EssProfile"
+    put:
+      operationId: updateEssProfile
+      tags: [ess]
+      summary: Update own contact/personal info
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEssProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EssProfile"
+
+  /ess/dashboard:
+    get:
+      operationId: getEssDashboard
+      tags: [ess]
+      summary: Get ESS dashboard summary (attendance, leave, goals, payslips)
+      responses:
+        "200":
+          description: ESS dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EssDashboard"
+
+  # ──────────────────────────────────────────────
+  # PERFORMANCE + ESS SCHEMA ADDITIONS
+  # (appended to components.schemas section via tag in existing file)
+  # ──────────────────────────────────────────────
+
 components:
   schemas:
     ShiftTemplate:
@@ -5795,3 +6209,200 @@ components:
       properties:
         action: { type: string, enum: [approve, reject] }
         approvalRemarks: { type: ["string", "null"] }
+
+    PerformanceCycle:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        cycleType: { type: string, enum: [Annual, Semi-Annual, Quarterly] }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        status: { type: string, enum: [Draft, Active, Closed] }
+        currentStage: { type: string }
+        description: { type: ['string', 'null'] }
+        createdBy: { type: ['integer', 'null'] }
+        createdAt: { type: string, format: date-time }
+      required: [id, title, cycleType, startDate, endDate, status, currentStage, createdAt]
+
+    CreatePerformanceCycleBody:
+      type: object
+      required: [title, cycleType, startDate, endDate]
+      properties:
+        title: { type: string }
+        cycleType: { type: string, enum: [Annual, Semi-Annual, Quarterly] }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        description: { type: ['string', 'null'] }
+        status: { type: string }
+
+    PerformanceGoal:
+      type: object
+      properties:
+        id: { type: integer }
+        cycleId: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ['string', 'null'] }
+        employeeCode: { type: ['string', 'null'] }
+        title: { type: string }
+        description: { type: ['string', 'null'] }
+        weightage: { type: string }
+        targetValue: { type: ['string', 'null'] }
+        measurementMethod: { type: ['string', 'null'] }
+        status: { type: string }
+        progressPercent: { type: ['integer', 'null'] }
+        assignedBy: { type: ['integer', 'null'] }
+        createdAt: { type: string, format: date-time }
+      required: [id, cycleId, employeeId, title, weightage, status, createdAt]
+
+    CreatePerformanceGoalBody:
+      type: object
+      required: [cycleId, employeeId, title, weightage]
+      properties:
+        cycleId: { type: integer }
+        employeeId: { type: integer }
+        title: { type: string }
+        description: { type: ['string', 'null'] }
+        weightage: { type: number }
+        targetValue: { type: ['string', 'null'] }
+        measurementMethod: { type: ['string', 'null'] }
+        status: { type: string }
+
+    GoalProgress:
+      type: object
+      properties:
+        id: { type: integer }
+        goalId: { type: integer }
+        progressPercent: { type: integer }
+        commentary: { type: ['string', 'null'] }
+        updatedAt: { type: string, format: date-time }
+      required: [id, goalId, progressPercent, updatedAt]
+
+    GoalProgressBody:
+      type: object
+      required: [progressPercent]
+      properties:
+        progressPercent: { type: integer }
+        commentary: { type: ['string', 'null'] }
+
+    SelfAppraisal:
+      type: object
+      properties:
+        id: { type: integer }
+        goalId: { type: integer }
+        employeeId: { type: integer }
+        rating: { type: integer }
+        commentary: { type: ['string', 'null'] }
+        submittedAt: { type: string, format: date-time }
+      required: [id, goalId, employeeId, rating, submittedAt]
+
+    SubmitSelfAppraisalBody:
+      type: object
+      required: [goalId, rating]
+      properties:
+        goalId: { type: integer }
+        rating: { type: integer }
+        commentary: { type: ['string', 'null'] }
+
+    ManagerEvaluation:
+      type: object
+      properties:
+        id: { type: integer }
+        goalId: { type: integer }
+        employeeId: { type: integer }
+        rating: { type: integer }
+        commentary: { type: ['string', 'null'] }
+        evaluatedBy: { type: ['integer', 'null'] }
+        evaluatedAt: { type: string, format: date-time }
+      required: [id, goalId, employeeId, rating, evaluatedAt]
+
+    SubmitManagerEvaluationBody:
+      type: object
+      required: [goalId, employeeId, rating]
+      properties:
+        goalId: { type: integer }
+        employeeId: { type: integer }
+        rating: { type: integer }
+        commentary: { type: ['string', 'null'] }
+
+    CalibrationRecord:
+      type: object
+      properties:
+        employeeId: { type: integer }
+        employeeName: { type: ['string', 'null'] }
+        employeeCode: { type: ['string', 'null'] }
+        department: { type: ['string', 'null'] }
+        selfScore: { type: ['number', 'null'] }
+        managerScore: { type: ['number', 'null'] }
+        weightedScore: { type: ['number', 'null'] }
+        goalCount: { type: integer }
+      required: [employeeId, goalCount]
+
+    AppraisalOutcome:
+      type: object
+      properties:
+        id: { type: integer }
+        cycleId: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ['string', 'null'] }
+        finalScore: { type: ['string', 'null'] }
+        outcomLabel: { type: ['string', 'null'] }
+        calibrationNote: { type: ['string', 'null'] }
+        normalizedScore: { type: ['string', 'null'] }
+        calculatedAt: { type: string, format: date-time }
+      required: [id, cycleId, employeeId, calculatedAt]
+
+    EssProfile:
+      type: object
+      properties:
+        employeeId: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        employeeCode: { type: ['string', 'null'] }
+        designation: { type: ['string', 'null'] }
+        department: { type: ['string', 'null'] }
+        dateOfJoining: { type: ['string', 'null'] }
+        phone: { type: ['string', 'null'] }
+        personalEmail: { type: ['string', 'null'] }
+        currentAddress: { type: ['string', 'null'] }
+        emergencyContactName: { type: ['string', 'null'] }
+        emergencyContactPhone: { type: ['string', 'null'] }
+        emergencyContactRelation: { type: ['string', 'null'] }
+      required: [employeeId, name, email]
+
+    UpdateEssProfileBody:
+      type: object
+      properties:
+        phone: { type: ['string', 'null'] }
+        personalEmail: { type: ['string', 'null'] }
+        currentAddress: { type: ['string', 'null'] }
+        emergencyContactName: { type: ['string', 'null'] }
+        emergencyContactPhone: { type: ['string', 'null'] }
+        emergencyContactRelation: { type: ['string', 'null'] }
+
+    EssDashboard:
+      type: object
+      properties:
+        attendance:
+          type: object
+          properties:
+            presentDays: { type: integer }
+            absentDays: { type: integer }
+            lateDays: { type: integer }
+            month: { type: string }
+        leaveBalances:
+          type: array
+          items:
+            type: object
+        recentPayslip:
+          type: object
+          nullable: true
+        performanceGoals:
+          type: array
+          items:
+            type: object
+        pendingActions:
+          type: array
+          items:
+            type: object
+      required: [attendance, leaveBalances, performanceGoals, pendingActions]
