@@ -96,9 +96,13 @@ async function exportReport(reportType: string, format: "xlsx" | "pdf", filters:
   const resp = await fetch(url, { credentials: "include" });
   if (!resp.ok) { alert("Export failed. Please try again."); return; }
   if (format === "pdf") {
-    const html = await resp.text();
-    const win = window.open("", "_blank");
-    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500); }
+    const blob = await resp.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${reportType}-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     return;
   }
   const blob = await resp.blob();
@@ -599,7 +603,7 @@ function SchedulerPanel() {
   const [form, setForm] = useState<CreateReportScheduleBody>({
     reportType: "employee-directory",
     name: "",
-    frequency: "Monthly",
+    frequency: "monthly",
     recipients: [],
     isActive: true,
   });
@@ -614,7 +618,7 @@ function SchedulerPanel() {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getListReportSchedulesQueryKey() });
           setModal(false);
-          setForm({ reportType: "employee-directory", name: "", frequency: "Monthly", recipients: [], isActive: true });
+          setForm({ reportType: "employee-directory", name: "", frequency: "monthly", recipients: [], isActive: true });
           setRecipientsInput("");
         },
       },
@@ -694,7 +698,7 @@ function SchedulerPanel() {
               <Select value={form.frequency} onValueChange={(v) => setForm((f) => ({ ...f, frequency: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["Daily", "Weekly", "Monthly", "Quarterly"].map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  {["daily", "weekly", "monthly", "quarterly"].map((f) => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

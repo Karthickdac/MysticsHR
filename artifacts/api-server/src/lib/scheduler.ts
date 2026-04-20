@@ -30,14 +30,22 @@ function createTransport() {
 // ─── Due-check helpers ────────────────────────────────────────────────────────
 function isDue(frequency: string, lastRunAt: Date | null): boolean {
   if (!lastRunAt) return true;
+  const freq = frequency.toLowerCase();
   const now = Date.now();
   const last = lastRunAt.getTime();
-  if (frequency === "daily") return now - last >= 24 * 60 * 60 * 1000;
-  if (frequency === "weekly") return now - last >= 7 * 24 * 60 * 60 * 1000;
-  if (frequency === "monthly") {
+  if (freq === "daily") return now - last >= 24 * 60 * 60 * 1000;
+  if (freq === "weekly") return now - last >= 7 * 24 * 60 * 60 * 1000;
+  if (freq === "monthly") {
     const n = new Date();
     const l = new Date(last);
     return n.getFullYear() > l.getFullYear() || n.getMonth() > l.getMonth();
+  }
+  if (freq === "quarterly") {
+    const n = new Date();
+    const l = new Date(last);
+    const nQ = Math.floor(n.getMonth() / 3) + n.getFullYear() * 4;
+    const lQ = Math.floor(l.getMonth() / 3) + l.getFullYear() * 4;
+    return nQ > lQ;
   }
   return false;
 }
