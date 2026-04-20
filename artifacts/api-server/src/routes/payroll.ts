@@ -7,6 +7,7 @@ import {
   payslipsTable, taxRegimeDeclarationsTable, salaryRevisionsTable, payrollLocksTable,
   payrollLockExceptionsTable, loanRepaymentsTable, employeesTable, hrmsUsersTable,
   departmentsTable, designationsTable, attendanceRecordsTable,
+  salaryComponentTypeEnum, lockExceptionTypeEnum, salaryRevisionStatusEnum,
 } from "@workspace/db/schema";
 import { eq, and, desc, asc, or, gte, lte, sql } from "drizzle-orm";
 
@@ -114,6 +115,28 @@ router.get("/payroll/salary-structures/:id", requireHrmsUser, requireRole(...HR_
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// Helper: check if current period is payroll-locked, allowing approved edit_salary exceptions
+async function checkSalaryEditLock(userId: number): Promise<string | null> {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const [lock] = await db.select().from(payrollLocksTable).where(
+    and(eq(payrollLocksTable.year, year), eq(payrollLocksTable.month, month), eq(payrollLocksTable.isLocked, true))
+  );
+  if (!lock) return null;
+  // Check if user has an approved edit_salary exception for this lock
+  const [exception] = await db.select().from(payrollLockExceptionsTable).where(
+    and(
+      eq(payrollLockExceptionsTable.payrollLockId, lock.id),
+      eq(payrollLockExceptionsTable.requestedById, userId),
+      eq(payrollLockExceptionsTable.exceptionType, "edit_salary"),
+      eq(payrollLockExceptionsTable.status, "Approved"),
+    )
+  );
+  if (exception) return null;
+  return "Payroll is locked for the current period. Raise a lock exception to proceed.";
+}
+
 router.post("/payroll/salary-structures", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const body = req.body as {
@@ -124,12 +147,8 @@ router.post("/payroll/salary-structures", requireHrmsUser, requireRole(...HR_ROL
       }>;
     };
 
-    // Check payroll lock
-    const now = new Date();
-    const [lock] = await db.select().from(payrollLocksTable).where(
-      and(eq(payrollLocksTable.year, now.getFullYear()), eq(payrollLocksTable.month, now.getMonth() + 1), eq(payrollLocksTable.isLocked, true))
-    );
-    if (lock) { res.status(422).json({ error: "Payroll is locked for the current period. Raise a lock exception to proceed." }); return; }
+    const lockError = await checkSalaryEditLock(req.hrmsUser!.id);
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
 
     const [structure] = await db.insert(salaryStructuresTable).values({
       employeeId: body.employeeId,
@@ -145,7 +164,7 @@ router.post("/payroll/salary-structures", requireHrmsUser, requireRole(...HR_ROL
       await db.insert(salaryComponentsTable).values(
         body.components.map((c, i) => ({
           salaryStructureId: structure.id,
-          componentType: c.componentType as any,
+          componentType: c.componentType as (typeof salaryComponentTypeEnum.enumValues)[number],
           componentName: c.componentName,
           amount: c.amount,
           percentageOfBasic: c.percentageOfBasic,
@@ -172,21 +191,19 @@ router.put("/payroll/salary-structures/:id", requireHrmsUser, requireRole(...HR_
       }>;
     };
 
-    const [lock] = await db.select().from(payrollLocksTable).where(
-      and(eq(payrollLocksTable.isLocked, true))
-    );
-    if (lock) { res.status(422).json({ error: "Payroll is locked. Raise a lock exception to proceed." }); return; }
+    const lockError = await checkSalaryEditLock(req.hrmsUser!.id);
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
 
-    const updateData: any = { updatedAt: new Date() };
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.effectiveFrom !== undefined) updateData.effectiveFrom = body.effectiveFrom;
-    if (body.effectiveTo !== undefined) updateData.effectiveTo = body.effectiveTo;
-    if (body.grossCtc !== undefined) updateData.grossCtc = body.grossCtc;
-    if (body.annualCtc !== undefined) updateData.annualCtc = body.annualCtc;
-    if (body.isActive !== undefined) updateData.isActive = body.isActive;
-    if (body.notes !== undefined) updateData.notes = body.notes;
-
-    const [updated] = await db.update(salaryStructuresTable).set(updateData).where(eq(salaryStructuresTable.id, id)).returning();
+    const [updated] = await db.update(salaryStructuresTable).set({
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.effectiveFrom !== undefined && { effectiveFrom: body.effectiveFrom }),
+      ...(body.effectiveTo !== undefined && { effectiveTo: body.effectiveTo }),
+      ...(body.grossCtc !== undefined && { grossCtc: body.grossCtc }),
+      ...(body.annualCtc !== undefined && { annualCtc: body.annualCtc }),
+      ...(body.isActive !== undefined && { isActive: body.isActive }),
+      ...(body.notes !== undefined && { notes: body.notes }),
+      updatedAt: new Date(),
+    }).where(eq(salaryStructuresTable.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
 
     if (body.components) {
@@ -195,7 +212,7 @@ router.put("/payroll/salary-structures/:id", requireHrmsUser, requireRole(...HR_
         await db.insert(salaryComponentsTable).values(
           body.components.map((c, i) => ({
             salaryStructureId: id,
-            componentType: c.componentType as any,
+            componentType: c.componentType as (typeof salaryComponentTypeEnum.enumValues)[number],
             componentName: c.componentName,
             amount: c.amount,
             percentageOfBasic: c.percentageOfBasic,
@@ -260,12 +277,13 @@ router.post("/payroll/loans", requireHrmsUser, requireRole(...HR_ROLES), async (
 router.patch("/payroll/loans/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const body = req.body as { outstandingAmount?: string; monthlyDeduction?: string; isActive?: boolean; notes?: string };
-    const updateData: any = { updatedAt: new Date() };
-    if (body.outstandingAmount !== undefined) updateData.outstandingAmount = body.outstandingAmount;
-    if (body.monthlyDeduction !== undefined) updateData.monthlyDeduction = body.monthlyDeduction;
-    if (body.isActive !== undefined) updateData.isActive = body.isActive;
-    if (body.notes !== undefined) updateData.notes = body.notes;
-    const [updated] = await db.update(loanRepaymentsTable).set(updateData).where(eq(loanRepaymentsTable.id, Number(req.params.id))).returning();
+    const [updated] = await db.update(loanRepaymentsTable).set({
+      ...(body.outstandingAmount !== undefined && { outstandingAmount: body.outstandingAmount }),
+      ...(body.monthlyDeduction !== undefined && { monthlyDeduction: body.monthlyDeduction }),
+      ...(body.isActive !== undefined && { isActive: body.isActive }),
+      ...(body.notes !== undefined && { notes: body.notes }),
+      updatedAt: new Date(),
+    }).where(eq(loanRepaymentsTable.id, Number(req.params.id))).returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -310,14 +328,38 @@ router.get("/payroll/tax-declarations", requireHrmsUser, requireRole(...ALL_ROLE
 
 router.post("/payroll/tax-declarations", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
+    const u = req.hrmsUser!;
     const body = req.body as {
-      employeeId: number; financialYear: string; regime: "Old" | "New";
+      employeeId?: number; financialYear: string; regime: "Old" | "New";
       investmentDeclarations?: Record<string, number>; declarationDate: string;
     };
+
+    let resolvedEmployeeId: number;
+
+    if (u.role === "employee") {
+      // Employees can only declare for themselves — derive from auth, ignore body value
+      const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!emp) { res.status(403).json({ error: "No employee record found for current user." }); return; }
+      resolvedEmployeeId = emp.id;
+    } else {
+      // HR/admin roles must supply employeeId
+      if (!body.employeeId) { res.status(400).json({ error: "employeeId is required." }); return; }
+      resolvedEmployeeId = body.employeeId;
+    }
+
     await db.update(taxRegimeDeclarationsTable).set({ isCurrent: false, updatedAt: new Date() })
-      .where(and(eq(taxRegimeDeclarationsTable.employeeId, body.employeeId), eq(taxRegimeDeclarationsTable.financialYear, body.financialYear)));
+      .where(and(
+        eq(taxRegimeDeclarationsTable.employeeId, resolvedEmployeeId),
+        eq(taxRegimeDeclarationsTable.financialYear, body.financialYear),
+      ));
     const [decl] = await db.insert(taxRegimeDeclarationsTable).values({
-      ...body,
+      employeeId: resolvedEmployeeId,
+      financialYear: body.financialYear,
+      regime: body.regime,
+      investmentDeclarations: body.investmentDeclarations,
+      declarationDate: body.declarationDate,
       isCurrent: true,
     }).returning();
     res.status(201).json(decl);
@@ -401,7 +443,7 @@ router.post("/payroll/lock-exceptions", requireHrmsUser, requireRole(...HR_ROLES
       payrollLockId: body.payrollLockId,
       requestedById: req.hrmsUser!.id,
       reason: body.reason,
-      exceptionType: body.exceptionType as any,
+      exceptionType: body.exceptionType as (typeof lockExceptionTypeEnum.enumValues)[number],
     }).returning();
     res.status(201).json(exc);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -430,7 +472,7 @@ router.get("/payroll/salary-revisions", requireHrmsUser, requireRole(...HR_READ_
     const { employeeId, status } = req.query as { employeeId?: string; status?: string };
     const conds = [];
     if (employeeId) conds.push(eq(salaryRevisionsTable.employeeId, Number(employeeId)));
-    if (status) conds.push(eq(salaryRevisionsTable.status, status as any));
+    if (status) conds.push(eq(salaryRevisionsTable.status, status as (typeof salaryRevisionStatusEnum.enumValues)[number]));
     const revisions = await db.select({
       id: salaryRevisionsTable.id,
       employeeId: salaryRevisionsTable.employeeId,
@@ -584,7 +626,7 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
     }).from(employeesTable).where(eq(employeesTable.isActive, true));
 
     let totalGross = 0, totalDeductions = 0, totalNet = 0;
-    const records: any[] = [];
+    const records: Array<typeof payrollRecordsTable.$inferInsert> = [];
 
     await db.delete(payrollRecordsTable).where(eq(payrollRecordsTable.payrollRunId, runId));
 
@@ -791,9 +833,11 @@ router.post("/payroll/runs/:id/finalize", requireHrmsUser, requireRole("super_ad
     const activeLoans = await db.select().from(loanRepaymentsTable).where(eq(loanRepaymentsTable.isActive, true));
     for (const loan of activeLoans) {
       const newOutstanding = Math.max(0, Number(loan.outstandingAmount) - Number(loan.monthlyDeduction));
-      const updates: any = { outstandingAmount: String(newOutstanding), updatedAt: new Date() };
-      if (newOutstanding <= 0) updates.isActive = false;
-      await db.update(loanRepaymentsTable).set(updates).where(eq(loanRepaymentsTable.id, loan.id));
+      await db.update(loanRepaymentsTable).set({
+        outstandingAmount: String(newOutstanding),
+        ...(newOutstanding <= 0 && { isActive: false }),
+        updatedAt: new Date(),
+      }).where(eq(loanRepaymentsTable.id, loan.id));
     }
     res.json({ message: "Payroll finalized and marked as Locked." });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -1019,8 +1063,27 @@ router.get("/payroll/reports/form-16/:employeeId/:year", requireHrmsUser, requir
 
 // ─── PAYSLIP HTML GENERATOR ──────────────────────────────────────────────────
 
-function generatePayslipHtml(data: any, monthName: string, year: number): string {
-  const fmt = (n: any) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+interface PayslipData {
+  employee: { name: string; code: string | null | undefined; department: string; designation: string };
+  period: { year: number; month: number };
+  earnings: {
+    basic: string | null; hra: string | null; specialAllowance: string | null;
+    travelAllowance: string | null; medicalAllowance: string | null;
+    performanceBonus: string | null; shiftAllowance: string | null;
+    nightDifferential: string | null; otherEarnings: string | null; grossEarnings: string | null;
+  };
+  deductions: {
+    pfEmployee: string | null; esiEmployee: string | null; professionalTax: string | null;
+    tds: string | null; lopDeduction: string | null; loanDeduction: string | null;
+    otherDeductions: string | null; totalDeductions: string | null;
+  };
+  attendance: { workingDays: string | null; presentDays: string | null; lopDays: string | null; overtimeHours: string | null };
+  netPay: string | null;
+  taxRegime: string | null;
+}
+
+function generatePayslipHtml(data: PayslipData, monthName: string, year: number): string {
+  const fmt = (n: string | number | null | undefined) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
   const e = data.earnings;
   const d = data.deductions;
   const a = data.attendance;
