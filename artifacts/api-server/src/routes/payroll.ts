@@ -9,6 +9,7 @@ import {
   payslipsTable, taxRegimeDeclarationsTable, salaryRevisionsTable, payrollLocksTable,
   payrollLockExceptionsTable, loanRepaymentsTable, employeesTable, hrmsUsersTable,
   departmentsTable, designationsTable, attendanceRecordsTable, payrollSettingsTable,
+  employeeProfilesTable,
   salaryComponentTypeEnum, lockExceptionTypeEnum, salaryRevisionStatusEnum,
 } from "@workspace/db/schema";
 import { eq, and, desc, asc, or, gte, lte, sql } from "drizzle-orm";
@@ -1031,91 +1032,245 @@ router.get("/payroll/payslips/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
 
 // ─── STATUTORY REPORTS ────────────────────────────────────────────────────────
 
+// Helper: build a WHERE condition supporting single period (year/month) or date range (fromYear/fromMonth to toYear/toMonth)
+function buildPeriodConditions(params: {
+  year?: string; month?: string;
+  fromYear?: string; fromMonth?: string; toYear?: string; toMonth?: string;
+}) {
+  const { year, month, fromYear, fromMonth, toYear, toMonth } = params;
+  if (year && month) {
+    return and(eq(payrollRunsTable.periodYear, Number(year)), eq(payrollRunsTable.periodMonth, Number(month)));
+  }
+  if (fromYear && fromMonth && toYear && toMonth) {
+    // Convert year+month to a comparable integer YYYYMM
+    const fromInt = Number(fromYear) * 100 + Number(fromMonth);
+    const toInt = Number(toYear) * 100 + Number(toMonth);
+    return and(
+      gte(sql<number>`${payrollRunsTable.periodYear} * 100 + ${payrollRunsTable.periodMonth}`, fromInt),
+      lte(sql<number>`${payrollRunsTable.periodYear} * 100 + ${payrollRunsTable.periodMonth}`, toInt),
+    );
+  }
+  return undefined;
+}
+
 router.get("/payroll/reports/pf-ecr", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
-    const { year, month } = req.query as { year: string; month: string };
+    const { year, month, fromYear, fromMonth, toYear, toMonth, format } = req.query as {
+      year?: string; month?: string; fromYear?: string; fromMonth?: string; toYear?: string; toMonth?: string; format?: string;
+    };
+    // Support date-range query (fromYear/fromMonth to toYear/toMonth) as well as single period (year/month)
+    const periodConds = buildPeriodConditions({ year, month, fromYear, fromMonth, toYear, toMonth });
     const records = await db.select({
       employeeCode: employeesTable.employeeId,
       employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+      periodYear: payrollRunsTable.periodYear,
+      periodMonth: payrollRunsTable.periodMonth,
       basic: payrollRecordsTable.basic,
       pfEmployee: payrollRecordsTable.pfEmployee,
       pfEmployer: payrollRecordsTable.pfEmployer,
     }).from(payrollRecordsTable)
       .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
       .leftJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(and(eq(payrollRunsTable.periodYear, Number(year)), eq(payrollRunsTable.periodMonth, Number(month))));
+      .where(periodConds ? periodConds : undefined);
 
     const totalPfEmployee = records.reduce((s, r) => s + Number(r.pfEmployee), 0);
     const totalPfEmployer = records.reduce((s, r) => s + Number(r.pfEmployer), 0);
-    res.json({ period: `${year}-${month}`, records, summary: { totalPfEmployee, totalPfEmployer, totalPf: totalPfEmployee + totalPfEmployer } });
+
+    if (format === "csv") {
+      const csvRows = [
+        "EmployeeCode,EmployeeName,Period,BasicWage,EmployeePF,EmployerPF",
+        ...records.map(r => [
+          r.employeeCode ?? "",
+          `"${(r.employeeName ?? "").replace(/"/g, '""')}"`,
+          `${r.periodYear}-${String(r.periodMonth).padStart(2, "0")}`,
+          Number(r.basic).toFixed(2),
+          Number(r.pfEmployee).toFixed(2),
+          Number(r.pfEmployer).toFixed(2),
+        ].join(",")),
+      ];
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="pf_ecr_report.csv"`);
+      res.send(csvRows.join("\r\n"));
+      return;
+    }
+
+    const period = year && month ? `${year}-${month}` : fromYear ? `${fromYear}-${fromMonth}_to_${toYear}-${toMonth}` : "all";
+    res.json({ period, records, summary: { totalPfEmployee, totalPfEmployer, totalPf: totalPfEmployee + totalPfEmployer } });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
 router.get("/payroll/reports/esi", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
-    const { year, month } = req.query as { year: string; month: string };
+    const { year, month, fromYear, fromMonth, toYear, toMonth, format } = req.query as {
+      year?: string; month?: string; fromYear?: string; fromMonth?: string; toYear?: string; toMonth?: string; format?: string;
+    };
+    const periodConds = buildPeriodConditions({ year, month, fromYear, fromMonth, toYear, toMonth });
     const records = await db.select({
       employeeCode: employeesTable.employeeId,
       employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+      periodYear: payrollRunsTable.periodYear,
+      periodMonth: payrollRunsTable.periodMonth,
       grossEarnings: payrollRecordsTable.grossEarnings,
       esiEmployee: payrollRecordsTable.esiEmployee,
       esiEmployer: payrollRecordsTable.esiEmployer,
     }).from(payrollRecordsTable)
       .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
       .leftJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(and(eq(payrollRunsTable.periodYear, Number(year)), eq(payrollRunsTable.periodMonth, Number(month))));
+      .where(periodConds ? periodConds : undefined);
 
     const eligible = records.filter(r => Number(r.grossEarnings) <= 21000);
-    res.json({ period: `${year}-${month}`, records: eligible, summary: { eligibleCount: eligible.length, totalEsiEmployee: eligible.reduce((s, r) => s + Number(r.esiEmployee), 0), totalEsiEmployer: eligible.reduce((s, r) => s + Number(r.esiEmployer), 0) } });
+
+    if (format === "csv") {
+      const csvRows = [
+        "EmployeeCode,EmployeeName,Period,GrossEarnings,ESIEmployee,ESIEmployer",
+        ...eligible.map(r => [
+          r.employeeCode ?? "",
+          `"${(r.employeeName ?? "").replace(/"/g, '""')}"`,
+          `${r.periodYear}-${String(r.periodMonth).padStart(2, "0")}`,
+          Number(r.grossEarnings).toFixed(2),
+          Number(r.esiEmployee).toFixed(2),
+          Number(r.esiEmployer).toFixed(2),
+        ].join(",")),
+      ];
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="esi_report.csv"`);
+      res.send(csvRows.join("\r\n"));
+      return;
+    }
+
+    const period = year && month ? `${year}-${month}` : fromYear ? `${fromYear}-${fromMonth}_to_${toYear}-${toMonth}` : "all";
+    res.json({ period, records: eligible, summary: { eligibleCount: eligible.length, totalEsiEmployee: eligible.reduce((s, r) => s + Number(r.esiEmployee), 0), totalEsiEmployer: eligible.reduce((s, r) => s + Number(r.esiEmployer), 0) } });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
 router.get("/payroll/reports/pt", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
-    const { year, month } = req.query as { year: string; month: string };
+    const { year, month, fromYear, fromMonth, toYear, toMonth, format } = req.query as {
+      year?: string; month?: string; fromYear?: string; fromMonth?: string; toYear?: string; toMonth?: string; format?: string;
+    };
+    const periodConds = buildPeriodConditions({ year, month, fromYear, fromMonth, toYear, toMonth });
     const records = await db.select({
       employeeCode: employeesTable.employeeId,
       employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+      periodYear: payrollRunsTable.periodYear,
+      periodMonth: payrollRunsTable.periodMonth,
       grossEarnings: payrollRecordsTable.grossEarnings,
       professionalTax: payrollRecordsTable.professionalTax,
     }).from(payrollRecordsTable)
       .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
       .leftJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(and(eq(payrollRunsTable.periodYear, Number(year)), eq(payrollRunsTable.periodMonth, Number(month))));
-    res.json({ period: `${year}-${month}`, records, summary: { totalPT: records.reduce((s, r) => s + Number(r.professionalTax), 0) } });
+      .where(periodConds ? periodConds : undefined);
+
+    if (format === "csv") {
+      const csvRows = [
+        "EmployeeCode,EmployeeName,Period,GrossEarnings,ProfessionalTax",
+        ...records.map(r => [
+          r.employeeCode ?? "",
+          `"${(r.employeeName ?? "").replace(/"/g, '""')}"`,
+          `${r.periodYear}-${String(r.periodMonth).padStart(2, "0")}`,
+          Number(r.grossEarnings).toFixed(2),
+          Number(r.professionalTax).toFixed(2),
+        ].join(",")),
+      ];
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="pt_report.csv"`);
+      res.send(csvRows.join("\r\n"));
+      return;
+    }
+
+    const period = year && month ? `${year}-${month}` : fromYear ? `${fromYear}-${fromMonth}_to_${toYear}-${toMonth}` : "all";
+    res.json({ period, records, summary: { totalPT: records.reduce((s, r) => s + Number(r.professionalTax), 0) } });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
 router.get("/payroll/reports/tds-summary", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
-    const { year, month } = req.query as { year: string; month: string };
+    const { year, month, fromYear, fromMonth, toYear, toMonth, format } = req.query as {
+      year?: string; month?: string; fromYear?: string; fromMonth?: string; toYear?: string; toMonth?: string; format?: string;
+    };
+    const periodConds = buildPeriodConditions({ year, month, fromYear, fromMonth, toYear, toMonth });
     const records = await db.select({
       employeeCode: employeesTable.employeeId,
       employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+      periodYear: payrollRunsTable.periodYear,
+      periodMonth: payrollRunsTable.periodMonth,
       grossEarnings: payrollRecordsTable.grossEarnings,
       tds: payrollRecordsTable.tds,
       taxRegime: payrollRecordsTable.taxRegime,
     }).from(payrollRecordsTable)
       .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
       .leftJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(and(eq(payrollRunsTable.periodYear, Number(year)), eq(payrollRunsTable.periodMonth, Number(month))));
-    res.json({ period: `${year}-${month}`, records, summary: { totalTDS: records.reduce((s, r) => s + Number(r.tds), 0), newRegimeCount: records.filter(r => r.taxRegime === "New").length, oldRegimeCount: records.filter(r => r.taxRegime === "Old").length } });
+      .where(periodConds ? periodConds : undefined);
+
+    if (format === "csv") {
+      const csvRows = [
+        "EmployeeCode,EmployeeName,Period,GrossEarnings,TDS,TaxRegime",
+        ...records.map(r => [
+          r.employeeCode ?? "",
+          `"${(r.employeeName ?? "").replace(/"/g, '""')}"`,
+          `${r.periodYear}-${String(r.periodMonth).padStart(2, "0")}`,
+          Number(r.grossEarnings).toFixed(2),
+          Number(r.tds).toFixed(2),
+          r.taxRegime ?? "",
+        ].join(",")),
+      ];
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="tds_summary_report.csv"`);
+      res.send(csvRows.join("\r\n"));
+      return;
+    }
+
+    const period = year && month ? `${year}-${month}` : fromYear ? `${fromYear}-${fromMonth}_to_${toYear}-${toMonth}` : "all";
+    res.json({ period, records, summary: { totalTDS: records.reduce((s, r) => s + Number(r.tds), 0), newRegimeCount: records.filter(r => r.taxRegime === "New").length, oldRegimeCount: records.filter(r => r.taxRegime === "Old").length } });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
 router.get("/payroll/reports/bank-transfer", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
-    const { year, month } = req.query as { year: string; month: string };
+    const { year, month, format } = req.query as { year: string; month: string; format?: string };
     const records = await db.select({
       employeeCode: employeesTable.employeeId,
       employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+      bankAccountName: employeeProfilesTable.bankAccountName,
+      bankAccountNumber: employeeProfilesTable.bankAccountNumber,
+      ifscCode: employeeProfilesTable.ifscCode,
+      bankName: employeeProfilesTable.bankName,
+      bankBranch: employeeProfilesTable.bankBranch,
       netPay: payrollRecordsTable.netPay,
       status: payrollRecordsTable.status,
     }).from(payrollRecordsTable)
       .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
+      .leftJoin(employeeProfilesTable, eq(employeeProfilesTable.employeeId, employeesTable.id))
       .leftJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
       .where(and(eq(payrollRunsTable.periodYear, Number(year)), eq(payrollRunsTable.periodMonth, Number(month))));
+
     const totalNetPay = records.reduce((s, r) => s + Number(r.netPay), 0);
+
+    // Return CSV bank transfer file when format=csv (NEFT/RTGS style)
+    if (format === "csv") {
+      const csvRows = [
+        "EmployeeCode,EmployeeName,BankAccountName,BankAccountNumber,IFSC,BankName,BankBranch,NetPay,Currency,PaymentMode",
+        ...records.map(r => [
+          r.employeeCode ?? "",
+          `"${(r.employeeName ?? "").replace(/"/g, '""')}"`,
+          `"${(r.bankAccountName ?? "").replace(/"/g, '""')}"`,
+          r.bankAccountNumber ?? "",
+          r.ifscCode ?? "",
+          `"${(r.bankName ?? "").replace(/"/g, '""')}"`,
+          `"${(r.bankBranch ?? "").replace(/"/g, '""')}"`,
+          Number(r.netPay).toFixed(2),
+          "INR",
+          "NEFT",
+        ].join(",")),
+      ];
+      const csvContent = csvRows.join("\r\n");
+      const filename = `bank_transfer_${year}_${String(month).padStart(2, "0")}.csv`;
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(csvContent);
+      return;
+    }
+
     res.json({ period: `${year}-${month}`, records, summary: { totalNetPay, recordCount: records.length } });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

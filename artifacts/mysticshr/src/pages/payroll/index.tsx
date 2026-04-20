@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Play, CheckCircle2, Lock, Unlock, FileText, RefreshCw, Plus, ChevronRight,
-  Banknote, Users, TrendingUp, TrendingDown,
+  Banknote, Users, TrendingUp,
 } from "lucide-react";
 
 const RUN_STATUS_COLORS: Record<string, string> = {
@@ -36,12 +36,42 @@ function fmt(n: string | number | null | undefined) {
   return `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 0 })}`;
 }
 
-export default function PayrollDashboardPage() {
-  const { role } = useCurrentHrmsUser();
-  const isAdmin = ["super_admin", "payroll_admin"].includes(role ?? "");
-  const isSuperAdmin = role === "super_admin";
-  const canApproveFinalize = isAdmin;
+function EmployeePayrollPortal() {
+  return (
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Payroll</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">Access your payslips and tax declarations below.</p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Link href="/payroll/payslips">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-blue-50"><FileText className="w-5 h-5 text-blue-600" /></div>
+              <div>
+                <p className="font-semibold">My Payslips</p>
+                <p className="text-xs text-muted-foreground">View and download your salary slips</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/payroll/tax-declaration">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-green-50"><Banknote className="w-5 h-5 text-green-600" /></div>
+              <div>
+                <p className="font-semibold">Tax Declaration</p>
+                <p className="text-xs text-muted-foreground">Submit your income tax regime declaration</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+    </div>
+  );
+}
 
+function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const qc = useQueryClient();
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -124,15 +154,12 @@ export default function PayrollDashboardPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Process monthly payroll, manage salary structures, and generate payslips.</p>
         </div>
         <div className="flex gap-2">
-          {isAdmin && (
-            <Button onClick={() => { setShowNew(true); setActionError(null); }}>
-              <Plus className="w-4 h-4 mr-1" /> New Payroll Run
-            </Button>
-          )}
+          <Button onClick={() => { setShowNew(true); setActionError(null); }}>
+            <Plus className="w-4 h-4 mr-1" /> New Payroll Run
+          </Button>
         </div>
       </div>
 
-      {/* Quick Links */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Salary Structures", href: "/payroll/salary-structures", icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
@@ -154,7 +181,6 @@ export default function PayrollDashboardPage() {
         ))}
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -174,7 +200,7 @@ export default function PayrollDashboardPage() {
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Current Period</p>
             <p className="text-lg font-bold mt-1">{MONTHS[currentMonth - 1]} {currentYear}</p>
             <Badge className={`mt-1 text-xs ${isCurrentlyLocked ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-              {isCurrentlyLocked ? "🔒 Locked" : "🔓 Open"}
+              {isCurrentlyLocked ? "Locked" : "Open"}
             </Badge>
           </CardContent>
         </Card>
@@ -186,43 +212,35 @@ export default function PayrollDashboardPage() {
         </Card>
       </div>
 
-      {/* Lock Control */}
-      {isAdmin && (
-        <Card className={`border-2 ${isCurrentlyLocked ? "border-red-200 bg-red-50/40" : "border-green-200 bg-green-50/40"}`}>
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="font-semibold">{MONTHS[currentMonth - 1]} {currentYear} — Payroll Lock</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {isCurrentlyLocked
-                  ? "Payroll is locked. Salary edits, attendance changes, and leave balance adjustments are blocked."
-                  : "Payroll is open. Initiating a new run will auto-lock the period."}
-              </p>
-            </div>
-            {canApproveFinalize && (
-              <Button variant={isCurrentlyLocked ? "outline" : "secondary"} size="sm" onClick={handleToggleLock} disabled={lockPayroll.isPending || unlockPayroll.isPending}>
-                {isCurrentlyLocked ? <><Unlock className="w-4 h-4 mr-1" />Unlock</> : <><Lock className="w-4 h-4 mr-1" />Lock</>}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <Card className={`border-2 ${isCurrentlyLocked ? "border-red-200 bg-red-50/40" : "border-green-200 bg-green-50/40"}`}>
+        <CardContent className="p-4 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">{MONTHS[currentMonth - 1]} {currentYear} — Payroll Lock</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {isCurrentlyLocked
+                ? "Payroll is locked. Salary edits, attendance changes, and leave balance adjustments are blocked."
+                : "Payroll is open. Initiating a new run will auto-lock the period."}
+            </p>
+          </div>
+          <Button variant={isCurrentlyLocked ? "outline" : "secondary"} size="sm" onClick={handleToggleLock} disabled={lockPayroll.isPending || unlockPayroll.isPending}>
+            {isCurrentlyLocked ? <><Unlock className="w-4 h-4 mr-1" />Unlock</> : <><Lock className="w-4 h-4 mr-1" />Lock</>}
+          </Button>
+        </CardContent>
+      </Card>
 
       {actionError && (
         <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm border border-red-200">{actionError}</div>
       )}
 
-      {/* Payroll Runs Table */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Payroll Run History</CardTitle>
-            {isAdmin && (
-              <Link href="/payroll/reports">
-                <Button variant="outline" size="sm">
-                  <FileText className="w-4 h-4 mr-1" /> Statutory Reports
-                </Button>
-              </Link>
-            )}
+            <Link href="/payroll/reports">
+              <Button variant="outline" size="sm">
+                <FileText className="w-4 h-4 mr-1" /> Statutory Reports
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
@@ -245,7 +263,7 @@ export default function PayrollDashboardPage() {
                     <th className="text-right py-2 pr-3 font-medium text-muted-foreground">Gross</th>
                     <th className="text-right py-2 pr-3 font-medium text-muted-foreground">Deductions</th>
                     <th className="text-right py-2 pr-3 font-medium text-muted-foreground">Net Pay</th>
-                    {isAdmin && <th className="text-center py-2 font-medium text-muted-foreground">Actions</th>}
+                    {isSuperAdmin && <th className="text-center py-2 font-medium text-muted-foreground">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -264,7 +282,7 @@ export default function PayrollDashboardPage() {
                       <td className="py-3 pr-3 text-right">{fmt(run.totalGross)}</td>
                       <td className="py-3 pr-3 text-right text-red-600">{fmt(run.totalDeductions)}</td>
                       <td className="py-3 pr-3 text-right font-semibold text-green-700">{fmt(run.totalNet)}</td>
-                      {isAdmin && (
+                      {isSuperAdmin && (
                         <td className="py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             {run.status === "Draft" && (
@@ -278,12 +296,12 @@ export default function PayrollDashboardPage() {
                                 <RefreshCw className="w-3 h-3" />
                               </Button>
                             )}
-                            {run.status === "Computed" && canApproveFinalize && (
+                            {run.status === "Computed" && (
                               <Button size="sm" onClick={() => handleApprove(run.id)} disabled={busy === run.id}>
                                 <CheckCircle2 className="w-3 h-3 mr-1" />Approve
                               </Button>
                             )}
-                            {run.status === "Approved" && canApproveFinalize && (
+                            {run.status === "Approved" && (
                               <Button size="sm" variant="outline" onClick={() => handleFinalize(run.id)} disabled={busy === run.id}>
                                 <Lock className="w-3 h-3 mr-1" />Finalize
                               </Button>
@@ -305,7 +323,6 @@ export default function PayrollDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* New Run Dialog */}
       <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent>
           <DialogHeader><DialogTitle>Initiate Payroll Run</DialogTitle></DialogHeader>
@@ -332,7 +349,7 @@ export default function PayrollDashboardPage() {
               <Textarea value={newForm.notes} onChange={e => setNewForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
             </div>
             <p className="text-xs text-muted-foreground bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-              ⚠️ Initiating a payroll run will lock the period, preventing salary edits, attendance changes, and leave balance adjustments.
+              Initiating a payroll run will lock the period, preventing salary edits, attendance changes, and leave balance adjustments.
             </p>
             {actionError && <p className="text-red-600 text-sm">{actionError}</p>}
           </div>
@@ -346,4 +363,16 @@ export default function PayrollDashboardPage() {
       </Dialog>
     </div>
   );
+}
+
+export default function PayrollDashboardPage() {
+  const { role } = useCurrentHrmsUser();
+  const isAdmin = ["super_admin", "payroll_admin"].includes(role ?? "");
+  const isSuperAdmin = role === "super_admin";
+
+  if (!isAdmin) {
+    return <EmployeePayrollPortal />;
+  }
+
+  return <AdminPayrollDashboard isSuperAdmin={isSuperAdmin} />;
 }
