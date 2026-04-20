@@ -306,13 +306,7 @@ router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), as
       fileContent,
     }).returning();
 
-    await logAudit({
-      userId: u.id,
-      action: "generate_document",
-      entityType: "issued_document",
-      entityId: issued.id,
-      changes: { documentType, employeeId },
-    });
+    await logAudit({ user: u, action: "generate_document", module: "documents", recordId: issued.id });
 
     res.status(201).json({
       id: issued.id,
@@ -421,13 +415,7 @@ router.post("/employees/:id/fnf-approve", requireHrmsUser, requireRole(...HR_ROL
       fileContent,
     }).returning();
 
-    await logAudit({
-      userId: u.id,
-      action: "fnf_approve",
-      entityType: "issued_document",
-      entityId: issued.id,
-      changes: { documentType, employeeId, lastWorkingDay },
-    });
+    await logAudit({ user: u, action: "fnf_approve", module: "documents", recordId: issued.id });
 
     res.json({
       message: `FnF approved. Relieving Letter issued for ${emp.firstName} ${emp.lastName}.`,

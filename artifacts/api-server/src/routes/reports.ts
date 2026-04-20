@@ -54,7 +54,7 @@ router.get("/analytics/dashboard", requireHrmsUser, requireRole(...MANAGER_ROLES
 
     const [openPositions] = await db.select({ count: sql<number>`count(*)::int` })
       .from(jobRequisitionsTable)
-      .where(eq(jobRequisitionsTable.status, "Open"));
+      .where(eq(jobRequisitionsTable.status, "Approved"));
 
     const [pendingLeave] = await db.select({ count: sql<number>`count(*)::int` })
       .from(leaveApplicationsTable)
@@ -166,7 +166,7 @@ router.get("/reports/employee-directory", requireHrmsUser, requireRole(...MANAGE
       email: employeesTable.email,
       phone: employeesTable.phone,
       department: departmentsTable.name,
-      designation: designationsTable.name,
+      designation: designationsTable.title,
       employmentType: employeesTable.employmentType,
       status: employeesTable.status,
       dateOfJoining: employeesTable.dateOfJoining,
@@ -270,12 +270,12 @@ router.get("/reports/payroll-register", requireHrmsUser, requireRole(...HR_ROLES
     const { month, year, departmentId } = req.query as Record<string, string>;
 
     const conds: any[] = [];
-    if (month) conds.push(eq(payrollRunsTable.month, Number(month)));
-    if (year) conds.push(eq(payrollRunsTable.year, Number(year)));
+    if (month) conds.push(eq(payrollRunsTable.periodMonth, Number(month)));
+    if (year) conds.push(eq(payrollRunsTable.periodYear, Number(year)));
 
     const runs = await db.select().from(payrollRunsTable)
       .where(conds.length ? and(...conds) : undefined)
-      .orderBy(desc(payrollRunsTable.year), desc(payrollRunsTable.month));
+      .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth));
 
     if (runs.length === 0) { res.json({ data: [], total: 0 }); return; }
 
@@ -305,7 +305,7 @@ router.get("/reports/payroll-register", requireHrmsUser, requireRole(...HR_ROLES
       employeeName: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : null,
     }));
 
-    res.json({ data, total: data.length, runId, month: runs[0].month, year: runs[0].year });
+    res.json({ data, total: data.length, runId, month: runs[0].periodMonth, year: runs[0].periodYear });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
@@ -432,7 +432,7 @@ router.get("/reports/recruitment-pipeline", requireHrmsUser, requireRole(...MANA
       status: jobRequisitionsTable.status,
       numberOfPositions: jobRequisitionsTable.numberOfPositions,
       department: departmentsTable.name,
-      designation: designationsTable.name,
+      designation: designationsTable.title,
       createdAt: jobRequisitionsTable.createdAt,
     }).from(jobRequisitionsTable)
       .leftJoin(departmentsTable, eq(jobRequisitionsTable.departmentId, departmentsTable.id))
@@ -593,12 +593,12 @@ router.get("/reports/statutory-compliance", requireHrmsUser, requireRole(...HR_R
     const ESI_EMPLOYEE_RATE = 0.0075;
 
     const runConds: ReturnType<typeof eq>[] = [];
-    if (month) runConds.push(eq(payrollRunsTable.month, Number(month)));
-    if (year) runConds.push(eq(payrollRunsTable.year, Number(year)));
+    if (month) runConds.push(eq(payrollRunsTable.periodMonth, Number(month)));
+    if (year) runConds.push(eq(payrollRunsTable.periodYear, Number(year)));
 
     const runs = await db.select().from(payrollRunsTable)
       .where(runConds.length ? and(...runConds) : undefined)
-      .orderBy(desc(payrollRunsTable.year), desc(payrollRunsTable.month));
+      .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth));
 
     if (runs.length === 0) { res.json({ data: [], total: 0, summary: {} }); return; }
 
@@ -650,8 +650,8 @@ router.get("/reports/statutory-compliance", requireHrmsUser, requireRole(...HR_R
     });
 
     const summary = {
-      month: runs[0].month,
-      year: runs[0].year,
+      month: runs[0].periodMonth,
+      year: runs[0].periodYear,
       totalPfEmployer: data.reduce((s, r) => s + r.pfEmployer, 0),
       totalPfEmployee: data.reduce((s, r) => s + r.pfEmployee, 0),
       totalEsiEmployer: data.reduce((s, r) => s + r.esiEmployer, 0),
@@ -661,7 +661,7 @@ router.get("/reports/statutory-compliance", requireHrmsUser, requireRole(...HR_R
       esiEligibleCount: data.filter(r => r.esiEligible).length,
     };
 
-    res.json({ data, total: data.length, summary, runId, month: runs[0].month, year: runs[0].year });
+    res.json({ data, total: data.length, summary, runId, month: runs[0].periodMonth, year: runs[0].periodYear });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
@@ -761,6 +761,100 @@ router.delete("/report-templates/:id", requireHrmsUser, requireRole(...MANAGER_R
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── XLSX / PDF EXPORT ────────────────────────────────────────────────────────
+// GET /reports/:type/export?format=xlsx|pdf  — streams a formatted Excel or print-ready HTML report
+router.get("/reports/:type/export", requireHrmsUser, requireRole(...HR_ROLES, "payroll_admin"), async (req, res) => {
+  try {
+    const type = String(req.params.type);
+    const { format = "xlsx", fromDate, toDate, departmentId, month, year } = req.query as Record<string, string>;
+
+    // Reuse the existing report data by calling our own GET endpoint internally
+    const reportRes = await fetch(`http://localhost:${process.env.PORT ?? 8080}/api/reports/${type}?` + new URLSearchParams({
+      ...(fromDate && { fromDate }), ...(toDate && { toDate }),
+      ...(departmentId && { departmentId }), ...(month && { month }), ...(year && { year }),
+    }).toString(), {
+      headers: { authorization: req.headers.authorization ?? "", cookie: req.headers.cookie ?? "" },
+    });
+    if (!reportRes.ok) { res.status(reportRes.status).json({ error: "Failed to fetch report data" }); return; }
+
+    const body = await reportRes.json() as { data?: Record<string, unknown>[]; rows?: Record<string, unknown>[] };
+    const rows: Record<string, unknown>[] = body.data ?? body.rows ?? [];
+
+    if (format === "pdf") {
+      // Return print-ready HTML with MysticsHR letterhead — the client can print-to-PDF
+      const headers = rows.length > 0 ? Object.keys(rows[0]).filter(k => k !== "id") : [];
+      const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+      const title = type.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) + " Report";
+      const tableHtml = `
+        <thead><tr>${headers.map(h => `<th>${h.replace(/([A-Z])/g, " $1").trim()}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map(r => `<tr>${headers.map(h => `<td>${r[h] ?? ""}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
+        body{font-family:Arial,sans-serif;font-size:11px;margin:20px}
+        .letterhead{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1e3a5f;padding-bottom:8px;margin-bottom:16px}
+        .company{font-size:20px;font-weight:bold;color:#1e3a5f}
+        .subtitle{font-size:11px;color:#666}
+        h2{color:#1e3a5f;margin:0 0 8px}
+        .meta{font-size:10px;color:#888;margin-bottom:12px}
+        table{border-collapse:collapse;width:100%;font-size:10px}
+        th{background:#1e3a5f;color:#fff;padding:5px 8px;text-align:left}
+        td{padding:4px 8px;border-bottom:1px solid #ddd}
+        tr:nth-child(even){background:#f5f7fb}
+        @media print{@page{margin:1cm}}</style></head><body>
+        <div class="letterhead"><div><div class="company">Automystics Technologies</div>
+        <div class="subtitle">Internal HR Management System · MysticsHR</div></div></div>
+        <h2>${title}</h2>
+        <div class="meta">Generated on ${date} · ${rows.length} record(s)</div>
+        <table>${tableHtml}</table></body></html>`;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Disposition", `inline; filename="${type}-report.html"`);
+      res.send(html);
+      return;
+    }
+
+    // Default: XLSX
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "MysticsHR — Automystics Technologies";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet(type.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()));
+
+    // Letterhead rows
+    sheet.mergeCells("A1:H1");
+    sheet.getCell("A1").value = "Automystics Technologies — MysticsHR";
+    sheet.getCell("A1").font = { bold: true, size: 14, color: { argb: "FF1E3A5F" } };
+    sheet.mergeCells("A2:H2");
+    sheet.getCell("A2").value = `${type.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Report · Generated ${new Date().toLocaleDateString("en-IN")}`;
+    sheet.getCell("A2").font = { size: 10, color: { argb: "FF888888" } };
+    sheet.addRow([]); // spacer
+
+    if (rows.length === 0) {
+      sheet.addRow(["No data available for the selected filters."]);
+    } else {
+      const headers = Object.keys(rows[0]).filter(k => k !== "id");
+      const headerRow = sheet.addRow(headers.map(h => h.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase()).trim()));
+      headerRow.eachCell(cell => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+        cell.alignment = { vertical: "middle" };
+      });
+      for (const row of rows) {
+        sheet.addRow(headers.map(h => {
+          const v = row[h];
+          if (v instanceof Date) return v.toLocaleDateString("en-IN");
+          if (v === null || v === undefined) return "";
+          return v;
+        }));
+      }
+      sheet.columns.forEach(col => { col.width = Math.max(14, col.header?.toString().length ?? 10); });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${type}-report-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    res.send(buffer);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 // ─── CUSTOM REPORT RUNNER ─────────────────────────────────────────────────────
 // Applies filters from the request body to the underlying employee dataset.
 // Supported filters: departmentId, designationId, employmentType, status, location, isActive
@@ -774,52 +868,149 @@ router.post("/reports/custom", requireHrmsUser, requireRole(...MANAGER_ROLES), a
     const VALID_REPORT_TYPES = new Set([
       "employee-directory", "attendance-summary", "leave-utilization", "headcount",
       "attrition", "performance-summary", "recruitment-pipeline",
-      "permission-usage", "helpdesk-sla", "statutory-compliance",
     ]);
     if (!VALID_REPORT_TYPES.has(reportType)) {
-      res.status(400).json({ error: `Unknown reportType: ${reportType}` }); return;
+      res.status(400).json({ error: `Unknown reportType: ${reportType}. Valid types: ${[...VALID_REPORT_TYPES].join(", ")}` }); return;
     }
 
-    // Build filter conditions from the provided filters object
-    const conds: ReturnType<typeof eq>[] = [eq(employeesTable.isActive, true)];
-    if (filters.departmentId) conds.push(eq(employeesTable.departmentId, Number(filters.departmentId)));
-    if (filters.designationId) conds.push(eq(employeesTable.designationId, Number(filters.designationId)));
-    if (filters.employmentType) conds.push(eq(employeesTable.employmentType, filters.employmentType));
-    if (filters.status) conds.push(eq(employeesTable.status, filters.status));
-    if (filters.location) conds.push(eq(employeesTable.location, filters.location));
+    let rawData: Record<string, unknown>[] = [];
 
-    const allEmployees = await db.select({
-      id: employeesTable.id,
-      employeeCode: employeesTable.employeeId,
-      firstName: employeesTable.firstName,
-      lastName: employeesTable.lastName,
-      email: employeesTable.email,
-      phone: employeesTable.phone,
-      gender: employeesTable.gender,
-      dateOfBirth: employeesTable.dateOfBirth,
-      dateOfJoining: employeesTable.dateOfJoining,
-      employmentType: employeesTable.employmentType,
-      status: employeesTable.status,
-      location: employeesTable.location,
-      ctc: employeesTable.ctc,
-      department: departmentsTable.name,
-      designation: designationsTable.name,
-    }).from(employeesTable)
-      .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
-      .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
-      .where(and(...conds))
-      .orderBy(employeesTable.firstName);
+    if (reportType === "employee-directory") {
+      const conds: ReturnType<typeof eq>[] = [eq(employeesTable.isActive, true)];
+      if (filters.departmentId) conds.push(eq(employeesTable.departmentId, Number(filters.departmentId)));
+      if (filters.designationId) conds.push(eq(employeesTable.designationId, Number(filters.designationId)));
+      if (filters.employmentType) conds.push(eq(employeesTable.employmentType, filters.employmentType));
+      if (filters.status) conds.push(eq(employeesTable.status, filters.status));
+      if (filters.location) conds.push(eq(employeesTable.location, filters.location));
+      const rows = await db.select({
+        employeeCode: employeesTable.employeeId,
+        employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+        email: employeesTable.email, phone: employeesTable.phone, gender: employeesTable.gender,
+        dateOfBirth: employeesTable.dateOfBirth, dateOfJoining: employeesTable.dateOfJoining,
+        employmentType: employeesTable.employmentType, status: employeesTable.status,
+        location: employeesTable.location, ctc: employeesTable.ctc,
+        department: departmentsTable.name, designation: designationsTable.title,
+      }).from(employeesTable)
+        .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+        .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
+        .where(and(...conds)).orderBy(employeesTable.firstName);
+      rawData = rows as Record<string, unknown>[];
+
+    } else if (reportType === "attendance-summary") {
+      const conds: ReturnType<typeof eq>[] = [];
+      if (filters.fromDate) conds.push(gte(attendanceRecordsTable.attendanceDate, filters.fromDate));
+      if (filters.toDate) conds.push(lte(attendanceRecordsTable.attendanceDate, filters.toDate));
+      if (filters.departmentId) conds.push(eq(employeesTable.departmentId, Number(filters.departmentId)));
+      const rows = await db.select({
+        employeeCode: employeesTable.employeeId,
+        employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+        department: departmentsTable.name,
+        attendanceDate: attendanceRecordsTable.attendanceDate,
+        signIn: attendanceRecordsTable.signInTime, signOut: attendanceRecordsTable.signOutTime,
+        status: attendanceRecordsTable.status,
+        totalMinutesWorked: attendanceRecordsTable.totalMinutesWorked,
+      }).from(attendanceRecordsTable)
+        .innerJoin(employeesTable, eq(attendanceRecordsTable.employeeId, employeesTable.id))
+        .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(attendanceRecordsTable.attendanceDate));
+      rawData = rows as Record<string, unknown>[];
+
+    } else if (reportType === "leave-utilization") {
+      const conds: ReturnType<typeof eq>[] = [];
+      if (filters.fromDate) conds.push(gte(leaveApplicationsTable.fromDate, filters.fromDate));
+      if (filters.toDate) conds.push(lte(leaveApplicationsTable.toDate, filters.toDate));
+      if (filters.departmentId) conds.push(eq(employeesTable.departmentId, Number(filters.departmentId)));
+      if (filters.leaveType) conds.push(eq(leaveTypesTable.name, filters.leaveType));
+      const rows = await db.select({
+        employeeCode: employeesTable.employeeId,
+        employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+        department: departmentsTable.name, leaveType: leaveTypesTable.name,
+        fromDate: leaveApplicationsTable.fromDate, toDate: leaveApplicationsTable.toDate,
+        totalDays: leaveApplicationsTable.totalDays, status: leaveApplicationsTable.status,
+        reason: leaveApplicationsTable.reason,
+      }).from(leaveApplicationsTable)
+        .innerJoin(employeesTable, eq(leaveApplicationsTable.employeeId, employeesTable.id))
+        .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+        .leftJoin(leaveTypesTable, eq(leaveApplicationsTable.leaveTypeId, leaveTypesTable.id))
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(leaveApplicationsTable.fromDate));
+      rawData = rows as Record<string, unknown>[];
+
+    } else if (reportType === "headcount") {
+      const conds: ReturnType<typeof eq>[] = [eq(employeesTable.isActive, true)];
+      if (filters.departmentId) conds.push(eq(employeesTable.departmentId, Number(filters.departmentId)));
+      const rows = await db.select({
+        department: departmentsTable.name,
+        employmentType: employeesTable.employmentType,
+        count: sql<number>`count(*)::int`,
+      }).from(employeesTable)
+        .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+        .where(and(...conds))
+        .groupBy(departmentsTable.name, employeesTable.employmentType)
+        .orderBy(departmentsTable.name);
+      rawData = rows as Record<string, unknown>[];
+
+    } else if (reportType === "attrition") {
+      const conds: ReturnType<typeof eq>[] = [eq(exitRequestsTable.status, "Separated")];
+      if (filters.fromDate) conds.push(gte(exitRequestsTable.separatedAt, new Date(filters.fromDate)));
+      if (filters.toDate) conds.push(lte(exitRequestsTable.separatedAt, new Date(filters.toDate)));
+      if (filters.departmentId) conds.push(eq(employeesTable.departmentId, Number(filters.departmentId)));
+      const rows = await db.select({
+        employeeCode: employeesTable.employeeId,
+        employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+        department: departmentsTable.name, exitType: exitRequestsTable.exitType,
+        reason: exitRequestsTable.reason,
+        requestedLwd: exitRequestsTable.requestedLwd, actualLwd: exitRequestsTable.actualLwd,
+        separatedAt: exitRequestsTable.separatedAt, dateOfJoining: employeesTable.dateOfJoining,
+      }).from(exitRequestsTable)
+        .innerJoin(employeesTable, eq(exitRequestsTable.employeeId, employeesTable.id))
+        .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+        .where(and(...conds)).orderBy(desc(exitRequestsTable.separatedAt));
+      rawData = rows.map(r => {
+        const joiningMs = r.dateOfJoining ? new Date(r.dateOfJoining).getTime() : null;
+        const separatedMs = r.separatedAt ? r.separatedAt.getTime() : null;
+        return { ...r, tenureYears: joiningMs && separatedMs ? Math.round((separatedMs - joiningMs) / (365.25 * 86400000) * 10) / 10 : null };
+      }) as Record<string, unknown>[];
+
+    } else if (reportType === "performance-summary") {
+      const rows = await db.select({
+        employeeCode: employeesTable.employeeId,
+        employeeName: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+        department: departmentsTable.name, cycleName: performanceCyclesTable.title,
+        finalScore: appraisalOutcomesTable.finalScore, outcomeLabel: appraisalOutcomesTable.outcomLabel,
+        normalizedScore: appraisalOutcomesTable.normalizedScore,
+      }).from(appraisalOutcomesTable)
+        .innerJoin(employeesTable, eq(appraisalOutcomesTable.employeeId, employeesTable.id))
+        .innerJoin(performanceCyclesTable, eq(appraisalOutcomesTable.cycleId, performanceCyclesTable.id))
+        .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+        .orderBy(desc(appraisalOutcomesTable.finalScore));
+      rawData = rows as Record<string, unknown>[];
+
+    } else if (reportType === "recruitment-pipeline") {
+      const rows = await db.select({
+        title: jobRequisitionsTable.title,
+        department: departmentsTable.name,
+        status: jobRequisitionsTable.status,
+        numberOfPositions: jobRequisitionsTable.numberOfPositions,
+        createdAt: jobRequisitionsTable.createdAt,
+        totalCandidates: sql<number>`(select count(*) from ${candidatesTable} where ${candidatesTable.requisitionId} = ${jobRequisitionsTable.id})::int`,
+      }).from(jobRequisitionsTable)
+        .leftJoin(departmentsTable, eq(jobRequisitionsTable.departmentId, departmentsTable.id))
+        .orderBy(desc(jobRequisitionsTable.createdAt));
+      rawData = rows as Record<string, unknown>[];
+    }
 
     // Validate selectedFields against available fields to prevent injection
-    const availableFields = new Set(Object.keys(allEmployees[0] ?? {}));
-    const fields = selectedFields.filter((f: string) => availableFields.has(f));
+    const availableFields = new Set(rawData.length > 0 ? Object.keys(rawData[0]) : Object.keys(selectedFields));
+    const fields = (selectedFields as string[]).filter((f) => availableFields.has(f));
+    const effectiveFields = fields.length > 0 ? fields : [...availableFields];
 
-    const data = allEmployees.map(row => {
+    const data = rawData.map(row => {
       const filtered: Record<string, unknown> = {};
-      for (const field of fields) {
-        filtered[field] = (row as Record<string, unknown>)[field];
+      for (const field of effectiveFields) {
+        filtered[field] = row[field];
       }
-      filtered.employeeName = `${row.firstName} ${row.lastName}`;
       return filtered;
     });
 

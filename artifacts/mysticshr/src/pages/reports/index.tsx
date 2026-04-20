@@ -26,6 +26,9 @@ import {
   getGetPerformanceSummaryReportQueryKey,
   getGetRecruitmentPipelineReportQueryKey,
   type CreateReportScheduleBody,
+  type ReportSchedule,
+  type SavedReportTemplate,
+  type RunCustomReport200DataItem,
   type GetEmployeeDirectoryReportParams,
   type GetAttendanceSummaryReportParams,
   type GetLeaveUtilizationReportParams,
@@ -72,6 +75,24 @@ function exportToCsv(data: object[], filename: string) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
+  a.click();
+}
+
+async function exportReport(reportType: string, format: "xlsx" | "pdf", filters: Record<string, string>) {
+  const params = new URLSearchParams({ format, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) });
+  const url = `/api/reports/${reportType}/export?${params.toString()}`;
+  const resp = await fetch(url, { credentials: "include" });
+  if (!resp.ok) { alert("Export failed. Please try again."); return; }
+  if (format === "pdf") {
+    const html = await resp.text();
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 500); }
+    return;
+  }
+  const blob = await resp.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${reportType}-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
   a.click();
 }
 
@@ -212,7 +233,7 @@ function ReportCatalog() {
   };
 
   const activeQuery = selected ? queryMap[selected] : null;
-  const reportData: object[] = (activeQuery?.data?.data ?? []) as object[];
+  const reportData: RunCustomReport200DataItem[] = (activeQuery?.data?.data ?? []) as RunCustomReport200DataItem[];
   const reportTotal: number = activeQuery?.data?.total ?? 0;
 
   const columns = reportData.length > 0 ? Object.keys(reportData[0]).filter((k) => k !== "id" && k !== "employeeId") : [];
@@ -253,9 +274,17 @@ function ReportCatalog() {
               </CardTitle>
               <div className="flex gap-2">
                 {reportData.length > 0 && (
-                  <Button size="sm" variant="outline" onClick={() => exportToCsv(reportData, `${selected}-report.csv`)}>
-                    <Download className="w-3 h-3 mr-1" /> Export CSV
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => exportToCsv(reportData, `${selected}-report.csv`)}>
+                      <Download className="w-3 h-3 mr-1" /> CSV
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => exportReport(selected, "xlsx", filters)}>
+                      <Download className="w-3 h-3 mr-1" /> Excel
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => exportReport(selected, "pdf", filters)}>
+                      <Download className="w-3 h-3 mr-1" /> PDF
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -292,7 +321,7 @@ function ReportCatalog() {
                       <tr key={i} className="hover:bg-gray-50">
                         {columns.map((col) => (
                           <td key={col} className="px-3 py-2 text-gray-700 whitespace-nowrap text-xs">
-                            {String((row as any)[col] ?? "—")}
+                            {String(row[col] ?? "—")}
                           </td>
                         ))}
                       </tr>
@@ -320,19 +349,28 @@ function CustomReportBuilder() {
 
   const [reportType, setReportType] = useState<ReportType>("employee-directory");
   const [selectedFields, setSelectedFields] = useState<string[]>(["employeeName", "department", "designation", "dateOfJoining"]);
-  const [results, setResults] = useState<object[] | null>(null);
+  const [results, setResults] = useState<RunCustomReport200DataItem[] | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [saveTemplateModal, setSaveTemplateModal] = useState(false);
 
-  const FIELD_OPTIONS: Record<ReportType, string[]> = {
+  const CUSTOM_REPORT_TYPES = [
+    { id: "employee-directory" as const, label: "Employee Directory" },
+    { id: "attendance-summary" as const, label: "Attendance Summary" },
+    { id: "leave-utilization" as const, label: "Leave Utilization" },
+    { id: "headcount" as const, label: "Headcount by Dept/Type" },
+    { id: "attrition" as const, label: "Attrition" },
+    { id: "performance-summary" as const, label: "Performance Summary" },
+    { id: "recruitment-pipeline" as const, label: "Recruitment Pipeline" },
+  ] as const;
+
+  const FIELD_OPTIONS: Partial<Record<ReportType, string[]>> & Record<string, string[]> = {
     "employee-directory": ["employeeCode", "employeeName", "email", "phone", "gender", "dateOfBirth", "dateOfJoining", "employmentType", "status", "location", "ctc", "department", "designation"],
-    "attendance-summary": ["employeeName", "employeeCode", "date", "status", "checkIn", "checkOut", "department"],
-    "leave-utilization": ["employeeName", "department", "leaveType", "fromDate", "toDate", "totalDays", "reason"],
-    "payroll-register": ["employeeName", "employeeCode", "department", "grossSalary", "netSalary", "totalDeductions", "presentDays", "lossOfPayDays"],
+    "attendance-summary": ["employeeCode", "employeeName", "department", "attendanceDate", "checkIn", "checkOut", "status", "shiftType", "hoursWorked"],
+    "leave-utilization": ["employeeCode", "employeeName", "department", "leaveType", "fromDate", "toDate", "totalDays", "status", "reason"],
     "headcount": ["department", "employmentType", "count"],
-    "attrition": ["employeeName", "department", "exitType", "reason", "requestedLwd", "actualLwd", "tenureYears"],
-    "performance-summary": ["employeeName", "department", "finalScore", "outcomeLabel", "normalizedScore"],
-    "recruitment-pipeline": ["title", "department", "designation", "status", "numberOfPositions", "createdAt"],
+    "attrition": ["employeeCode", "employeeName", "department", "exitType", "reason", "requestedLwd", "actualLwd", "separatedAt", "dateOfJoining", "tenureYears"],
+    "performance-summary": ["employeeCode", "employeeName", "department", "cycleName", "finalScore", "outcomeLabel", "normalizedScore"],
+    "recruitment-pipeline": ["title", "department", "status", "numberOfPositions", "createdAt", "totalCandidates"],
   };
 
   function toggleField(field: string) {
@@ -341,14 +379,14 @@ function CustomReportBuilder() {
 
   function handleRun() {
     runCustom.mutate(
-      { data: { reportType, selectedFields } as any },
-      { onSuccess: (data) => setResults((data as any)?.data ?? []) },
+      { data: { reportType, selectedFields } },
+      { onSuccess: (data) => setResults(data?.data ?? []) },
     );
   }
 
   function handleSaveTemplate() {
     createTemplate.mutate(
-      { data: { name: templateName, reportType, selectedFields } as any },
+      { data: { name: templateName, reportType, selectedFields } },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getListSavedReportTemplatesQueryKey() });
@@ -359,9 +397,9 @@ function CustomReportBuilder() {
     );
   }
 
-  function loadTemplate(tmpl: any) {
-    setReportType(tmpl.reportType);
-    setSelectedFields(tmpl.selectedFields);
+  function loadTemplate(tmpl: SavedReportTemplate) {
+    setReportType((tmpl.reportType ?? "employee-directory") as ReportType);
+    setSelectedFields(tmpl.selectedFields ?? []);
     setResults(null);
   }
 
@@ -384,7 +422,7 @@ function CustomReportBuilder() {
               <Select value={reportType} onValueChange={(v) => { setReportType(v as ReportType); setSelectedFields([]); setResults(null); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {REPORT_TYPES.map(({ id, label }) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
+                  {CUSTOM_REPORT_TYPES.map(({ id, label }) => <SelectItem key={id} value={id}>{label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -423,11 +461,11 @@ function CustomReportBuilder() {
             <CardTitle className="text-sm font-semibold text-gray-700">Saved Templates</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {(templates as any[]).length === 0 ? (
+            {templates.length === 0 ? (
               <div className="p-4 text-center text-gray-400 text-sm">No saved templates yet.</div>
             ) : (
               <div className="divide-y">
-                {(templates as any[]).map((tmpl) => (
+                {templates.map((tmpl) => (
                   <div key={tmpl.id} className="px-4 py-3 flex items-center justify-between gap-2">
                     <button
                       onClick={() => loadTemplate(tmpl)}
@@ -485,7 +523,7 @@ function CustomReportBuilder() {
                       <tr key={i} className="hover:bg-gray-50">
                         {columns.map((col) => (
                           <td key={col} className="px-3 py-2 text-xs text-gray-700 whitespace-nowrap">
-                            {String((row as any)[col] ?? "—")}
+                            {String(row[col] ?? "—")}
                           </td>
                         ))}
                       </tr>
@@ -540,7 +578,7 @@ function SchedulerPanel() {
     e.preventDefault();
     const recipients = recipientsInput.split(",").map((r) => r.trim()).filter(Boolean);
     createSchedule.mutate(
-      { data: { ...form, recipients } as any },
+      { data: { ...form, recipients } },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getListReportSchedulesQueryKey() });
@@ -561,7 +599,7 @@ function SchedulerPanel() {
         </Button>
       </div>
 
-      {(schedules as any[]).length === 0 ? (
+      {schedules.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-400">
             <Calendar className="w-10 h-10 mx-auto mb-2 opacity-40" />
@@ -570,7 +608,7 @@ function SchedulerPanel() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {(schedules as any[]).map((s) => (
+          {schedules.map((s) => (
             <Card key={s.id}>
               <CardContent className="p-4 flex items-center justify-between gap-3">
                 <div>

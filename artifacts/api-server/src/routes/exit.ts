@@ -34,7 +34,18 @@ async function getEmployeeForUser(userId: number) {
   return emp ?? null;
 }
 
-function computeNoticePeriodDays(joinDate: string | null): number {
+/**
+ * Compute notice period days using contractual terms when available.
+ * Precedence: employee.noticePeriodDays (if set) → employment-type contractual default → tenure heuristic.
+ * Per Automystics policy: Probation=0, employment-type defaults per contract, otherwise tenure-based.
+ */
+function computeNoticePeriodDays(joinDate: string | null, employmentType?: string | null, noticePeriodDays?: number | null): number {
+  // If the employee record carries an explicit contractual notice period, honour it
+  if (noticePeriodDays != null && noticePeriodDays > 0) return noticePeriodDays;
+  // Employment-type contractual defaults
+  if (employmentType === "Contract" || employmentType === "Internship") return 15;
+  if (employmentType === "Probation") return 0;
+  // Tenure-based fallback (permanent/regular employees)
   if (!joinDate) return 30;
   const years = (Date.now() - new Date(joinDate).getTime()) / (1000 * 60 * 60 * 24 * 365);
   if (years < 1) return 30;
@@ -42,16 +53,45 @@ function computeNoticePeriodDays(joinDate: string | null): number {
   return 90;
 }
 
-async function autoGenerateClearanceTasks(exitRequestId: number, actualLwd: string) {
-  const defaultTasks = [
-    { department: "IT", taskName: "Revoke System Access", description: "Disable email, VPN, and all system access." },
-    { department: "IT", taskName: "Asset Return", description: "Collect laptop, access cards, and any company hardware." },
-    { department: "Finance", taskName: "Expense Claims Settlement", description: "Settle all pending expense claims." },
-    { department: "Finance", taskName: "Salary & Recovery Clearance", description: "Confirm no pending salary recoveries." },
-    { department: "HR", taskName: "Exit Interview Completion", description: "Ensure exit interview form is submitted." },
-    { department: "HR", taskName: "Relieving Documents", description: "Prepare relieving letter and experience certificate." },
-    { department: "Manager", taskName: "Knowledge Transfer", description: "Ensure all knowledge transfer sessions are complete." },
-    { department: "Manager", taskName: "Work Handover", description: "Hand over all pending work to the designated colleague." },
+/**
+ * Auto-generate clearance checklist tasks with role-based assignees.
+ * HR tasks → assigned to an hr_manager user; Finance → payroll_admin; Manager → employee's HOD;
+ * IT tasks → assigned to super_admin (system admin) as a proxy since there is no dedicated IT role.
+ */
+async function autoGenerateClearanceTasks(exitRequestId: number, actualLwd: string, employeeId?: number) {
+  // Resolve role-based assignees
+  const [hrUser] = await db.select({ id: hrmsUsersTable.id }).from(hrmsUsersTable)
+    .where(eq(hrmsUsersTable.role, "hr_manager")).limit(1);
+  const [financeUser] = await db.select({ id: hrmsUsersTable.id }).from(hrmsUsersTable)
+    .where(eq(hrmsUsersTable.role, "payroll_admin")).limit(1);
+  const [adminUser] = await db.select({ id: hrmsUsersTable.id }).from(hrmsUsersTable)
+    .where(eq(hrmsUsersTable.role, "super_admin")).limit(1);
+
+  // Resolve the employee's reporting manager (HOD of their department)
+  let managerUserId: number | undefined;
+  if (employeeId) {
+    const [emp] = await db.select({ departmentId: employeesTable.departmentId })
+      .from(employeesTable).where(eq(employeesTable.id, employeeId));
+    if (emp?.departmentId) {
+      const [hod] = await db.select({ id: hrmsUsersTable.id }).from(hrmsUsersTable)
+        .innerJoin(employeesTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(and(eq(hrmsUsersTable.role, "hod"), eq(employeesTable.departmentId, emp.departmentId)))
+        .limit(1);
+      managerUserId = hod?.id;
+    }
+  }
+  // Fallback: use hr_manager for manager tasks if no HOD found
+  const resolvedManagerId = managerUserId ?? hrUser?.id;
+
+  const defaultTasks: { department: string; taskName: string; description: string; assignedToUserId?: number }[] = [
+    { department: "IT", taskName: "Revoke System Access", description: "Disable email, VPN, and all system access.", assignedToUserId: adminUser?.id },
+    { department: "IT", taskName: "Asset Return", description: "Collect laptop, access cards, and any company hardware.", assignedToUserId: adminUser?.id },
+    { department: "Finance", taskName: "Expense Claims Settlement", description: "Settle all pending expense claims.", assignedToUserId: financeUser?.id },
+    { department: "Finance", taskName: "Salary & Recovery Clearance", description: "Confirm no pending salary recoveries.", assignedToUserId: financeUser?.id },
+    { department: "HR", taskName: "Exit Interview Completion", description: "Ensure exit interview form is submitted.", assignedToUserId: hrUser?.id },
+    { department: "HR", taskName: "Relieving Documents", description: "Prepare relieving letter and experience certificate.", assignedToUserId: hrUser?.id },
+    { department: "Manager", taskName: "Knowledge Transfer", description: "Ensure all knowledge transfer sessions are complete.", assignedToUserId: resolvedManagerId },
+    { department: "Manager", taskName: "Work Handover", description: "Hand over all pending work to the designated colleague.", assignedToUserId: resolvedManagerId },
   ];
 
   const dueDate = actualLwd;
@@ -62,6 +102,7 @@ async function autoGenerateClearanceTasks(exitRequestId: number, actualLwd: stri
       taskName: task.taskName,
       description: task.description,
       dueDate,
+      assignedToUserId: task.assignedToUserId ?? null,
     });
   }
 }
@@ -133,6 +174,11 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
       res.status(403).json({ error: "Employees may only submit resignation requests via self-service" }); return;
     }
 
+    // Termination is a disciplinary action — only HR Manager or Super Admin may initiate it
+    if (exitType === "Termination" && u.role !== "hr_manager" && u.role !== "super_admin") {
+      res.status(403).json({ error: "Termination can only be initiated by HR Manager or Super Admin" }); return;
+    }
+
     let empId: number;
 
     if (isHr && bodyEmployeeId) {
@@ -146,8 +192,8 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
     const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, empId));
     if (!emp) { res.status(404).json({ error: "Employee not found" }); return; }
 
-    // Compute notice period
-    const noticePeriodDays = computeNoticePeriodDays(emp.dateOfJoining);
+    // Compute notice period using contractual terms: employment-type defaults, then tenure-based fallback
+    const noticePeriodDays = computeNoticePeriodDays(emp.dateOfJoining, emp.employmentType, null);
 
     const [exitReq] = await db.insert(exitRequestsTable).values({
       employeeId: empId,
@@ -164,13 +210,7 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
       .set({ status: "Notice Period", updatedAt: new Date() })
       .where(eq(employeesTable.id, empId));
 
-    await logAudit({
-      userId: u.id,
-      action: "create_exit_request",
-      entityType: "exit_request",
-      entityId: exitReq.id,
-      changes: { exitType, reason, requestedLwd, empId },
-    });
+    await logAudit({ user: u, action: "create_exit_request", module: "exit", recordId: exitReq.id });
 
     res.status(201).json(await enrichExitRequest(exitReq));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -251,7 +291,7 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
       updates.approvedByUserId = u.id;
       updates.approvedAt = new Date();
       const lwd = actualLwd ?? existing.requestedLwd;
-      await autoGenerateClearanceTasks(id, lwd);
+      await autoGenerateClearanceTasks(id, lwd, existing.employeeId);
     }
 
     if (status === "Separated") {
@@ -277,13 +317,7 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
     const [updated] = await db.update(exitRequestsTable).set(updates)
       .where(eq(exitRequestsTable.id, id)).returning();
 
-    await logAudit({
-      userId: u.id,
-      action: "update_exit_request",
-      entityType: "exit_request",
-      entityId: id,
-      changes: updates,
-    });
+    await logAudit({ user: u, action: "update_exit_request", module: "exit", recordId: id });
 
     res.json(await enrichExitRequest(updated));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -393,7 +427,7 @@ router.get("/exit/requests/:id/fnf/suggest", requireHrmsUser, requireRole(...HR_
     // ── Last payroll record ──────────────────────────────────────────────────
     const latestPayrollRun = await db.select().from(payrollRunsTable)
       .where(eq(payrollRunsTable.status, "Approved"))
-      .orderBy(desc(payrollRunsTable.year), desc(payrollRunsTable.month))
+      .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth))
       .limit(1);
 
     let pendingSalary = 0;
@@ -431,7 +465,7 @@ router.get("/exit/requests/:id/fnf/suggest", requireHrmsUser, requireRole(...HR_
     // ── Leave encashment (earned leave with encashment enabled) ──────────────
     let leaveEncashment = 0;
     const balances = await db.select({
-      available: leaveBalancesTable.available,
+      available: sql<string>`(${leaveBalancesTable.allocated}::numeric - ${leaveBalancesTable.used}::numeric - ${leaveBalancesTable.pending}::numeric + ${leaveBalancesTable.carryForward}::numeric)`,
       encashmentEnabled: leaveTypesTable.encashmentEnabled,
     }).from(leaveBalancesTable)
       .leftJoin(leaveTypesTable, eq(leaveBalancesTable.leaveTypeId, leaveTypesTable.id))
@@ -547,13 +581,7 @@ router.post("/exit/requests/:id/fnf", requireHrmsUser, requireRole(...HR_ROLES, 
         .where(eq(exitRequestsTable.id, exitRequestId));
     }
 
-    await logAudit({
-      userId: u.id,
-      action: "compute_fnf",
-      entityType: "fnf_computation",
-      entityId: fnf.id,
-      changes: { exitRequestId, totalPayable },
-    });
+    await logAudit({ user: u, action: "compute_fnf", module: "exit", recordId: fnf.id });
 
     res.json(fnf);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -639,13 +667,7 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
       }
     }
 
-    await logAudit({
-      userId: u.id,
-      action: "approve_fnf",
-      entityType: "fnf_computation",
-      entityId: fnf.id,
-      changes: { approverLane, exitRequestId },
-    });
+    await logAudit({ user: u, action: "approve_fnf", module: "exit", recordId: fnf.id });
 
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -721,7 +743,7 @@ router.put("/exit/requests/:id/interview/questions", requireHrmsUser, requireRol
 
     if (existing) {
       const [updated] = await db.update(exitInterviewsTable)
-        .set({ questions, updatedAt: new Date() })
+        .set({ questions })
         .where(eq(exitInterviewsTable.id, existing.id)).returning();
       res.json(updated);
     } else {
