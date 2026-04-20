@@ -5,6 +5,8 @@ import {
   useUpdateLeaveType,
   useDeleteLeaveType,
   getListLeaveTypesQueryKey,
+  type CreateLeaveTypeMutationBody,
+  type LeaveType,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -52,7 +54,7 @@ export default function LeaveTypesPage() {
     setShowForm(true);
   }
 
-  function openEdit(lt: any) {
+  function openEdit(lt: LeaveType) {
     setForm({
       name: lt.name, code: lt.code, description: lt.description ?? "",
       annualQuota: lt.annualQuota ?? "12", carryForwardEnabled: lt.carryForwardEnabled,
@@ -66,19 +68,19 @@ export default function LeaveTypesPage() {
   }
 
   async function handleSave() {
-    const payload = {
+    const payload: CreateLeaveTypeMutationBody = {
       name: form.name, code: form.code.toUpperCase(), description: form.description || undefined,
       annualQuota: form.annualQuota, carryForwardEnabled: form.carryForwardEnabled,
-      carryForwardMax: form.carryForwardEnabled && form.carryForwardMax ? form.carryForwardMax : null,
+      carryForwardMax: form.carryForwardEnabled && form.carryForwardMax ? form.carryForwardMax : undefined,
       encashmentEnabled: form.encashmentEnabled, advanceNoticeDays: Number(form.advanceNoticeDays),
       requiresHrApproval: form.requiresHrApproval, requiresHodApproval: form.requiresHodApproval,
       allowHalfDay: form.allowHalfDay, lopByDefault: form.lopByDefault, isActive: form.isActive,
     };
     try {
       if (editId) {
-        await updateMutation.mutateAsync({ id: editId, data: payload as any });
+        await updateMutation.mutateAsync({ id: editId, data: payload });
       } else {
-        await createMutation.mutateAsync({ data: payload as any });
+        await createMutation.mutateAsync({ data: payload });
       }
       invalidate();
       setShowForm(false);

@@ -11,6 +11,9 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, isNull, sql, desc, SQL } from "drizzle-orm";
 
+const PERMISSION_STATUSES = ["Pending", "Approved", "Rejected", "Cancelled"] as const;
+type PermissionStatusValue = (typeof PERMISSION_STATUSES)[number];
+
 const router = Router();
 
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
@@ -71,7 +74,9 @@ router.get("/permissions", requireHrmsUser, requireRole(...ALL_ROLES), async (re
       conds.push(eq(permissionApplicationsTable.employeeId, Number(employeeId)));
     }
 
-    if (status) conds.push(eq(permissionApplicationsTable.status, status as any));
+    if (status && PERMISSION_STATUSES.includes(status as PermissionStatusValue)) {
+      conds.push(eq(permissionApplicationsTable.status, status as PermissionStatusValue));
+    }
     if (month) {
       const [y, m] = month.split("-");
       const from = `${y}-${m}-01`;
@@ -125,13 +130,26 @@ router.get("/permissions/register", requireHrmsUser, requireRole(...ALL_ROLES), 
     const { employeeId, month } = req.query as { employeeId?: string; month?: string };
     let empId: number;
 
-    if (req.hrmsUser.role === "employee") {
-      const emp = await getEmployeeForUser(req.hrmsUser.id);
-      if (!emp) { res.status(422).json({ error: "No employee profile linked" }); return; }
-      empId = emp.id;
-    } else {
-      if (!employeeId) { res.status(400).json({ error: "employeeId is required" }); return; }
+    if (employeeId) {
+      // HR/HOD/admin explicitly querying a specific employee — validate access
       empId = Number(employeeId);
+      if (req.hrmsUser.role === "employee") {
+        // Employees cannot query other employees' registers
+        const emp = await getEmployeeForUser(req.hrmsUser.id);
+        if (!emp || emp.id !== empId) { res.status(403).json({ error: "Forbidden" }); return; }
+      } else if (req.hrmsUser.role === "hod") {
+        const hodEmp = await getEmployeeForUser(req.hrmsUser.id);
+        const [targetEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, empId));
+        if (!hodEmp?.departmentId || hodEmp.departmentId !== targetEmp?.departmentId) {
+          res.status(403).json({ error: "You can only view registers for employees in your department" }); return;
+        }
+      }
+      // payroll_admin/hr_*/super_admin: unrestricted
+    } else {
+      // No employeeId provided — resolve current user's own employee record
+      const emp = await getEmployeeForUser(req.hrmsUser.id);
+      if (!emp) { res.status(422).json({ error: "No employee profile linked to your account" }); return; }
+      empId = emp.id;
     }
 
     const now = new Date();
@@ -211,6 +229,20 @@ router.get("/permissions/:id", requireHrmsUser, requireRole(...ALL_ROLES), async
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
       .where(eq(permissionApplicationsTable.id, Number(req.params.id)));
     if (!app) { res.status(404).json({ error: "Not found" }); return; }
+
+    // Scope check: employee can only read own; HOD can only read dept employees'
+    if (req.hrmsUser.role === "employee") {
+      const emp = await getEmployeeForUser(req.hrmsUser.id);
+      if (!emp || emp.id !== app.employeeId) { res.status(403).json({ error: "Forbidden" }); return; }
+    } else if (req.hrmsUser.role === "hod") {
+      const hodEmp = await getEmployeeForUser(req.hrmsUser.id);
+      const [reqEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, app.employeeId));
+      if (!hodEmp?.departmentId || hodEmp.departmentId !== reqEmp?.departmentId) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
+    }
+    // payroll_admin, hr_*, super_admin: unrestricted read
+
     res.json(app);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -322,6 +354,19 @@ router.post("/permissions/:id/cancel", requireHrmsUser, requireRole(...ALL_ROLES
     if (["Rejected", "Cancelled"].includes(perm.status)) {
       res.status(422).json({ error: "Cannot cancel an already rejected or cancelled permission" }); return;
     }
+
+    // Ownership / scope check
+    if (req.hrmsUser.role === "employee" || req.hrmsUser.role === "payroll_admin") {
+      const emp = await getEmployeeForUser(req.hrmsUser.id);
+      if (!emp || emp.id !== perm.employeeId) { res.status(403).json({ error: "You can only cancel your own permission requests" }); return; }
+    } else if (req.hrmsUser.role === "hod") {
+      const hodEmp = await getEmployeeForUser(req.hrmsUser.id);
+      const [reqEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, perm.employeeId));
+      if (!hodEmp?.departmentId || hodEmp.departmentId !== reqEmp?.departmentId) {
+        res.status(403).json({ error: "You can only cancel permission requests from employees in your department" }); return;
+      }
+    }
+    // hr_*, super_admin: unrestricted cancel
 
     const updated = await db.transaction(async (tx) => {
       const [row] = await tx.update(permissionApplicationsTable)

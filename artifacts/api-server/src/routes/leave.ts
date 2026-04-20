@@ -12,7 +12,10 @@ import {
   hrmsUsersTable,
   departmentsTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, isNull, or, sql, desc, SQL } from "drizzle-orm";
+import { eq, and, gte, lte, isNull, or, sql, desc, SQL, inArray } from "drizzle-orm";
+
+const LEAVE_STATUSES = ["Pending", "HOD Approved", "Approved", "Rejected", "Cancelled"] as const;
+type LeaveStatusValue = (typeof LEAVE_STATUSES)[number];
 
 const router = Router();
 
@@ -170,7 +173,9 @@ router.get("/leave/applications", requireHrmsUser, requireRole(...ALL_ROLES), as
       conds.push(eq(leaveApplicationsTable.employeeId, Number(employeeId)));
     }
 
-    if (status) conds.push(eq(leaveApplicationsTable.status, status as any));
+    if (status && LEAVE_STATUSES.includes(status as LeaveStatusValue)) {
+      conds.push(eq(leaveApplicationsTable.status, status as LeaveStatusValue));
+    }
     if (fromDate) conds.push(gte(leaveApplicationsTable.fromDate, fromDate));
     if (toDate) conds.push(lte(leaveApplicationsTable.toDate, toDate));
     if (leaveTypeId) conds.push(eq(leaveApplicationsTable.leaveTypeId, Number(leaveTypeId)));
@@ -267,6 +272,20 @@ router.get("/leave/applications/:id", requireHrmsUser, requireRole(...ALL_ROLES)
       .innerJoin(leaveTypesTable, eq(leaveApplicationsTable.leaveTypeId, leaveTypesTable.id))
       .where(eq(leaveApplicationsTable.id, Number(req.params.id)));
     if (!app) { res.status(404).json({ error: "Not found" }); return; }
+
+    // Scope check: employee can only read own; HOD can only read dept employees'
+    if (req.hrmsUser.role === "employee") {
+      const emp = await getEmployeeForUser(req.hrmsUser.id);
+      if (!emp || emp.id !== app.employeeId) { res.status(403).json({ error: "Forbidden" }); return; }
+    } else if (req.hrmsUser.role === "hod") {
+      const hodEmp = await getEmployeeForUser(req.hrmsUser.id);
+      const [reqEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, app.employeeId));
+      if (!hodEmp?.departmentId || hodEmp.departmentId !== reqEmp?.departmentId) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
+    }
+    // payroll_admin, hr_*, super_admin: unrestricted read
+
     res.json(app);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -444,8 +463,18 @@ router.post("/leave/applications/:id/hr-action", requireHrmsUser, requireRole(..
 
     const [app] = await db.select().from(leaveApplicationsTable).where(eq(leaveApplicationsTable.id, appId));
     if (!app) { res.status(404).json({ error: "Not found" }); return; }
-    if (app.status !== "HOD Approved" && app.status !== "Pending") {
-      res.status(422).json({ error: "Application must be HOD Approved (or Pending if no HOD approval required) before HR action" });
+
+    // Enforce HOD approval sequence: if leave type requires HOD approval, status must be "HOD Approved"
+    const [leaveTypeForCheck] = await db.select({ requiresHodApproval: leaveTypesTable.requiresHodApproval })
+      .from(leaveTypesTable).where(eq(leaveTypesTable.id, app.leaveTypeId));
+    const requiresHod = leaveTypeForCheck?.requiresHodApproval ?? true;
+    const validPrecondition = requiresHod ? app.status === "HOD Approved" : app.status === "Pending";
+    if (!validPrecondition) {
+      res.status(422).json({
+        error: requiresHod
+          ? "Application must be HOD Approved before HR can action it"
+          : "Application must be in Pending state"
+      });
       return;
     }
 
@@ -491,6 +520,23 @@ router.post("/leave/applications/:id/cancel", requireHrmsUser, requireRole(...AL
     if (["Rejected", "Cancelled"].includes(app.status)) {
       res.status(422).json({ error: "Cannot cancel an already rejected or cancelled application" });
       return;
+    }
+
+    // Ownership / scope check
+    if (req.hrmsUser.role === "employee") {
+      const emp = await getEmployeeForUser(req.hrmsUser.id);
+      if (!emp || emp.id !== app.employeeId) { res.status(403).json({ error: "You can only cancel your own leave applications" }); return; }
+    } else if (req.hrmsUser.role === "hod") {
+      const hodEmp = await getEmployeeForUser(req.hrmsUser.id);
+      const [reqEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, app.employeeId));
+      if (!hodEmp?.departmentId || hodEmp.departmentId !== reqEmp?.departmentId) {
+        res.status(403).json({ error: "You can only cancel leave applications from employees in your department" }); return;
+      }
+    }
+    // payroll_admin cannot cancel others' leave (read-only role)
+    if (req.hrmsUser.role === "payroll_admin") {
+      const emp = await getEmployeeForUser(req.hrmsUser.id);
+      if (!emp || emp.id !== app.employeeId) { res.status(403).json({ error: "Payroll admin can only cancel their own leave" }); return; }
     }
 
     const totalDays = parseFloat(app.totalDays as string);

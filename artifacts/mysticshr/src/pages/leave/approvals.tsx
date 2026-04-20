@@ -6,6 +6,8 @@ import {
   useInitializeLeaveBalances,
   getListLeaveApplicationsQueryKey,
   getListLeaveBalancesQueryKey,
+  type InitializeLeaveBalances200,
+  type LeaveApplication,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -74,8 +76,8 @@ export default function LeaveApprovalsPage() {
 
   async function handleInitBalances() {
     try {
-      const result = await initMutation.mutateAsync({ data: { year: Number(initYear) } });
-      alert(`Initialized ${(result as any).count} leave balance records for ${initYear}.`);
+      const result: InitializeLeaveBalances200 = await initMutation.mutateAsync({ data: { year: Number(initYear) } });
+      alert(`Initialized ${result.count} leave balance records for ${initYear}.`);
       setShowInit(false);
     } catch { alert("Failed to initialize balances"); }
   }
@@ -86,7 +88,7 @@ export default function LeaveApprovalsPage() {
   });
 
   // Determine what actions are available per application for current role
-  function getActions(app: any): Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> {
+  function getActions(app: LeaveApplication): Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> {
     const actions: Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> = [];
     if ((isHod || isHr) && app.status === "Pending") {
       actions.push({ type: "hod", action: "Approved" }, { type: "hod", action: "Rejected" });

@@ -118,7 +118,7 @@ export default function PermissionsPage() {
     try {
       await overrideMutation.mutateAsync({
         data: {
-          employeeId: (register as any)?.employeeId ?? 0,
+          employeeId: register?.employeeId ?? 0,
           year: y, month: m,
           newLimitMinutes: Number(overrideForm.newLimitMinutes),
           justification: overrideForm.justification,
@@ -130,10 +130,9 @@ export default function PermissionsPage() {
   }
 
   const apps = allApps ?? [];
-  const regData = register as any;
-  const usedMins = regData?.usedMinutes ?? 0;
-  const limitMins = regData?.limitMinutes ?? 240;
-  const remainingMins = regData?.remainingMinutes ?? (limitMins - usedMins);
+  const usedMins = register?.usedMinutes ?? 0;
+  const limitMins = register?.limitMinutes ?? 240;
+  const remainingMins = register?.remainingMinutes ?? (limitMins - usedMins);
   const usedPct = Math.min(100, Math.round((usedMins / limitMins) * 100));
 
   const monthName = currentDate.toLocaleString("default", { month: "long", year: "numeric" });
