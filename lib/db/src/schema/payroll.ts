@@ -218,6 +218,19 @@ export const payrollLockExceptionsTable = pgTable("payroll_lock_exceptions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── PAYROLL SETTINGS ─────────────────────────────────────────────────────────
+// Key-value configuration store for payroll module settings.
+// Used to store the annual tax declaration window (start/end date per FY).
+export const payrollSettingsTable = pgTable("payroll_settings", {
+  id: serial("id").primaryKey(),
+  settingKey: text("setting_key").notNull().unique(),
+  settingValue: text("setting_value").notNull(),
+  description: text("description"),
+  updatedById: integer("updated_by_id").references(() => hrmsUsersTable.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── LOAN REPAYMENTS ──────────────────────────────────────────────────────────
 // Tracks active loan deductions per employee
 export const loanRepaymentsTable = pgTable("loan_repayments", {

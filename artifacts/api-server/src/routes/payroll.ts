@@ -8,7 +8,7 @@ import {
   salaryStructuresTable, salaryComponentsTable, payrollRunsTable, payrollRecordsTable,
   payslipsTable, taxRegimeDeclarationsTable, salaryRevisionsTable, payrollLocksTable,
   payrollLockExceptionsTable, loanRepaymentsTable, employeesTable, hrmsUsersTable,
-  departmentsTable, designationsTable, attendanceRecordsTable,
+  departmentsTable, designationsTable, attendanceRecordsTable, payrollSettingsTable,
   salaryComponentTypeEnum, lockExceptionTypeEnum, salaryRevisionStatusEnum,
 } from "@workspace/db/schema";
 import { eq, and, desc, asc, or, gte, lte, sql } from "drizzle-orm";
@@ -326,6 +326,24 @@ router.post("/payroll/tax-declarations", requireHrmsUser, requireRole(...ALL_ROL
         .where(eq(hrmsUsersTable.id, u.id));
       if (!emp) { res.status(403).json({ error: "No employee record found for current user." }); return; }
       resolvedEmployeeId = emp.id;
+
+      // Employees and HODs are subject to declaration window enforcement.
+      // HR/Super Admin/Payroll Admin can always submit declarations.
+      const [windowStart] = await db.select({ settingValue: payrollSettingsTable.settingValue })
+        .from(payrollSettingsTable)
+        .where(eq(payrollSettingsTable.settingKey, `declaration_window_start_${body.financialYear}`));
+      const [windowEnd] = await db.select({ settingValue: payrollSettingsTable.settingValue })
+        .from(payrollSettingsTable)
+        .where(eq(payrollSettingsTable.settingKey, `declaration_window_end_${body.financialYear}`));
+      if (windowStart && windowEnd) {
+        const today = new Date().toISOString().split("T")[0];
+        if (today < windowStart.settingValue || today > windowEnd.settingValue) {
+          res.status(422).json({
+            error: `Tax declarations are only accepted between ${windowStart.settingValue} and ${windowEnd.settingValue} for FY ${body.financialYear}.`,
+          });
+          return;
+        }
+      }
     } else {
       // HR/payroll_admin/super_admin roles must supply employeeId
       if (!body.employeeId) { res.status(400).json({ error: "employeeId is required." }); return; }
@@ -346,6 +364,41 @@ router.post("/payroll/tax-declarations", requireHrmsUser, requireRole(...ALL_ROL
       isCurrent: true,
     }).returning();
     res.status(201).json(decl);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── PAYROLL SETTINGS ─────────────────────────────────────────────────────────
+// Key-value config for the payroll module (e.g. declaration window per FY).
+// Setting keys for tax declaration window:
+//   declaration_window_start_<FY>  e.g. declaration_window_start_2024-25  → "2024-04-01"
+//   declaration_window_end_<FY>    e.g. declaration_window_end_2024-25    → "2024-06-30"
+
+router.get("/payroll/settings", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+  try {
+    const settings = await db.select().from(payrollSettingsTable).orderBy(asc(payrollSettingsTable.settingKey));
+    res.json(settings);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.put("/payroll/settings/:key", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
+  try {
+    const key = req.params.key;
+    const { value, description } = req.body as { value: string; description?: string };
+    if (!value) { res.status(400).json({ error: "value is required." }); return; }
+    const u = req.hrmsUser!;
+    const existing = await db.select().from(payrollSettingsTable).where(eq(payrollSettingsTable.settingKey, key));
+    if (existing.length) {
+      const [updated] = await db.update(payrollSettingsTable)
+        .set({ settingValue: value, description: description ?? existing[0].description, updatedById: u.id, updatedAt: new Date() })
+        .where(eq(payrollSettingsTable.settingKey, key))
+        .returning();
+      res.json(updated);
+    } else {
+      const [created] = await db.insert(payrollSettingsTable)
+        .values({ settingKey: key, settingValue: value, description, updatedById: u.id })
+        .returning();
+      res.status(201).json(created);
+    }
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

@@ -1802,6 +1802,18 @@ export interface CreateTaxDeclarationBody {
   declarationDate: string;
 }
 
+export interface PayrollSetting {
+  id: number;
+  settingKey: string;
+  settingValue: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  updatedById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PayrollLock {
   id: number;
   year: number;
@@ -2365,6 +2377,11 @@ export type UpdateLoanBody = {
 export type ListTaxDeclarationsParams = {
   employeeId?: number;
   financialYear?: string;
+};
+
+export type UpsertPayrollSettingBody = {
+  value: string;
+  description?: string;
 };
 
 export type ListPayrollLocksParams = {

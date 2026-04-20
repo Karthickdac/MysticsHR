@@ -3890,6 +3890,44 @@ export const CreateTaxDeclarationBody = zod.object({
 });
 
 /**
+ * @summary List all payroll configuration settings
+ */
+export const GetPayrollSettingsResponseItem = zod.object({
+  id: zod.number(),
+  settingKey: zod.string(),
+  settingValue: zod.string(),
+  description: zod.string().nullish(),
+  updatedById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetPayrollSettingsResponse = zod.array(
+  GetPayrollSettingsResponseItem,
+);
+
+/**
+ * @summary Create or update a payroll setting
+ */
+export const UpsertPayrollSettingParams = zod.object({
+  key: zod.coerce.string(),
+});
+
+export const UpsertPayrollSettingBody = zod.object({
+  value: zod.string(),
+  description: zod.string().optional(),
+});
+
+export const UpsertPayrollSettingResponse = zod.object({
+  id: zod.number(),
+  settingKey: zod.string(),
+  settingValue: zod.string(),
+  description: zod.string().nullish(),
+  updatedById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List payroll lock records
  */
 export const ListPayrollLocksQueryParams = zod.object({

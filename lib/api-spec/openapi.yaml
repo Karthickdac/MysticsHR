@@ -3034,6 +3034,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/TaxDeclaration"
 
+  /payroll/settings:
+    get:
+      operationId: getPayrollSettings
+      tags: [payroll]
+      summary: List all payroll configuration settings
+      responses:
+        "200":
+          description: Settings list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayrollSetting"
+
+  /payroll/settings/{key}:
+    put:
+      operationId: upsertPayrollSetting
+      tags: [payroll]
+      summary: Create or update a payroll setting
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string }
+                description: { type: string }
+      responses:
+        "200":
+          description: Updated setting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollSetting"
+        "201":
+          description: Created setting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollSetting"
+
   /payroll/locks:
     get:
       operationId: listPayrollLocks
@@ -5568,6 +5617,18 @@ components:
         regime: { type: string, enum: [Old, New] }
         investmentDeclarations: {}
         declarationDate: { type: string, format: date }
+
+    PayrollSetting:
+      type: object
+      properties:
+        id: { type: integer }
+        settingKey: { type: string }
+        settingValue: { type: string }
+        description: { type: ["string", "null"] }
+        updatedById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, settingKey, settingValue, createdAt, updatedAt]
 
     PayrollLock:
       type: object

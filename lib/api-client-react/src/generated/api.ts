@@ -135,6 +135,7 @@ import type {
   PayrollLockException,
   PayrollRecord,
   PayrollRun,
+  PayrollSetting,
   PayslipDetail,
   PayslipSummary,
   PermissionActionBody,
@@ -183,6 +184,7 @@ import type {
   UpdateSalaryStructureBody,
   UpdateUserBody,
   UpsertEmployeeProfileBody,
+  UpsertPayrollSettingBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -14034,6 +14036,169 @@ export const useCreateTaxDeclaration = <
   TContext
 > => {
   return useMutation(getCreateTaxDeclarationMutationOptions(options));
+};
+
+/**
+ * @summary List all payroll configuration settings
+ */
+export const getGetPayrollSettingsUrl = () => {
+  return `/api/payroll/settings`;
+};
+
+export const getPayrollSettings = async (
+  options?: RequestInit,
+): Promise<PayrollSetting[]> => {
+  return customFetch<PayrollSetting[]>(getGetPayrollSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPayrollSettingsQueryKey = () => {
+  return [`/api/payroll/settings`] as const;
+};
+
+export const getGetPayrollSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPayrollSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPayrollSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPayrollSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPayrollSettings>>
+  > = ({ signal }) => getPayrollSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPayrollSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPayrollSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPayrollSettings>>
+>;
+export type GetPayrollSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all payroll configuration settings
+ */
+
+export function useGetPayrollSettings<
+  TData = Awaited<ReturnType<typeof getPayrollSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPayrollSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPayrollSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create or update a payroll setting
+ */
+export const getUpsertPayrollSettingUrl = (key: string) => {
+  return `/api/payroll/settings/${key}`;
+};
+
+export const upsertPayrollSetting = async (
+  key: string,
+  upsertPayrollSettingBody: UpsertPayrollSettingBody,
+  options?: RequestInit,
+): Promise<PayrollSetting> => {
+  return customFetch<PayrollSetting>(getUpsertPayrollSettingUrl(key), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(upsertPayrollSettingBody),
+  });
+};
+
+export const getUpsertPayrollSettingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof upsertPayrollSetting>>,
+    TError,
+    { key: string; data: BodyType<UpsertPayrollSettingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof upsertPayrollSetting>>,
+  TError,
+  { key: string; data: BodyType<UpsertPayrollSettingBody> },
+  TContext
+> => {
+  const mutationKey = ["upsertPayrollSetting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof upsertPayrollSetting>>,
+    { key: string; data: BodyType<UpsertPayrollSettingBody> }
+  > = (props) => {
+    const { key, data } = props ?? {};
+
+    return upsertPayrollSetting(key, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpsertPayrollSettingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof upsertPayrollSetting>>
+>;
+export type UpsertPayrollSettingMutationBody =
+  BodyType<UpsertPayrollSettingBody>;
+export type UpsertPayrollSettingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create or update a payroll setting
+ */
+export const useUpsertPayrollSetting = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof upsertPayrollSetting>>,
+    TError,
+    { key: string; data: BodyType<UpsertPayrollSettingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof upsertPayrollSetting>>,
+  TError,
+  { key: string; data: BodyType<UpsertPayrollSettingBody> },
+  TContext
+> => {
+  return useMutation(getUpsertPayrollSettingMutationOptions(options));
 };
 
 /**
