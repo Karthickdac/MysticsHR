@@ -11,6 +11,7 @@ import {
   getGetPreOnboardingRecordQueryKey,
   getListPreOnboardingRecordsQueryKey,
 } from "@workspace/api-client-react";
+import type { PreOnboardingDocument } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ const RECORD_STATUS_COLORS: Record<string, string> = {
   Cancelled: "bg-red-100 text-red-800",
 };
 
-function DocumentRow({ doc, recordId }: { doc: any; recordId: number }) {
+function DocumentRow({ doc, recordId }: { doc: PreOnboardingDocument; recordId: number }) {
   const qc = useQueryClient();
   const [url, setUrl] = useState(doc.fileUrl ?? "");
   const { role } = useCurrentHrmsUser();

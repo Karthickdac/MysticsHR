@@ -45,7 +45,7 @@ async function recomputeCompletion(recordId: number): Promise<number> {
   return pct;
 }
 
-router.get("/pre-onboarding", requireHrmsUser, async (req, res) => {
+router.get("/pre-onboarding", requireHrmsUser, requireRole(...HR_WRITE_ROLES), async (req, res) => {
   try {
     const { status } = req.query as Record<string, string>;
     const query = db
@@ -62,7 +62,7 @@ router.get("/pre-onboarding", requireHrmsUser, async (req, res) => {
   }
 });
 
-router.get("/pre-onboarding/:id", requireHrmsUser, async (req, res) => {
+router.get("/pre-onboarding/:id", requireHrmsUser, requireRole(...HR_WRITE_ROLES), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [row] = await db
@@ -123,7 +123,7 @@ const docSelect = {
   updatedAt: preOnboardingDocumentsTable.updatedAt,
 };
 
-router.get("/pre-onboarding/:id/documents", requireHrmsUser, async (req, res) => {
+router.get("/pre-onboarding/:id/documents", requireHrmsUser, requireRole(...HR_WRITE_ROLES), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const rows = await db
@@ -154,7 +154,7 @@ router.post("/pre-onboarding/:id/documents", requireHrmsUser, requireRole(...HR_
         documentType: b.documentType,
         documentName: b.documentName,
         fileUrl: b.fileUrl ?? null,
-        status: b.fileUrl ? "Uploaded" : "Pending",
+        status: b.fileUrl ? "Under Verification" : "Pending",
         uploadedAt: b.fileUrl ? new Date() : null,
         isRequired: b.isRequired ?? 1,
       })
@@ -178,7 +178,7 @@ router.patch("/pre-onboarding-documents/:docId", requireHrmsUser, requireRole(..
       updates.fileUrl = req.body.fileUrl;
       if (req.body.fileUrl) {
         updates.uploadedAt = new Date();
-        if (req.body.status === undefined) updates.status = "Uploaded";
+        if (req.body.status === undefined) updates.status = "Under Verification";
       }
     }
     const [row] = await db

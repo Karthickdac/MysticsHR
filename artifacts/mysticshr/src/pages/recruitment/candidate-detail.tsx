@@ -30,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { ArrowLeft, Plus, CheckCircle2, XCircle, Send } from "lucide-react";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
+import type { InterviewRound } from "@workspace/api-client-react";
 
 const STAGE_COLORS: Record<string, string> = {
   Applied: "bg-slate-100 text-slate-700",
@@ -206,7 +207,7 @@ function FeedbackDialog({ interviewId, candidateId }: { interviewId: number; can
   );
 }
 
-function InterviewItem({ interview, candidateId }: { interview: any; candidateId: number }) {
+function InterviewItem({ interview, candidateId }: { interview: InterviewRound; candidateId: number }) {
   const qc = useQueryClient();
   const { data: feedback } = useGetInterviewFeedback(interview.id);
   const update = useUpdateInterview({

@@ -65,7 +65,7 @@ const requisitionGroupBy = [
   designationsTable.title,
 ] as const;
 
-router.get("/requisitions", requireHrmsUser, async (req, res) => {
+router.get("/requisitions", requireHrmsUser, requireRole(...HR_WRITE_ROLES, ...APPROVE_ROLES), async (req, res) => {
   try {
     const { status, departmentId } = req.query as Record<string, string>;
     const conditions = [isNull(jobRequisitionsTable.deletedAt)];
@@ -127,7 +127,7 @@ router.post("/requisitions", requireHrmsUser, requireRole(...HR_WRITE_ROLES), as
   }
 });
 
-router.get("/requisitions/:id", requireHrmsUser, async (req, res) => {
+router.get("/requisitions/:id", requireHrmsUser, requireRole(...HR_WRITE_ROLES, ...APPROVE_ROLES), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [row] = await db
@@ -294,7 +294,7 @@ const candidateSelect = {
   updatedAt: candidatesTable.updatedAt,
 };
 
-router.get("/candidates", requireHrmsUser, async (req, res) => {
+router.get("/candidates", requireHrmsUser, requireRole(...HR_WRITE_ROLES, "hod"), async (req, res) => {
   try {
     const { requisitionId, stage } = req.query as Record<string, string>;
     const conditions = [isNull(candidatesTable.deletedAt)];
@@ -348,7 +348,7 @@ router.post("/candidates", requireHrmsUser, requireRole(...HR_WRITE_ROLES), asyn
   }
 });
 
-router.get("/candidates/:id", requireHrmsUser, async (req, res) => {
+router.get("/candidates/:id", requireHrmsUser, requireRole(...HR_WRITE_ROLES, "hod"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [row] = await db
@@ -498,7 +498,7 @@ const interviewSelect = {
   updatedAt: interviewRoundsTable.updatedAt,
 };
 
-router.get("/candidates/:candidateId/interviews", requireHrmsUser, async (req, res) => {
+router.get("/candidates/:candidateId/interviews", requireHrmsUser, requireRole(...HR_WRITE_ROLES, "hod"), async (req, res) => {
   try {
     const candidateId = parseInt(String(req.params.candidateId), 10);
     const rows = await db
@@ -621,7 +621,7 @@ const feedbackSelect = {
   updatedAt: interviewFeedbackTable.updatedAt,
 };
 
-router.get("/interviews/:id/feedback", requireHrmsUser, async (req, res) => {
+router.get("/interviews/:id/feedback", requireHrmsUser, requireRole(...HR_WRITE_ROLES, "hod"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const rows = await db
@@ -703,7 +703,7 @@ const offerSelect = {
   updatedAt: offerLettersTable.updatedAt,
 };
 
-router.get("/offers", requireHrmsUser, async (req, res) => {
+router.get("/offers", requireHrmsUser, requireRole(...HR_WRITE_ROLES), async (req, res) => {
   try {
     const { status, candidateId } = req.query as Record<string, string>;
     const conditions = [];
@@ -806,7 +806,7 @@ router.post("/candidates/:candidateId/offer", requireHrmsUser, requireRole(...HR
   }
 });
 
-router.get("/offers/:id", requireHrmsUser, async (req, res) => {
+router.get("/offers/:id", requireHrmsUser, requireRole(...HR_WRITE_ROLES), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [row] = await db
