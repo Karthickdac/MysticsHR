@@ -874,15 +874,55 @@ router.get("/ess/dashboard", requireHrmsUser, requireRole(...ALL_ROLES), async (
     const absentDays = attRows.filter(r => r.status === "Absent").length;
     const lateDays = attRows.filter(r => r.status === "Late").length;
 
-    // Leave balances
-    const { leaveBalancesTable, leaveTypesTable } = await import("@workspace/db/schema");
+    // Leave balances — lazy-init for any active leave types missing a row so
+    // the ESS dashboard always reflects what the employee is entitled to.
+    const { leaveBalancesTable, leaveTypesTable, permissionRegistersTable } = await import("@workspace/db/schema");
+    const [empMeta] = await db.select({ employmentType: employeesTable.employmentType })
+      .from(employeesTable).where(eq(employeesTable.id, emp.id));
+    const activeTypes = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.isActive, true));
+    for (const lt of activeTypes) {
+      if (lt.applicableEmploymentTypes && lt.applicableEmploymentTypes.length > 0 && empMeta?.employmentType) {
+        if (!lt.applicableEmploymentTypes.includes(empMeta.employmentType)) continue;
+      }
+      const [existing] = await db.select({ id: leaveBalancesTable.id }).from(leaveBalancesTable)
+        .where(and(
+          eq(leaveBalancesTable.employeeId, emp.id),
+          eq(leaveBalancesTable.leaveTypeId, lt.id),
+          eq(leaveBalancesTable.year, now.getFullYear()),
+        ));
+      if (!existing) {
+        await db.insert(leaveBalancesTable).values({
+          employeeId: emp.id, leaveTypeId: lt.id, year: now.getFullYear(),
+          allocated: lt.annualQuota, used: "0", pending: "0", carryForward: "0",
+        });
+      }
+    }
     const balances = await db.select({
       leaveTypeName: leaveTypesTable.name,
-      balance: leaveBalancesTable.allocated,
+      allocated: leaveBalancesTable.allocated,
       used: leaveBalancesTable.used,
+      pending: leaveBalancesTable.pending,
+      carryForward: leaveBalancesTable.carryForward,
+      balance: sql<string>`(${leaveBalancesTable.allocated}::numeric + ${leaveBalancesTable.carryForward}::numeric - ${leaveBalancesTable.used}::numeric - ${leaveBalancesTable.pending}::numeric)::text`,
     }).from(leaveBalancesTable)
       .leftJoin(leaveTypesTable, eq(leaveBalancesTable.leaveTypeId, leaveTypesTable.id))
-      .where(and(eq(leaveBalancesTable.employeeId, emp.id), eq(leaveBalancesTable.year, now.getFullYear())));
+      .where(and(eq(leaveBalancesTable.employeeId, emp.id), eq(leaveBalancesTable.year, now.getFullYear())))
+      .orderBy(leaveTypesTable.name);
+
+    // Permission register for current month
+    const curMonth = now.getMonth() + 1;
+    const curYear = now.getFullYear();
+    let [register] = await db.select().from(permissionRegistersTable)
+      .where(and(
+        eq(permissionRegistersTable.employeeId, emp.id),
+        eq(permissionRegistersTable.year, curYear),
+        eq(permissionRegistersTable.month, curMonth),
+      ));
+    if (!register) {
+      [register] = await db.insert(permissionRegistersTable).values({
+        employeeId: emp.id, year: curYear, month: curMonth, usedMinutes: 0, limitMinutes: 240,
+      }).returning();
+    }
 
     // Active performance goals
     const { payslipsTable } = await import("@workspace/db/schema");
@@ -912,6 +952,13 @@ router.get("/ess/dashboard", requireHrmsUser, requireRole(...ALL_ROLES), async (
     res.json({
       attendance: { presentDays, absentDays, lateDays, month: yearMonth },
       leaveBalances: balances,
+      permissionRegister: {
+        year: curYear,
+        month: curMonth,
+        usedMinutes: register.usedMinutes,
+        limitMinutes: register.limitMinutes,
+        remainingMinutes: register.limitMinutes - register.usedMinutes,
+      },
       recentPayslip: recentPayslip ?? null,
       performanceGoals: activeGoals,
       pendingActions: [],

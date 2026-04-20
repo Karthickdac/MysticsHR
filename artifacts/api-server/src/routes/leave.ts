@@ -885,12 +885,26 @@ router.post("/leave/applications/:id/cancel-action", requireHrmsUser, requireRol
 router.get("/leave/balances", requireHrmsUser, requireRole(...HR_READ_ROLES, "employee"), async (req, res) => {
   try {
     let { employeeId, year } = req.query as { employeeId?: string; year?: string };
+    const targetYear = year ? Number(year) : new Date().getFullYear();
     const conds: SQL[] = [];
-    if (year) conds.push(eq(leaveBalancesTable.year, Number(year)));
+    if (year) conds.push(eq(leaveBalancesTable.year, targetYear));
 
     if (req.hrmsUser.role === "employee") {
+      // Always scope employees to the resolved year so lazy-init below
+      // matches what we return.
+      if (!year) conds.push(eq(leaveBalancesTable.year, targetYear));
       const emp = await getEmployeeForUser(req.hrmsUser.id);
       if (!emp) { res.json([]); return; }
+      // Lazy-init: ensure this employee has a balance row for every applicable
+      // active leave type for the requested year so the ESS UI always shows
+      // balance cards even before HR runs the bulk initializer.
+      const activeTypes = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.isActive, true));
+      for (const lt of activeTypes) {
+        if (lt.applicableEmploymentTypes && lt.applicableEmploymentTypes.length > 0 && emp.employmentType) {
+          if (!lt.applicableEmploymentTypes.includes(emp.employmentType)) continue;
+        }
+        await getOrCreateBalance(emp.id, lt.id, targetYear, lt.annualQuota);
+      }
       conds.push(eq(leaveBalancesTable.employeeId, emp.id));
     } else if (req.hrmsUser.role === "hod") {
       // HOD may only see balances of employees in their department

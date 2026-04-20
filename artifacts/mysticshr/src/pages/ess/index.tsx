@@ -23,9 +23,25 @@ import {
 
 type LeaveBalanceItem = {
   leaveTypeName: string;
-  balance: number | null;
-  used: number | null;
+  balance: string | number | null;
+  allocated?: string | number | null;
+  used: string | number | null;
+  pending?: string | number | null;
+  carryForward?: string | number | null;
 };
+
+type PermissionRegisterSummary = {
+  year: number;
+  month: number;
+  usedMinutes: number;
+  limitMinutes: number;
+  remainingMinutes: number;
+};
+
+function num(v: string | number | null | undefined): number {
+  if (v == null) return 0;
+  return typeof v === "number" ? v : parseFloat(v) || 0;
+}
 
 type GoalSummaryItem = {
   id: number;
@@ -183,6 +199,10 @@ export default function EssPortalPage() {
   const leaveBalances = (dashboard?.leaveBalances ?? []) as LeaveBalanceItem[];
   const performanceGoals = (dashboard?.performanceGoals ?? []) as GoalSummaryItem[];
   const recentPayslip = dashboard?.recentPayslip as PayslipSummaryItem | null | undefined;
+  const permissionRegister = dashboard?.permissionRegister as PermissionRegisterSummary | null | undefined;
+
+  const totalLeaveRemaining = leaveBalances.reduce((sum, lb) => sum + num(lb.balance), 0);
+  const permRemainingHrs = permissionRegister ? (permissionRegister.remainingMinutes / 60) : 0;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -204,6 +224,49 @@ export default function EssPortalPage() {
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
+          {dashboard && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Link href="/leave">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-100">
+                      <Calendar className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold">
+                        {totalLeaveRemaining}
+                        <span className="text-base font-normal text-muted-foreground"> days</span>
+                      </p>
+                      <p className="text-sm text-muted-foreground">Leave Remaining</p>
+                      <p className="text-xs text-muted-foreground">across {leaveBalances.length} leave type{leaveBalances.length !== 1 ? "s" : ""}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+              <Link href="/permissions">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-violet-100">
+                      <Clock className="w-5 h-5 text-violet-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold">
+                        {permRemainingHrs.toFixed(1)}
+                        <span className="text-base font-normal text-muted-foreground"> hrs</span>
+                      </p>
+                      <p className="text-sm text-muted-foreground">Permission Remaining</p>
+                      <p className="text-xs text-muted-foreground">
+                        {permissionRegister
+                          ? `${(permissionRegister.usedMinutes / 60).toFixed(1)} of ${(permissionRegister.limitMinutes / 60).toFixed(1)} hrs used this month`
+                          : "this month"}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          )}
+
           {dashboard && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card>
@@ -254,18 +317,30 @@ export default function EssPortalPage() {
                 {leaveBalances.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No leave balances found.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {leaveBalances.map((lb, i) => (
-                      <div key={i} className="flex items-center justify-between">
-                        <span className="text-sm">{lb.leaveTypeName}</span>
-                        <div className="flex gap-2">
-                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
-                            {lb.balance ?? 0} left
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">{lb.used ?? 0} used</span>
+                  <div className="space-y-3">
+                    {leaveBalances.map((lb, i) => {
+                      const available = num(lb.balance);
+                      const allocated = num(lb.allocated) + num(lb.carryForward);
+                      const used = num(lb.used);
+                      const pending = num(lb.pending);
+                      const usedPct = allocated > 0 ? Math.min(100, Math.round((used / allocated) * 100)) : 0;
+                      const pendingPct = allocated > 0 ? Math.min(100 - usedPct, Math.round((pending / allocated) * 100)) : 0;
+                      return (
+                        <div key={i}>
+                          <div className="flex items-baseline justify-between mb-1">
+                            <span className="text-sm">{lb.leaveTypeName}</span>
+                            <span className="text-xs">
+                              <span className={`font-semibold ${available <= 0 ? "text-red-600" : "text-green-700"}`}>{available}</span>
+                              <span className="text-muted-foreground"> / {allocated} left</span>
+                            </span>
+                          </div>
+                          <div className="bg-gray-100 rounded-full h-1.5 overflow-hidden flex">
+                            <div className="bg-blue-500 h-1.5" style={{ width: `${usedPct}%` }} />
+                            <div className="bg-yellow-400 h-1.5" style={{ width: `${pendingPct}%` }} />
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 <Link href="/leave" className="text-xs text-primary hover:underline mt-3 block">

@@ -147,28 +147,57 @@ export default function LeavePage() {
       </div>
 
       {/* Balance Cards */}
-      {balances && balances.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Leave Balance — {year}</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Leave Balance — {year}</h2>
+        {!balances ? (
+          <div className="text-sm text-gray-400">Loading balances...</div>
+        ) : balances.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 border rounded-lg bg-gray-50/50">
+            <Calendar className="w-6 h-6 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No leave types configured yet. Contact HR.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {balances.map((b) => {
+              const allocated = parseFloat(b.allocated) + parseFloat(b.carryForward ?? "0");
+              const used = parseFloat(b.used);
+              const pending = parseFloat(b.pending);
               const available = parseFloat(b.available);
+              const usedPct = allocated > 0 ? Math.min(100, Math.round((used / allocated) * 100)) : 0;
+              const pendingPct = allocated > 0 ? Math.min(100 - usedPct, Math.round((pending / allocated) * 100)) : 0;
               return (
                 <Card key={b.id} className="border shadow-none">
-                  <CardContent className="p-3">
-                    <div className="text-xs font-medium text-gray-500 truncate">{b.leaveTypeCode}</div>
-                    <div className={`text-2xl font-bold mt-1 ${available <= 0 ? "text-red-600" : "text-green-600"}`}>
-                      {available}
+                  <CardContent className="p-4">
+                    <div className="flex items-baseline justify-between mb-1">
+                      <div className="text-sm font-medium text-gray-700 truncate">
+                        {b.leaveTypeName ?? b.leaveTypeCode}
+                      </div>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wide">{b.leaveTypeCode}</span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">of {b.allocated} days</div>
-                    <div className="text-xs text-gray-400">{b.pending > "0" ? `${b.pending} pending` : ""}</div>
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className={`text-2xl font-bold ${available <= 0 ? "text-red-600" : "text-green-600"}`}>
+                        {available}
+                      </span>
+                      <span className="text-xs text-gray-400">/ {allocated} days remaining</span>
+                    </div>
+                    <div className="bg-gray-100 rounded-full h-2 overflow-hidden flex" title={`${used} used, ${pending} pending`}>
+                      <div className="bg-blue-500 h-2" style={{ width: `${usedPct}%` }} />
+                      <div className="bg-yellow-400 h-2" style={{ width: `${pendingPct}%` }} />
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-[11px] text-gray-500">
+                      <span>{used} used</span>
+                      {pending > 0 && <span className="text-yellow-600">{pending} pending</span>}
+                      {parseFloat(b.carryForward ?? "0") > 0 && (
+                        <span className="text-gray-400">+{b.carryForward} CF</span>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* My Applications */}
       <div>

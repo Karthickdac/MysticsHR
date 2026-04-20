@@ -2285,6 +2285,14 @@ export type EssDashboardAttendance = {
 
 export type EssDashboardLeaveBalancesItem = { [key: string]: unknown };
 
+export type EssDashboardPermissionRegister = {
+  year?: number;
+  month?: number;
+  usedMinutes?: number;
+  limitMinutes?: number;
+  remainingMinutes?: number;
+} | null;
+
 export type EssDashboardRecentPayslip = { [key: string]: unknown } | null;
 
 export type EssDashboardPerformanceGoalsItem = { [key: string]: unknown };
@@ -2294,6 +2302,7 @@ export type EssDashboardPendingActionsItem = { [key: string]: unknown };
 export interface EssDashboard {
   attendance: EssDashboardAttendance;
   leaveBalances: EssDashboardLeaveBalancesItem[];
+  permissionRegister?: EssDashboardPermissionRegister;
   recentPayslip?: EssDashboardRecentPayslip;
   performanceGoals: EssDashboardPerformanceGoalsItem[];
   pendingActions: EssDashboardPendingActionsItem[];

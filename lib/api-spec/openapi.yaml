@@ -7843,6 +7843,15 @@ components:
           type: array
           items:
             type: object
+        permissionRegister:
+          type: object
+          nullable: true
+          properties:
+            year: { type: integer }
+            month: { type: integer }
+            usedMinutes: { type: integer }
+            limitMinutes: { type: integer }
+            remainingMinutes: { type: integer }
         recentPayslip:
           type: object
           nullable: true

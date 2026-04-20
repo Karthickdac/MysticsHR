@@ -4844,6 +4844,15 @@ export const GetEssDashboardResponse = zod.object({
     month: zod.string().optional(),
   }),
   leaveBalances: zod.array(zod.object({}).passthrough()),
+  permissionRegister: zod
+    .object({
+      year: zod.number().optional(),
+      month: zod.number().optional(),
+      usedMinutes: zod.number().optional(),
+      limitMinutes: zod.number().optional(),
+      remainingMinutes: zod.number().optional(),
+    })
+    .nullish(),
   recentPayslip: zod.object({}).passthrough().nullish(),
   performanceGoals: zod.array(zod.object({}).passthrough()),
   pendingActions: zod.array(zod.object({}).passthrough()),
