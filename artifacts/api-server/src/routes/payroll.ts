@@ -317,15 +317,16 @@ router.post("/payroll/tax-declarations", requireHrmsUser, requireRole(...ALL_ROL
 
     let resolvedEmployeeId: number;
 
-    if (u.role === "employee") {
-      // Employees can only declare for themselves — derive from auth, ignore body value
+    const selfOnlyRoles = ["employee", "hod"] as const;
+    if ((selfOnlyRoles as readonly string[]).includes(u.role)) {
+      // Employee and HOD can only declare for themselves — derive from auth, ignore body value
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
       if (!emp) { res.status(403).json({ error: "No employee record found for current user." }); return; }
       resolvedEmployeeId = emp.id;
     } else {
-      // HR/admin roles must supply employeeId
+      // HR/payroll_admin/super_admin roles must supply employeeId
       if (!body.employeeId) { res.status(400).json({ error: "employeeId is required." }); return; }
       resolvedEmployeeId = body.employeeId;
     }

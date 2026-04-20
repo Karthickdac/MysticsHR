@@ -202,10 +202,15 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
 
 router.post("/attendance", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
-    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance");
+    const body = req.body;
+    // Determine the period year/month from the attendance date being written
+    const attendancePeriod = body.attendanceDate ? new Date(body.attendanceDate) : new Date();
+    const lockError = await checkPayrollLock(
+      req.hrmsUser!.id, "edit_attendance",
+      attendancePeriod.getFullYear(), attendancePeriod.getMonth() + 1,
+    );
     if (lockError) { res.status(422).json({ error: lockError }); return; }
 
-    const body = req.body;
     const signIn = body.signInTime ? new Date(body.signInTime) : null;
     const signOut = body.signOutTime ? new Date(body.signOutTime) : null;
     const breakMins: number = body.breakDurationMinutes ?? 0;
@@ -521,14 +526,19 @@ router.get("/attendance/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), as
 
 router.patch("/attendance/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
-    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance");
-    if (lockError) { res.status(422).json({ error: lockError }); return; }
-
     const body = req.body;
     if (!body.overrideReason) { res.status(400).json({ error: "overrideReason is required for HR override" }); return; }
     const id = Number(req.params.id);
     const [existing] = await db.select().from(attendanceRecordsTable).where(eq(attendanceRecordsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
+    // Check lock against the actual date of the attendance record being patched
+    const recordPeriod = existing.attendanceDate ? new Date(existing.attendanceDate) : new Date();
+    const lockError = await checkPayrollLock(
+      req.hrmsUser!.id, "edit_attendance",
+      recordPeriod.getFullYear(), recordPeriod.getMonth() + 1,
+    );
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
 
     const signIn = body.signInTime ? new Date(body.signInTime) : existing.signInTime;
     const signOut = body.signOutTime ? new Date(body.signOutTime) : existing.signOutTime;

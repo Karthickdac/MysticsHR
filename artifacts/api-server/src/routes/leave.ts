@@ -889,10 +889,10 @@ router.get("/leave/balances", requireHrmsUser, requireRole(...HR_READ_ROLES, "em
 
 router.post("/leave/balances/initialize", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
-    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance");
-    if (lockError) { res.status(422).json({ error: lockError }); return; }
-
     const { year, employeeId } = req.body as { year: number; employeeId?: number };
+    // Check lock for current month in the target year (initialization affects the year's allocations)
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance", year, new Date().getMonth() + 1);
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
     const leaveTypes = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.isActive, true));
     const emps = await db.select({ id: employeesTable.id }).from(employeesTable)
       .where(and(isNull(employeesTable.deletedAt), employeeId ? eq(employeesTable.id, employeeId) : undefined));
@@ -932,10 +932,10 @@ router.post("/leave/balances/initialize", requireHrmsUser, requireRole(...HR_ROL
 
 router.post("/leave/balances/accrue", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
-    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance");
-    if (lockError) { res.status(422).json({ error: lockError }); return; }
-
     const { year, month, employeeId } = req.body as { year: number; month: number; employeeId?: number };
+    // Check lock against the specific period being accrued
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance", year, month);
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
 
     if (!year || !month || month < 1 || month > 12) {
       res.status(400).json({ error: "Valid year and month (1–12) are required" }); return;
