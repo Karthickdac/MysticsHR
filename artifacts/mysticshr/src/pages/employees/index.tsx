@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
-import { useListEmployees, useListDepartments } from "@workspace/api-client-react";
+import { useListEmployees, useListDepartments, usePostEmployeesBulkImport } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { Search, Plus, ChevronLeft, ChevronRight, Upload, FileDown, CheckCircle2, AlertCircle, X } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useQueryClient } from "@tanstack/react-query";
 
 const STATUS_COLORS: Record<string, string> = {
   "Active": "bg-green-100 text-green-800 border-green-200",
@@ -27,7 +31,18 @@ const EMPLOYMENT_TYPE_COLORS: Record<string, string> = {
   "Part-Time": "bg-pink-100 text-pink-700 border-pink-200",
 };
 
+const CSV_TEMPLATE = [
+  "firstName,lastName,email,phone,employeeId,departmentId,designationId,dateOfJoining,employmentType,status",
+  "Jane,Doe,jane.doe@automystics.com,9876543210,EMP001,1,1,2024-01-15,Permanent,Active",
+].join("\n");
+
 const PAGE_SIZE = 12;
+
+type ImportResult = {
+  imported: number;
+  skipped: number;
+  errors: Array<{ row: number; error: string }>;
+};
 
 export default function EmployeesPage() {
   const [search, setSearch] = useState("");
@@ -35,6 +50,15 @@ export default function EmployeesPage() {
   const [deptFilter, setDeptFilter] = useState<string>("");
   const [page, setPage] = useState(0);
   const debouncedSearch = useDebounce(search, 300);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const queryClient = useQueryClient();
+  const bulkImport = usePostEmployeesBulkImport();
 
   const { data: departments } = useListDepartments();
   const { data, isLoading } = useListEmployees({
@@ -49,6 +73,49 @@ export default function EmployeesPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  function downloadTemplate() {
+    const blob = new Blob([CSV_TEMPLATE], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "employee_import_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleOpenImport() {
+    setImportFile(null);
+    setImportResult(null);
+    setImportError(null);
+    setImportOpen(true);
+  }
+
+  async function handleImport() {
+    if (!importFile) return;
+    setImportError(null);
+    setImportResult(null);
+
+    const text = await importFile.text();
+    const lines = text.trim().split(/\r?\n/);
+    const headers = lines[0].split(",").map(h => h.trim());
+    const rows = lines.slice(1).map((line) => {
+      const vals = line.split(",").map(v => v.trim());
+      return headers.reduce<Record<string, string>>((acc, h, i) => {
+        acc[h] = vals[i] ?? "";
+        return acc;
+      }, {});
+    });
+
+    try {
+      const result = await bulkImport.mutateAsync({ data: { rows: rows as never[] } });
+      setImportResult(result as unknown as ImportResult);
+      queryClient.invalidateQueries({ queryKey: ["listEmployees"] });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Import failed";
+      setImportError(msg);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -56,12 +123,18 @@ export default function EmployeesPage() {
           <h1 className="text-2xl font-bold text-foreground">Employees</h1>
           <p className="text-muted-foreground mt-1">{total} employees total</p>
         </div>
-        <Link href="/employees/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Employee
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleOpenImport}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import CSV
           </Button>
-        </Link>
+          <Link href="/employees/new">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Employee
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -175,6 +248,100 @@ export default function EmployeesPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk Import Dialog */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Employees from CSV</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to bulk-import employees. Download the template to see the required format.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Button variant="outline" size="sm" onClick={downloadTemplate} className="w-full">
+              <FileDown className="w-4 h-4 mr-2" />
+              Download CSV Template
+            </Button>
+
+            <div
+              className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const f = e.dataTransfer.files[0];
+                if (f && f.name.endsWith(".csv")) setImportFile(f);
+              }}
+            >
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+              />
+              <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+              {importFile ? (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-sm font-medium text-foreground">{importFile.name}</span>
+                  <button
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setImportFile(null); }}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">Drop your CSV here or click to browse</p>
+                  <p className="text-xs text-muted-foreground mt-1">Only .csv files are accepted</p>
+                </>
+              )}
+            </div>
+
+            {importResult && (
+              <div className="rounded-lg border p-4 space-y-2">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">{importResult.imported} employees imported</span>
+                </div>
+                {importResult.skipped > 0 && (
+                  <p className="text-xs text-muted-foreground">{importResult.skipped} rows skipped (duplicates)</p>
+                )}
+                {importResult.errors.length > 0 && (
+                  <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                    {importResult.errors.map((e, i) => (
+                      <div key={i} className="flex items-start gap-1.5 text-xs text-destructive">
+                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                        <span>Row {e.row}: {e.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {importError && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive">{importError}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleImport}
+              disabled={!importFile || bulkImport.isPending}
+            >
+              {bulkImport.isPending ? "Importing…" : "Import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

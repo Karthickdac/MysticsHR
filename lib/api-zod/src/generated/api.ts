@@ -391,6 +391,751 @@ export const DeleteEmployeeParams = zod.object({
 });
 
 /**
+ * @summary Bulk import employees via CSV data
+ */
+export const PostEmployeesBulkImportBody = zod.object({
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+export const PostEmployeesBulkImportResponse = zod.object({
+  imported: zod.number(),
+  failed: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number(),
+      error: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get extended employee profile
+ */
+export const GetEmployeesIdProfileParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdProfileResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  nationalId: zod.string().nullish(),
+  pan: zod.string().nullish(),
+  aadhaar: zod.string().nullish(),
+  pfNumber: zod.string().nullish(),
+  esiNumber: zod.string().nullish(),
+  uan: zod.string().nullish(),
+  maritalStatus: zod.string().nullish(),
+  bloodGroup: zod.string().nullish(),
+  nationality: zod.string().nullish(),
+  permanentAddress: zod.string().nullish(),
+  currentAddress: zod.string().nullish(),
+  linkedinUrl: zod.string().nullish(),
+  emergencyContactName: zod.string().nullish(),
+  emergencyContactPhone: zod.string().nullish(),
+  emergencyContactRelation: zod.string().nullish(),
+  bankAccountName: zod.string().nullish(),
+  bankAccountNumber: zod.string().nullish(),
+  ifscCode: zod.string().nullish(),
+  bankName: zod.string().nullish(),
+  bankBranch: zod.string().nullish(),
+  probationEndDate: zod.coerce.date().nullish(),
+  confirmationDate: zod.coerce.date().nullish(),
+  noticePeriodDays: zod.number().nullish(),
+  workLocation: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Create or update extended employee profile
+ */
+export const PutEmployeesIdProfileParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PutEmployeesIdProfileBody = zod.object({
+  nationalId: zod.string().nullish(),
+  pan: zod.string().nullish(),
+  aadhaar: zod.string().nullish(),
+  pfNumber: zod.string().nullish(),
+  esiNumber: zod.string().nullish(),
+  uan: zod.string().nullish(),
+  maritalStatus: zod.string().nullish(),
+  bloodGroup: zod.string().nullish(),
+  nationality: zod.string().nullish(),
+  permanentAddress: zod.string().nullish(),
+  currentAddress: zod.string().nullish(),
+  linkedinUrl: zod.string().nullish(),
+  emergencyContactName: zod.string().nullish(),
+  emergencyContactPhone: zod.string().nullish(),
+  emergencyContactRelation: zod.string().nullish(),
+  bankAccountName: zod.string().nullish(),
+  bankAccountNumber: zod.string().nullish(),
+  ifscCode: zod.string().nullish(),
+  bankName: zod.string().nullish(),
+  bankBranch: zod.string().nullish(),
+  probationEndDate: zod.coerce.date().nullish(),
+  confirmationDate: zod.coerce.date().nullish(),
+  noticePeriodDays: zod.number().nullish(),
+  workLocation: zod.string().nullish(),
+});
+
+export const PutEmployeesIdProfileResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  nationalId: zod.string().nullish(),
+  pan: zod.string().nullish(),
+  aadhaar: zod.string().nullish(),
+  pfNumber: zod.string().nullish(),
+  esiNumber: zod.string().nullish(),
+  uan: zod.string().nullish(),
+  maritalStatus: zod.string().nullish(),
+  bloodGroup: zod.string().nullish(),
+  nationality: zod.string().nullish(),
+  permanentAddress: zod.string().nullish(),
+  currentAddress: zod.string().nullish(),
+  linkedinUrl: zod.string().nullish(),
+  emergencyContactName: zod.string().nullish(),
+  emergencyContactPhone: zod.string().nullish(),
+  emergencyContactRelation: zod.string().nullish(),
+  bankAccountName: zod.string().nullish(),
+  bankAccountNumber: zod.string().nullish(),
+  ifscCode: zod.string().nullish(),
+  bankName: zod.string().nullish(),
+  bankBranch: zod.string().nullish(),
+  probationEndDate: zod.coerce.date().nullish(),
+  confirmationDate: zod.coerce.date().nullish(),
+  noticePeriodDays: zod.number().nullish(),
+  workLocation: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List employee education records
+ */
+export const GetEmployeesIdEducationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdEducationResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  degree: zod.string(),
+  institution: zod.string(),
+  fieldOfStudy: zod.string().nullish(),
+  startYear: zod.number().nullish(),
+  endYear: zod.number().nullish(),
+  grade: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdEducationResponse = zod.array(
+  GetEmployeesIdEducationResponseItem,
+);
+
+/**
+ * @summary Add education record
+ */
+export const PostEmployeesIdEducationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdEducationBody = zod.object({
+  degree: zod.string(),
+  institution: zod.string(),
+  fieldOfStudy: zod.string().nullish(),
+  startYear: zod.number().nullish(),
+  endYear: zod.number().nullish(),
+  grade: zod.string().nullish(),
+});
+
+/**
+ * @summary Update education record
+ */
+export const PatchEmployeeEducationIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchEmployeeEducationIdBody = zod.object({
+  degree: zod.string(),
+  institution: zod.string(),
+  fieldOfStudy: zod.string().nullish(),
+  startYear: zod.number().nullish(),
+  endYear: zod.number().nullish(),
+  grade: zod.string().nullish(),
+});
+
+export const PatchEmployeeEducationIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  degree: zod.string(),
+  institution: zod.string(),
+  fieldOfStudy: zod.string().nullish(),
+  startYear: zod.number().nullish(),
+  endYear: zod.number().nullish(),
+  grade: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete education record
+ */
+export const DeleteEmployeeEducationIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List employee work experience
+ */
+export const GetEmployeesIdWorkExperienceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdWorkExperienceResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  company: zod.string(),
+  designation: zod.string(),
+  location: zod.string().nullish(),
+  startDate: zod.coerce.date().nullish(),
+  endDate: zod.coerce.date().nullish(),
+  description: zod.string().nullish(),
+  ctcDrawn: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdWorkExperienceResponse = zod.array(
+  GetEmployeesIdWorkExperienceResponseItem,
+);
+
+/**
+ * @summary Add work experience record
+ */
+export const PostEmployeesIdWorkExperienceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdWorkExperienceBody = zod.object({
+  company: zod.string(),
+  designation: zod.string(),
+  location: zod.string().nullish(),
+  startDate: zod.coerce.date().nullish(),
+  endDate: zod.coerce.date().nullish(),
+  description: zod.string().nullish(),
+  ctcDrawn: zod.string().nullish(),
+});
+
+/**
+ * @summary Update work experience record
+ */
+export const PatchEmployeeWorkExperienceIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchEmployeeWorkExperienceIdBody = zod.object({
+  company: zod.string(),
+  designation: zod.string(),
+  location: zod.string().nullish(),
+  startDate: zod.coerce.date().nullish(),
+  endDate: zod.coerce.date().nullish(),
+  description: zod.string().nullish(),
+  ctcDrawn: zod.string().nullish(),
+});
+
+export const PatchEmployeeWorkExperienceIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  company: zod.string(),
+  designation: zod.string(),
+  location: zod.string().nullish(),
+  startDate: zod.coerce.date().nullish(),
+  endDate: zod.coerce.date().nullish(),
+  description: zod.string().nullish(),
+  ctcDrawn: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete work experience record
+ */
+export const DeleteEmployeeWorkExperienceIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List employee documents
+ */
+export const GetEmployeesIdEmpDocumentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdEmpDocumentsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+  alertDays: zod.number().nullish(),
+  status: zod.string(),
+  notes: zod.string().nullish(),
+  uploadedById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdEmpDocumentsResponse = zod.array(
+  GetEmployeesIdEmpDocumentsResponseItem,
+);
+
+/**
+ * @summary Upload employee document
+ */
+export const PostEmployeesIdEmpDocumentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdEmpDocumentsBody = zod.object({
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+  alertDays: zod.number().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Update employee document
+ */
+export const PatchEmpDocumentsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchEmpDocumentsIdBody = zod.object({
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+  alertDays: zod.number().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const PatchEmpDocumentsIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  documentType: zod.string(),
+  documentName: zod.string(),
+  fileUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+  alertDays: zod.number().nullish(),
+  status: zod.string(),
+  notes: zod.string().nullish(),
+  uploadedById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete employee document
+ */
+export const DeleteEmpDocumentsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Get employee field change history
+ */
+export const GetEmployeesIdHistoryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdHistoryResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  module: zod.string(),
+  fieldName: zod.string(),
+  oldValue: zod.string().nullish(),
+  newValue: zod.string().nullish(),
+  changedById: zod.number().nullish(),
+  changedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdHistoryResponse = zod.array(
+  GetEmployeesIdHistoryResponseItem,
+);
+
+/**
+ * @summary List onboarding checklists
+ */
+export const GetOnboardingChecklistsQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+});
+
+export const GetOnboardingChecklistsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  status: zod.string(),
+  completionPercentage: zod.number(),
+  joiningDate: zod.coerce.date().nullish(),
+  welcomeEmailSentAt: zod.coerce.date().nullish(),
+  idCardGeneratedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetOnboardingChecklistsResponse = zod.array(
+  GetOnboardingChecklistsResponseItem,
+);
+
+/**
+ * @summary Create onboarding checklist for employee
+ */
+export const PostEmployeesIdOnboardingChecklistParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdOnboardingChecklistBody = zod.object({
+  joiningDate: zod.coerce.date().optional(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Get employee onboarding checklist
+ */
+export const GetEmployeesIdOnboardingChecklistParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdOnboardingChecklistResponse = zod.object({
+  checklist: zod.object({
+    id: zod.number(),
+    employeeId: zod.number(),
+    employeeName: zod.string().nullish(),
+    employeeCode: zod.string().nullish(),
+    departmentName: zod.string().nullish(),
+    status: zod.string(),
+    completionPercentage: zod.number(),
+    joiningDate: zod.coerce.date().nullish(),
+    welcomeEmailSentAt: zod.coerce.date().nullish(),
+    idCardGeneratedAt: zod.coerce.date().nullish(),
+    notes: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  tasks: zod.array(
+    zod.object({
+      id: zod.number(),
+      checklistId: zod.number(),
+      title: zod.string(),
+      description: zod.string().nullish(),
+      category: zod.string(),
+      assigneeRole: zod.string().nullish(),
+      dueDate: zod.coerce.date().nullish(),
+      completedAt: zod.coerce.date().nullish(),
+      completedById: zod.number().nullish(),
+      notes: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get checklist by ID
+ */
+export const GetOnboardingChecklistsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOnboardingChecklistsIdResponse = zod.object({
+  checklist: zod.object({
+    id: zod.number(),
+    employeeId: zod.number(),
+    employeeName: zod.string().nullish(),
+    employeeCode: zod.string().nullish(),
+    departmentName: zod.string().nullish(),
+    status: zod.string(),
+    completionPercentage: zod.number(),
+    joiningDate: zod.coerce.date().nullish(),
+    welcomeEmailSentAt: zod.coerce.date().nullish(),
+    idCardGeneratedAt: zod.coerce.date().nullish(),
+    notes: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  tasks: zod.array(
+    zod.object({
+      id: zod.number(),
+      checklistId: zod.number(),
+      title: zod.string(),
+      description: zod.string().nullish(),
+      category: zod.string(),
+      assigneeRole: zod.string().nullish(),
+      dueDate: zod.coerce.date().nullish(),
+      completedAt: zod.coerce.date().nullish(),
+      completedById: zod.number().nullish(),
+      notes: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update checklist
+ */
+export const PatchOnboardingChecklistsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchOnboardingChecklistsIdBody = zod.object({
+  joiningDate: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const PatchOnboardingChecklistsIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  status: zod.string(),
+  completionPercentage: zod.number(),
+  joiningDate: zod.coerce.date().nullish(),
+  welcomeEmailSentAt: zod.coerce.date().nullish(),
+  idCardGeneratedAt: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List tasks in checklist
+ */
+export const GetOnboardingChecklistsIdTasksParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOnboardingChecklistsIdTasksResponseItem = zod.object({
+  id: zod.number(),
+  checklistId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  assigneeRole: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  completedAt: zod.coerce.date().nullish(),
+  completedById: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetOnboardingChecklistsIdTasksResponse = zod.array(
+  GetOnboardingChecklistsIdTasksResponseItem,
+);
+
+/**
+ * @summary Add task to checklist
+ */
+export const PostOnboardingChecklistsIdTasksParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostOnboardingChecklistsIdTasksBody = zod.object({
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  assigneeRole: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Update onboarding task
+ */
+export const PatchOnboardingTasksIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchOnboardingTasksIdBody = zod.object({
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  assigneeRole: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const PatchOnboardingTasksIdResponse = zod.object({
+  id: zod.number(),
+  checklistId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  assigneeRole: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  completedAt: zod.coerce.date().nullish(),
+  completedById: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete onboarding task
+ */
+export const DeleteOnboardingTasksIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Mark task as completed
+ */
+export const PostOnboardingTasksIdCompleteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostOnboardingTasksIdCompleteBody = zod.object({
+  notes: zod.string().nullish(),
+});
+
+export const PostOnboardingTasksIdCompleteResponse = zod.object({
+  id: zod.number(),
+  checklistId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  assigneeRole: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  completedAt: zod.coerce.date().nullish(),
+  completedById: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Mark task as not completed
+ */
+export const PostOnboardingTasksIdUncompleteParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostOnboardingTasksIdUncompleteResponse = zod.object({
+  id: zod.number(),
+  checklistId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.string(),
+  assigneeRole: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  completedAt: zod.coerce.date().nullish(),
+  completedById: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List induction sessions for employee
+ */
+export const GetEmployeesIdInductionSessionsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdInductionSessionsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  sessionDate: zod.coerce.date(),
+  trainerName: zod.string(),
+  topics: zod.string().nullish(),
+  durationMinutes: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  recordedById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdInductionSessionsResponse = zod.array(
+  GetEmployeesIdInductionSessionsResponseItem,
+);
+
+/**
+ * @summary Record induction session
+ */
+export const PostEmployeesIdInductionSessionsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdInductionSessionsBody = zod.object({
+  sessionDate: zod.coerce.date(),
+  trainerName: zod.string(),
+  topics: zod.string().nullish(),
+  durationMinutes: zod.number().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Update induction session
+ */
+export const PatchInductionSessionsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchInductionSessionsIdBody = zod.object({
+  sessionDate: zod.coerce.date(),
+  trainerName: zod.string(),
+  topics: zod.string().nullish(),
+  durationMinutes: zod.number().nullish(),
+  notes: zod.string().nullish(),
+});
+
+export const PatchInductionSessionsIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  sessionDate: zod.coerce.date(),
+  trainerName: zod.string(),
+  topics: zod.string().nullish(),
+  durationMinutes: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  recordedById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete induction session
+ */
+export const DeleteInductionSessionsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Generate and download employee ID card PDF
+ */
+export const GetEmployeesIdIdCardParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdIdCardResponse = zod.object({
+  employeeId: zod.string(),
+  employeeName: zod.string(),
+  designation: zod.string(),
+  department: zod.string(),
+  avatarUrl: zod.string().nullish(),
+  qrCodeData: zod.string(),
+  idCardUrl: zod.string(),
+  generatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Update employee status (lifecycle transition)
  */
 export const UpdateEmployeeStatusParams = zod.object({

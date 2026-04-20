@@ -417,6 +417,527 @@ paths:
         "204":
           description: Deactivated
 
+  /employees/bulk-import:
+    post:
+      summary: Bulk import employees via CSV data
+      tags: [Employees]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+              required: [rows]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
+  /employees/{id}/profile:
+    get:
+      summary: Get extended employee profile
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Employee profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeProfile"
+    put:
+      summary: Create or update extended employee profile
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertEmployeeProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeProfile"
+
+  /employees/{id}/education:
+    get:
+      summary: List employee education records
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Education records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeEducation"
+    post:
+      summary: Add education record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeEducationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeEducation"
+
+  /employee-education/{id}:
+    patch:
+      summary: Update education record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeEducationBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeEducation"
+    delete:
+      summary: Delete education record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /employees/{id}/work-experience:
+    get:
+      summary: List employee work experience
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Work experience records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeWorkExperience"
+    post:
+      summary: Add work experience record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeWorkExperienceBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeWorkExperience"
+
+  /employee-work-experience/{id}:
+    patch:
+      summary: Update work experience record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeWorkExperienceBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeWorkExperience"
+    delete:
+      summary: Delete work experience record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /employees/{id}/emp-documents:
+    get:
+      summary: List employee documents
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Document list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeDocument"
+    post:
+      summary: Upload employee document
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeDocumentBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeDocument"
+
+  /emp-documents/{id}:
+    patch:
+      summary: Update employee document
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeDocumentBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeDocument"
+    delete:
+      summary: Delete employee document
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /employees/{id}/history:
+    get:
+      summary: Get employee field change history
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: History records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeHistory"
+
+  /onboarding/checklists:
+    get:
+      summary: List onboarding checklists
+      tags: [Onboarding]
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Checklist list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OnboardingChecklist"
+
+  /employees/{id}/onboarding-checklist:
+    post:
+      summary: Create onboarding checklist for employee
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                joiningDate: { type: string, format: date }
+                notes: { type: ["string", "null"] }
+      responses:
+        "201":
+          description: Created checklist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingChecklist"
+    get:
+      summary: Get employee onboarding checklist
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Checklist with tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingChecklistDetail"
+
+  /onboarding/checklists/{id}:
+    get:
+      summary: Get checklist by ID
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Checklist with tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingChecklistDetail"
+    patch:
+      summary: Update checklist
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                joiningDate: { type: ["string", "null"], format: date }
+                notes: { type: ["string", "null"] }
+      responses:
+        "200":
+          description: Updated checklist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingChecklist"
+
+  /onboarding/checklists/{id}/tasks:
+    get:
+      summary: List tasks in checklist
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OnboardingTask"
+    post:
+      summary: Add task to checklist
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOnboardingTaskBody"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingTask"
+
+  /onboarding/tasks/{id}:
+    patch:
+      summary: Update onboarding task
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOnboardingTaskBody"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingTask"
+    delete:
+      summary: Delete onboarding task
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /onboarding/tasks/{id}/complete:
+    post:
+      summary: Mark task as completed
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: ["string", "null"] }
+      responses:
+        "200":
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingTask"
+
+  /onboarding/tasks/{id}/uncomplete:
+    post:
+      summary: Mark task as not completed
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Task uncompleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingTask"
+
+  /employees/{id}/induction-sessions:
+    get:
+      summary: List induction sessions for employee
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InductionSession"
+    post:
+      summary: Record induction session
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInductionSessionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InductionSession"
+
+  /induction-sessions/{id}:
+    patch:
+      summary: Update induction session
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInductionSessionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InductionSession"
+    delete:
+      summary: Delete induction session
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /employees/{id}/id-card:
+    get:
+      summary: Generate and download employee ID card PDF
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: ID card status and data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdCardData"
+        "403":
+          description: Conditions not met (onboarding incomplete or documents pending)
+
   /employees/{id}/status:
     patch:
       operationId: updateEmployeeStatus
@@ -2476,6 +2997,274 @@ components:
         - action
         - module
         - createdAt
+
+    EmployeeProfile:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        nationalId: { type: ["string", "null"] }
+        pan: { type: ["string", "null"] }
+        aadhaar: { type: ["string", "null"] }
+        pfNumber: { type: ["string", "null"] }
+        esiNumber: { type: ["string", "null"] }
+        uan: { type: ["string", "null"] }
+        maritalStatus: { type: ["string", "null"] }
+        bloodGroup: { type: ["string", "null"] }
+        nationality: { type: ["string", "null"] }
+        permanentAddress: { type: ["string", "null"] }
+        currentAddress: { type: ["string", "null"] }
+        linkedinUrl: { type: ["string", "null"] }
+        emergencyContactName: { type: ["string", "null"] }
+        emergencyContactPhone: { type: ["string", "null"] }
+        emergencyContactRelation: { type: ["string", "null"] }
+        bankAccountName: { type: ["string", "null"] }
+        bankAccountNumber: { type: ["string", "null"] }
+        ifscCode: { type: ["string", "null"] }
+        bankName: { type: ["string", "null"] }
+        bankBranch: { type: ["string", "null"] }
+        probationEndDate: { type: ["string", "null"], format: date }
+        confirmationDate: { type: ["string", "null"], format: date }
+        noticePeriodDays: { type: ["integer", "null"] }
+        workLocation: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, createdAt, updatedAt]
+
+    UpsertEmployeeProfileBody:
+      type: object
+      properties:
+        nationalId: { type: ["string", "null"] }
+        pan: { type: ["string", "null"] }
+        aadhaar: { type: ["string", "null"] }
+        pfNumber: { type: ["string", "null"] }
+        esiNumber: { type: ["string", "null"] }
+        uan: { type: ["string", "null"] }
+        maritalStatus: { type: ["string", "null"] }
+        bloodGroup: { type: ["string", "null"] }
+        nationality: { type: ["string", "null"] }
+        permanentAddress: { type: ["string", "null"] }
+        currentAddress: { type: ["string", "null"] }
+        linkedinUrl: { type: ["string", "null"] }
+        emergencyContactName: { type: ["string", "null"] }
+        emergencyContactPhone: { type: ["string", "null"] }
+        emergencyContactRelation: { type: ["string", "null"] }
+        bankAccountName: { type: ["string", "null"] }
+        bankAccountNumber: { type: ["string", "null"] }
+        ifscCode: { type: ["string", "null"] }
+        bankName: { type: ["string", "null"] }
+        bankBranch: { type: ["string", "null"] }
+        probationEndDate: { type: ["string", "null"], format: date }
+        confirmationDate: { type: ["string", "null"], format: date }
+        noticePeriodDays: { type: ["integer", "null"] }
+        workLocation: { type: ["string", "null"] }
+
+    EmployeeEducation:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        degree: { type: string }
+        institution: { type: string }
+        fieldOfStudy: { type: ["string", "null"] }
+        startYear: { type: ["integer", "null"] }
+        endYear: { type: ["integer", "null"] }
+        grade: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, degree, institution, createdAt, updatedAt]
+
+    CreateEmployeeEducationBody:
+      type: object
+      properties:
+        degree: { type: string }
+        institution: { type: string }
+        fieldOfStudy: { type: ["string", "null"] }
+        startYear: { type: ["integer", "null"] }
+        endYear: { type: ["integer", "null"] }
+        grade: { type: ["string", "null"] }
+      required: [degree, institution]
+
+    EmployeeWorkExperience:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        company: { type: string }
+        designation: { type: string }
+        location: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], format: date }
+        endDate: { type: ["string", "null"], format: date }
+        description: { type: ["string", "null"] }
+        ctcDrawn: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, company, designation, createdAt, updatedAt]
+
+    CreateEmployeeWorkExperienceBody:
+      type: object
+      properties:
+        company: { type: string }
+        designation: { type: string }
+        location: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], format: date }
+        endDate: { type: ["string", "null"], format: date }
+        description: { type: ["string", "null"] }
+        ctcDrawn: { type: ["string", "null"] }
+      required: [company, designation]
+
+    EmployeeDocument:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        documentType: { type: string }
+        documentName: { type: string }
+        fileUrl: { type: ["string", "null"] }
+        issueDate: { type: ["string", "null"], format: date }
+        expiryDate: { type: ["string", "null"], format: date }
+        alertDays: { type: ["integer", "null"] }
+        status: { type: string }
+        notes: { type: ["string", "null"] }
+        uploadedById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, documentType, documentName, status, createdAt, updatedAt]
+
+    CreateEmployeeDocumentBody:
+      type: object
+      properties:
+        documentType: { type: string }
+        documentName: { type: string }
+        fileUrl: { type: ["string", "null"] }
+        issueDate: { type: ["string", "null"], format: date }
+        expiryDate: { type: ["string", "null"], format: date }
+        alertDays: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+      required: [documentType, documentName]
+
+    EmployeeHistory:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        module: { type: string }
+        fieldName: { type: string }
+        oldValue: { type: ["string", "null"] }
+        newValue: { type: ["string", "null"] }
+        changedById: { type: ["integer", "null"] }
+        changedAt: { type: string, format: date-time }
+      required: [id, employeeId, module, fieldName, changedAt]
+
+    BulkImportResult:
+      type: object
+      properties:
+        imported: { type: integer }
+        failed: { type: integer }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row: { type: integer }
+              error: { type: string }
+            required: [row, error]
+      required: [imported, failed, errors]
+
+    OnboardingChecklist:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+        departmentName: { type: ["string", "null"] }
+        status: { type: string }
+        completionPercentage: { type: integer }
+        joiningDate: { type: ["string", "null"], format: date }
+        welcomeEmailSentAt: { type: ["string", "null"], format: date-time }
+        idCardGeneratedAt: { type: ["string", "null"], format: date-time }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, status, completionPercentage, createdAt, updatedAt]
+
+    OnboardingTask:
+      type: object
+      properties:
+        id: { type: integer }
+        checklistId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        category: { type: string }
+        assigneeRole: { type: ["string", "null"] }
+        dueDate: { type: ["string", "null"], format: date }
+        completedAt: { type: ["string", "null"], format: date-time }
+        completedById: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, checklistId, title, category, createdAt, updatedAt]
+
+    CreateOnboardingTaskBody:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        category: { type: string }
+        assigneeRole: { type: ["string", "null"] }
+        dueDate: { type: ["string", "null"], format: date }
+        notes: { type: ["string", "null"] }
+      required: [title, category]
+
+    OnboardingChecklistDetail:
+      type: object
+      properties:
+        checklist:
+          $ref: "#/components/schemas/OnboardingChecklist"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/OnboardingTask"
+      required: [checklist, tasks]
+
+    InductionSession:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        sessionDate: { type: string, format: date }
+        trainerName: { type: string }
+        topics: { type: ["string", "null"] }
+        durationMinutes: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+        recordedById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, sessionDate, trainerName, createdAt, updatedAt]
+
+    CreateInductionSessionBody:
+      type: object
+      properties:
+        sessionDate: { type: string, format: date }
+        trainerName: { type: string }
+        topics: { type: ["string", "null"] }
+        durationMinutes: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+      required: [sessionDate, trainerName]
+
+    IdCardData:
+      type: object
+      properties:
+        employeeId: { type: string }
+        employeeName: { type: string }
+        designation: { type: string }
+        department: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        qrCodeData: { type: string }
+        idCardUrl: { type: string }
+        generatedAt: { type: string, format: date-time }
+      required: [employeeId, employeeName, designation, department, qrCodeData, idCardUrl, generatedAt]
 
     AuditLogListResponse:
       type: object

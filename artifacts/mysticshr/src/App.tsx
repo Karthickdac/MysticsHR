@@ -18,6 +18,8 @@ import RequisitionDetailPage from "@/pages/recruitment/requisition-detail";
 import CandidateDetailPage from "@/pages/recruitment/candidate-detail";
 import PreOnboardingPage from "@/pages/pre-onboarding/index";
 import PreOnboardingDetailPage from "@/pages/pre-onboarding/detail";
+import OnboardingPage from "@/pages/onboarding/index";
+import OnboardingDetailPage from "@/pages/onboarding/detail";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -312,6 +314,21 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
                 <PreOnboardingPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/onboarding/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <OnboardingDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+          <Route path="/onboarding">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <OnboardingPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

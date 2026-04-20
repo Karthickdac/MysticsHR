@@ -50,6 +50,14 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `employees`: employeeId, names, email, phone, DOB, gender, dept, desig, employmentType, status, DOJ, CTC, managerId, location, soft-delete
 - `hrms_users`: clerkUserId, employeeId, email, name, role, isActive
 - `audit_logs`: userId, userEmail, action, module, recordId, fieldName, previousValue, newValue, ipAddress
+- `employee_profiles`: pan, aadhaar, nationalId, maritalStatus, bloodGroup, bank info (accountNo, ifsc, bankName), probation dates, emergency contact, address fields
+- `employee_education`: degree, institution, fieldOfStudy, startYear, endYear, grade, employeeId
+- `employee_work_experience`: company, designation, location, startDate, endDate, responsibilities, employeeId
+- `employee_documents`: docType, docNumber, issueDate, expiryDate, alertDays, fileUrl, status, employeeId
+- `employee_history`: fieldName, oldValue, newValue, changedById, module (field-level audit trail)
+- `onboarding_checklists`: employeeId, status, completionPct, idCardGeneratedAt
+- `onboarding_tasks`: checklistId, title, category (HR/IT/Department/Employee), assigneeRole, dueDate, completedAt, completedById, notes
+- `induction_sessions`: employeeId, sessionDate, trainerName, topics, notes, recordedById
 
 ## API Routes (all under /api)
 
@@ -63,12 +71,29 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `GET|POST /api/designations` — list/create designations
 - `GET|PUT|DELETE /api/designations/:id` — get/update/delete designation
 - `GET|POST /api/employees` — list/create employees
+- `POST /api/employees/bulk-import` — CSV bulk import (rows array)
 - `GET|PUT|DELETE /api/employees/:id` — get/update/delete employee
 - `PATCH /api/employees/:id/status` — update employee status
+- `GET|PUT /api/employees/:id/profile` — extended profile (PAN, Aadhaar, bank, address)
+- `GET|POST /api/employees/:id/education` — list/add education records
+- `PATCH|DELETE /api/employee-education/:id` — update/delete education record
+- `GET|POST /api/employees/:id/work-experience` — list/add work experience
+- `PATCH|DELETE /api/employee-work-experience/:id` — update/delete experience
+- `GET|POST /api/employees/:id/documents` — list/add HR documents
+- `PATCH|DELETE /api/employee-documents/:id` — update/delete document
+- `GET /api/employees/:id/history` — field-level change history
+- `GET /api/employees/:id/id-card` — download employee ID card PDF (requires 100% onboarding)
 - `GET|POST /api/users` — list/create HRMS users
 - `GET /api/users/me` — current user profile
 - `GET|PUT /api/users/:id` — get/update user
 - `GET /api/audit-logs` — list audit logs
+- `GET /api/onboarding/checklists` — list all onboarding checklists
+- `POST /api/employees/:id/onboarding/checklist` — create checklist (auto-seeds 10 default tasks)
+- `GET /api/onboarding/checklists/:id` — checklist detail with tasks
+- `POST /api/onboarding/tasks/:id/complete` — mark task complete
+- `POST /api/onboarding/tasks/:id/uncomplete` — unmark task
+- `GET|POST /api/employees/:id/induction-sessions` — list/add induction sessions
+- `PUT|DELETE /api/induction-sessions/:id` — update/delete induction session
 
 ## Frontend Pages (artifacts/mysticshr/src/)
 
@@ -76,8 +101,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `/sign-in` — Clerk sign-in (custom branded)
 - `/sign-up` — Clerk sign-up (custom branded)
 - `/dashboard` — KPI tiles, charts, activity feed
-- `/employees` — Employee directory with search/filter/pagination
-- `/employees/:id` — Employee detail with tabs
+- `/employees` — Employee directory with search/filter/pagination + CSV bulk import dialog
+- `/employees/:id` — Employee detail with 9 tabs (Personal, Statutory & Bank, Address & Emergency, Employment, Education, Work History, Documents, History, Onboarding)
 - `/employees/new` — New employee (placeholder)
 - `/departments` — Dept management with create/edit/delete
 - `/designations` — Designation management with create/edit/delete
@@ -89,6 +114,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `/recruitment/candidates/:id` — Candidate profile + interviews + offers
 - `/pre-onboarding` — Pre-onboarding records list
 - `/pre-onboarding/:id` — Document review (verify/reject) with auto completion %
+- `/onboarding` — Onboarding dashboard (checklists with progress bars)
+- `/onboarding/:id` — Onboarding detail (task completion per category, induction sessions, ID card download)
 
 ## Recruitment & Pre-Onboarding (Task #2)
 
@@ -98,6 +125,17 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Document verify/reject auto-recomputes `completion_percentage` based on required documents verified
 - Candidate stage auto-syncs when interviews are scheduled/completed and when offers are issued/accepted
 - Source-of-hire enum values: LinkedIn, Naukri, Indeed, Referral, Walk-In, Campus, Agency, Company Website, Other
+
+## Employee Master & Onboarding (Task #3)
+
+- 8 DB tables: `employee_profiles`, `employee_education`, `employee_work_experience`, `employee_documents`, `employee_history`, `onboarding_checklists`, `onboarding_tasks`, `induction_sessions`
+- Backend routes: `routes/employees-extended.ts` (profile, edu, work-exp, docs, history, bulk-import) and `routes/onboarding.ts` (checklists, tasks, induction, ID card)
+- Field-level history logging on all profile/statutory updates (stored in `employee_history`)
+- ID card generated as PDF using `pdf-lib` (no native deps); requires onboarding at 100%
+- QR code on ID card via `qrcode` package (encodes employee ID + name + department)
+- Bulk CSV import: accepts `rows` array of key-value objects; skips duplicates by email; returns `{imported, skipped, errors[]}`
+- Onboarding checklist auto-seeds 10 default tasks across 4 categories: HR (3), IT (3), Department (2), Employee (2)
+- Completion % = (completed tasks / total tasks) × 100
 
 ## Key Commands
 

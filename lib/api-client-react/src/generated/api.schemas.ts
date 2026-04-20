@@ -699,6 +699,340 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export interface EmployeeProfile {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  nationalId?: string | null;
+  /** @nullable */
+  pan?: string | null;
+  /** @nullable */
+  aadhaar?: string | null;
+  /** @nullable */
+  pfNumber?: string | null;
+  /** @nullable */
+  esiNumber?: string | null;
+  /** @nullable */
+  uan?: string | null;
+  /** @nullable */
+  maritalStatus?: string | null;
+  /** @nullable */
+  bloodGroup?: string | null;
+  /** @nullable */
+  nationality?: string | null;
+  /** @nullable */
+  permanentAddress?: string | null;
+  /** @nullable */
+  currentAddress?: string | null;
+  /** @nullable */
+  linkedinUrl?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelation?: string | null;
+  /** @nullable */
+  bankAccountName?: string | null;
+  /** @nullable */
+  bankAccountNumber?: string | null;
+  /** @nullable */
+  ifscCode?: string | null;
+  /** @nullable */
+  bankName?: string | null;
+  /** @nullable */
+  bankBranch?: string | null;
+  /** @nullable */
+  probationEndDate?: string | null;
+  /** @nullable */
+  confirmationDate?: string | null;
+  /** @nullable */
+  noticePeriodDays?: number | null;
+  /** @nullable */
+  workLocation?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertEmployeeProfileBody {
+  /** @nullable */
+  nationalId?: string | null;
+  /** @nullable */
+  pan?: string | null;
+  /** @nullable */
+  aadhaar?: string | null;
+  /** @nullable */
+  pfNumber?: string | null;
+  /** @nullable */
+  esiNumber?: string | null;
+  /** @nullable */
+  uan?: string | null;
+  /** @nullable */
+  maritalStatus?: string | null;
+  /** @nullable */
+  bloodGroup?: string | null;
+  /** @nullable */
+  nationality?: string | null;
+  /** @nullable */
+  permanentAddress?: string | null;
+  /** @nullable */
+  currentAddress?: string | null;
+  /** @nullable */
+  linkedinUrl?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelation?: string | null;
+  /** @nullable */
+  bankAccountName?: string | null;
+  /** @nullable */
+  bankAccountNumber?: string | null;
+  /** @nullable */
+  ifscCode?: string | null;
+  /** @nullable */
+  bankName?: string | null;
+  /** @nullable */
+  bankBranch?: string | null;
+  /** @nullable */
+  probationEndDate?: string | null;
+  /** @nullable */
+  confirmationDate?: string | null;
+  /** @nullable */
+  noticePeriodDays?: number | null;
+  /** @nullable */
+  workLocation?: string | null;
+}
+
+export interface EmployeeEducation {
+  id: number;
+  employeeId: number;
+  degree: string;
+  institution: string;
+  /** @nullable */
+  fieldOfStudy?: string | null;
+  /** @nullable */
+  startYear?: number | null;
+  /** @nullable */
+  endYear?: number | null;
+  /** @nullable */
+  grade?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeEducationBody {
+  degree: string;
+  institution: string;
+  /** @nullable */
+  fieldOfStudy?: string | null;
+  /** @nullable */
+  startYear?: number | null;
+  /** @nullable */
+  endYear?: number | null;
+  /** @nullable */
+  grade?: string | null;
+}
+
+export interface EmployeeWorkExperience {
+  id: number;
+  employeeId: number;
+  company: string;
+  designation: string;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  ctcDrawn?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeWorkExperienceBody {
+  company: string;
+  designation: string;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  ctcDrawn?: string | null;
+}
+
+export interface EmployeeDocument {
+  id: number;
+  employeeId: number;
+  documentType: string;
+  documentName: string;
+  /** @nullable */
+  fileUrl?: string | null;
+  /** @nullable */
+  issueDate?: string | null;
+  /** @nullable */
+  expiryDate?: string | null;
+  /** @nullable */
+  alertDays?: number | null;
+  status: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  uploadedById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeDocumentBody {
+  documentType: string;
+  documentName: string;
+  /** @nullable */
+  fileUrl?: string | null;
+  /** @nullable */
+  issueDate?: string | null;
+  /** @nullable */
+  expiryDate?: string | null;
+  /** @nullable */
+  alertDays?: number | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface EmployeeHistory {
+  id: number;
+  employeeId: number;
+  module: string;
+  fieldName: string;
+  /** @nullable */
+  oldValue?: string | null;
+  /** @nullable */
+  newValue?: string | null;
+  /** @nullable */
+  changedById?: number | null;
+  changedAt: string;
+}
+
+export type BulkImportResultErrorsItem = {
+  row: number;
+  error: string;
+};
+
+export interface BulkImportResult {
+  imported: number;
+  failed: number;
+  errors: BulkImportResultErrorsItem[];
+}
+
+export interface OnboardingChecklist {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  departmentName?: string | null;
+  status: string;
+  completionPercentage: number;
+  /** @nullable */
+  joiningDate?: string | null;
+  /** @nullable */
+  welcomeEmailSentAt?: string | null;
+  /** @nullable */
+  idCardGeneratedAt?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OnboardingTask {
+  id: number;
+  checklistId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  category: string;
+  /** @nullable */
+  assigneeRole?: string | null;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  /** @nullable */
+  completedById?: number | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOnboardingTaskBody {
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  category: string;
+  /** @nullable */
+  assigneeRole?: string | null;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface OnboardingChecklistDetail {
+  checklist: OnboardingChecklist;
+  tasks: OnboardingTask[];
+}
+
+export interface InductionSession {
+  id: number;
+  employeeId: number;
+  sessionDate: string;
+  trainerName: string;
+  /** @nullable */
+  topics?: string | null;
+  /** @nullable */
+  durationMinutes?: number | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  recordedById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInductionSessionBody {
+  sessionDate: string;
+  trainerName: string;
+  /** @nullable */
+  topics?: string | null;
+  /** @nullable */
+  durationMinutes?: number | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface IdCardData {
+  employeeId: string;
+  employeeName: string;
+  designation: string;
+  department: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+  qrCodeData: string;
+  idCardUrl: string;
+  generatedAt: string;
+}
+
 export interface AuditLogListResponse {
   data: AuditLog[];
   total: number;
@@ -732,6 +1066,34 @@ export type ListEmployeesParams = {
   search?: string | null;
   limit?: number;
   offset?: number;
+};
+
+export type PostEmployeesBulkImportBodyRowsItem = { [key: string]: unknown };
+
+export type PostEmployeesBulkImportBody = {
+  rows: PostEmployeesBulkImportBodyRowsItem[];
+};
+
+export type GetOnboardingChecklistsParams = {
+  status?: string;
+};
+
+export type PostEmployeesIdOnboardingChecklistBody = {
+  joiningDate?: string;
+  /** @nullable */
+  notes?: string | null;
+};
+
+export type PatchOnboardingChecklistsIdBody = {
+  /** @nullable */
+  joiningDate?: string | null;
+  /** @nullable */
+  notes?: string | null;
+};
+
+export type PostOnboardingTasksIdCompleteBody = {
+  /** @nullable */
+  notes?: string | null;
 };
 
 export type ListRequisitionsParams = {
