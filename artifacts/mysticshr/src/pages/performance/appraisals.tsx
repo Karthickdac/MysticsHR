@@ -59,7 +59,7 @@ function AppraisalModal({
       { data: { goalId: goal.id, rating, commentary: commentary || null } },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: ["/performance/self-appraisals"] });
+          qc.invalidateQueries({ queryKey: ["/api/performance/self-appraisals"] });
           onClose();
         },
       }

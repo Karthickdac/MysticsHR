@@ -42,8 +42,8 @@ function ProgressModal({ goal, open, onClose }: { goal: PerformanceGoal; open: b
       { id: goal.id, data: { progressPercent: Number(pct), commentary: note || null } },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: ["/performance/goals"] });
-          qc.invalidateQueries({ queryKey: [`/performance/goals/${goal.id}/progress`] });
+          qc.invalidateQueries({ queryKey: ["/api/performance/goals"] });
+          qc.invalidateQueries({ queryKey: [`/api/performance/goals/${goal.id}/progress`] });
           setNote("");
           onClose();
         },
@@ -104,7 +104,7 @@ function GoalCard({ goal, canManage, canDelete }: { goal: PerformanceGoal; canMa
 
   function handleDelete() {
     if (!confirm("Delete this goal?")) return;
-    deleteGoal.mutate({ id: goal.id }, { onSuccess: () => qc.invalidateQueries({ queryKey: ["/performance/goals"] }) });
+    deleteGoal.mutate({ id: goal.id }, { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/performance/goals"] }) });
   }
 
   return (
@@ -182,7 +182,7 @@ function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: (
       },
     }, {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["/performance/goals"] });
+        qc.invalidateQueries({ queryKey: ["/api/performance/goals"] });
         onClose();
         setForm({ cycleId: cycleId ? String(cycleId) : "", employeeId: "", title: "", description: "", weightage: "10", targetValue: "", measurementMethod: "" });
       },

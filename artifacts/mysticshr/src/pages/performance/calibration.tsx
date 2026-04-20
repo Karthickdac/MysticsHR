@@ -68,7 +68,7 @@ export default function CalibrationPage() {
       { data: { cycleId } },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: ["/performance/outcomes"] });
+          qc.invalidateQueries({ queryKey: ["/api/performance/outcomes"] });
           setComputing(false);
         },
         onError: () => setComputing(false),

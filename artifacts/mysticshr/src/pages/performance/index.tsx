@@ -73,7 +73,7 @@ function CycleCard({ cycle, isHR }: { cycle: PerformanceCycle; isHR: boolean }) 
 
   function handleAdvance(e: React.MouseEvent) {
     e.stopPropagation();
-    advance.mutate({ id: cycle.id }, { onSuccess: () => qc.invalidateQueries({ queryKey: ["/performance/cycles"] }) });
+    advance.mutate({ id: cycle.id }, { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/performance/cycles"] }) });
   }
 
   return (
@@ -135,7 +135,7 @@ function CreateCycleModal({ open, onClose }: { open: boolean; onClose: () => voi
     e.preventDefault();
     create.mutate({ data: { ...form, status: "Draft" } }, {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["/performance/cycles"] });
+        qc.invalidateQueries({ queryKey: ["/api/performance/cycles"] });
         onClose();
         setForm({ title: "", cycleType: CreatePerformanceCycleBodyCycleType.Annual, startDate: "", endDate: "", description: "" });
       },

@@ -67,7 +67,7 @@ export default function CycleDetailPage() {
   function handleAdvance() {
     if (!confirm("Advance this cycle to the next stage?")) return;
     advance.mutate({ id: cycleId }, {
-      onSuccess: () => qc.invalidateQueries({ queryKey: [`/performance/cycles/${cycleId}`] }),
+      onSuccess: () => qc.invalidateQueries({ queryKey: [`/api/performance/cycles/${cycleId}`] }),
     });
   }
 

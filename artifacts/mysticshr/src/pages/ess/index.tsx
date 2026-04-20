@@ -53,7 +53,7 @@ function EditProfileModal({ open, onClose }: { open: boolean; onClose: () => voi
     e.preventDefault();
     update.mutate({ data: form }, {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["/ess/me"] });
+        qc.invalidateQueries({ queryKey: ["/api/ess/me"] });
         onClose();
       },
     });

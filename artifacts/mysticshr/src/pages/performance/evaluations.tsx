@@ -62,7 +62,7 @@ function EvalModal({
       { data: { goalId: goal.id, employeeId, rating, commentary: commentary || null } },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: ["/performance/manager-evaluations"] });
+          qc.invalidateQueries({ queryKey: ["/api/performance/manager-evaluations"] });
           onClose();
         },
       }

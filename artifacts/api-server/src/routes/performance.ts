@@ -14,6 +14,8 @@ const router = Router();
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
 const MANAGER_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod"] as const;
 const ALL_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] as const;
+// Performance-specific roles: excludes payroll_admin (finance role with no appraisal visibility)
+const PERF_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "employee"] as const;
 
 const STAGES = [
   "Goal Setting", "Mid Review", "Self Appraisal",
@@ -102,7 +104,7 @@ router.post("/performance/cycles/:id/advance-stage", requireHrmsUser, requireRol
 
 // ─── PERFORMANCE GOALS (KRA/KPI) ──────────────────────────────────────────────
 
-router.get("/performance/goals", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+router.get("/performance/goals", requireHrmsUser, requireRole(...PERF_ROLES), async (req, res) => {
   try {
     const { cycleId, employeeId } = req.query as { cycleId?: string; employeeId?: string };
     const u = req.hrmsUser!;
@@ -333,10 +335,11 @@ router.post("/performance/goals/:id/progress", requireHrmsUser, requireRole(...M
 
 // ─── SELF APPRAISALS ──────────────────────────────────────────────────────────
 
-router.get("/performance/self-appraisals", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+router.get("/performance/self-appraisals", requireHrmsUser, requireRole(...PERF_ROLES), async (req, res) => {
   try {
     const { cycleId, employeeId } = req.query as { cycleId?: string; employeeId?: string };
     const u = req.hrmsUser!;
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
 
     const conds = [];
     if (employeeId) conds.push(eq(selfAppraisalsTable.employeeId, Number(employeeId)));
@@ -347,6 +350,16 @@ router.get("/performance/self-appraisals", requireHrmsUser, requireRole(...ALL_R
         .where(eq(hrmsUsersTable.id, u.id));
       if (!emp) { res.json([]); return; } // Fail closed — no linked employee record
       conds.push(eq(selfAppraisalsTable.employeeId, emp.id));
+    } else if (!isHrRole) {
+      // HOD: scope to direct reports only
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp) { res.json([]); return; }
+      const directReports = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(eq(employeesTable.managerId, hodEmp.id));
+      if (directReports.length === 0) { res.json([]); return; }
+      conds.push(inArray(selfAppraisalsTable.employeeId, directReports.map(r => r.id)));
     }
 
     let query = db.select({
@@ -369,7 +382,7 @@ router.get("/performance/self-appraisals", requireHrmsUser, requireRole(...ALL_R
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-router.post("/performance/self-appraisals", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+router.post("/performance/self-appraisals", requireHrmsUser, requireRole(...PERF_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
     const { goalId, rating, commentary } = req.body;
@@ -605,10 +618,11 @@ router.get("/performance/calibration/:cycleId", requireHrmsUser, requireRole(...
 
 // ─── APPRAISAL OUTCOMES ───────────────────────────────────────────────────────
 
-router.get("/performance/outcomes", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+router.get("/performance/outcomes", requireHrmsUser, requireRole(...PERF_ROLES), async (req, res) => {
   try {
     const { cycleId, employeeId } = req.query as { cycleId?: string; employeeId?: string };
     const u = req.hrmsUser!;
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
 
     const conds = [];
     if (cycleId) conds.push(eq(appraisalOutcomesTable.cycleId, Number(cycleId)));
@@ -620,6 +634,16 @@ router.get("/performance/outcomes", requireHrmsUser, requireRole(...ALL_ROLES), 
         .where(eq(hrmsUsersTable.id, u.id));
       if (!emp) { res.json([]); return; } // Fail closed — no linked employee record
       conds.push(eq(appraisalOutcomesTable.employeeId, emp.id));
+    } else if (!isHrRole) {
+      // HOD: scope to direct reports only
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp) { res.json([]); return; }
+      const directReports = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(eq(employeesTable.managerId, hodEmp.id));
+      if (directReports.length === 0) { res.json([]); return; }
+      conds.push(inArray(appraisalOutcomesTable.employeeId, directReports.map(r => r.id)));
     }
 
     const rows = await db.select({
