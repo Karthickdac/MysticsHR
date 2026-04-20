@@ -549,6 +549,19 @@ router.post("/exit/requests/:id/fnf", requireHrmsUser, requireRole(...HR_ROLES, 
     const [exitReq] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, exitRequestId));
     if (!exitReq) { res.status(404).json({ error: "Exit request not found" }); return; }
 
+    // Gate: all clearance tasks must be Completed or Waived before FnF can be computed
+    const clearanceTasks = await db.select({ id: exitClearanceTasksTable.id, status: exitClearanceTasksTable.status })
+      .from(exitClearanceTasksTable)
+      .where(eq(exitClearanceTasksTable.exitRequestId, exitRequestId));
+    const incomplete = clearanceTasks.filter((t) => t.status !== "Completed" && t.status !== "Waived");
+    if (incomplete.length > 0) {
+      res.status(422).json({
+        error: `Cannot compute FnF: ${incomplete.length} clearance task(s) are still pending. All clearance tasks must be Completed or Waived first.`,
+        pendingTaskCount: incomplete.length,
+      });
+      return;
+    }
+
     const {
       pendingSalary = 0,
       leaveEncashment = 0,

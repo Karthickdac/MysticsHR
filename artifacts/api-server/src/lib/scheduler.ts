@@ -6,6 +6,7 @@ import {
   employeesTable,
   hrmsUsersTable,
   departmentsTable,
+  designationsTable,
   attendanceRecordsTable,
   leaveApplicationsTable,
   leaveTypesTable,
@@ -13,6 +14,9 @@ import {
   payrollRecordsTable,
   payrollRunsTable,
   helpdeskTicketsTable,
+  appraisalOutcomesTable,
+  jobRequisitionsTable,
+  permissionApplicationsTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, isNotNull, ne, sql } from "drizzle-orm";
 import { generateTablePdf } from "./pdf";
@@ -177,6 +181,86 @@ async function fetchReportData(reportType: string, filters: Record<string, unkno
           resolvedAt: helpdeskTicketsTable.resolvedAt,
         }).from(helpdeskTicketsTable)
           .where(conds.length ? and(...conds) : undefined)
+          .limit(500);
+        return rows as Record<string, unknown>[];
+      }
+      case "performance-summary": {
+        const conds = [];
+        if (deptId) conds.push(eq(employeesTable.departmentId, deptId));
+        const rows = await db.select({
+          employeeCode: employeesTable.employeeId,
+          employeeName: employeesTable.firstName,
+          department: departmentsTable.name,
+          finalScore: appraisalOutcomesTable.finalScore,
+          outcomeLabel: appraisalOutcomesTable.outcomLabel,
+          normalizedScore: appraisalOutcomesTable.normalizedScore,
+        }).from(appraisalOutcomesTable)
+          .leftJoin(employeesTable, eq(appraisalOutcomesTable.employeeId, employeesTable.id))
+          .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+          .where(conds.length ? and(...conds) : undefined)
+          .limit(500);
+        return rows as Record<string, unknown>[];
+      }
+      case "recruitment-pipeline": {
+        const conds = [];
+        if (fromDate) conds.push(gte(jobRequisitionsTable.createdAt, new Date(fromDate)));
+        if (toDate) conds.push(lte(jobRequisitionsTable.createdAt, new Date(toDate)));
+        if (deptId) conds.push(eq(jobRequisitionsTable.departmentId, deptId));
+        const rows = await db.select({
+          title: jobRequisitionsTable.title,
+          status: jobRequisitionsTable.status,
+          numberOfPositions: jobRequisitionsTable.numberOfPositions,
+          department: departmentsTable.name,
+          designation: designationsTable.title,
+          createdAt: jobRequisitionsTable.createdAt,
+        }).from(jobRequisitionsTable)
+          .leftJoin(departmentsTable, eq(jobRequisitionsTable.departmentId, departmentsTable.id))
+          .leftJoin(designationsTable, eq(jobRequisitionsTable.designationId, designationsTable.id))
+          .where(conds.length ? and(...conds) : undefined)
+          .limit(500);
+        return rows as Record<string, unknown>[];
+      }
+      case "permission-usage": {
+        const conds = [];
+        if (fromDate) conds.push(gte(permissionApplicationsTable.permissionDate, fromDate));
+        if (toDate) conds.push(lte(permissionApplicationsTable.permissionDate, toDate));
+        if (deptId) conds.push(eq(employeesTable.departmentId, deptId));
+        const rows = await db.select({
+          employeeCode: employeesTable.employeeId,
+          employeeName: employeesTable.firstName,
+          permissionDate: permissionApplicationsTable.permissionDate,
+          startTime: permissionApplicationsTable.startTime,
+          endTime: permissionApplicationsTable.endTime,
+          durationMinutes: permissionApplicationsTable.durationMinutes,
+          reason: permissionApplicationsTable.reason,
+          status: permissionApplicationsTable.status,
+        }).from(permissionApplicationsTable)
+          .leftJoin(employeesTable, eq(permissionApplicationsTable.employeeId, employeesTable.id))
+          .where(conds.length ? and(...conds) : undefined)
+          .limit(500);
+        return rows as Record<string, unknown>[];
+      }
+      case "statutory-compliance": {
+        const month = filters["month"] ? Number(filters["month"]) : new Date().getMonth() + 1;
+        const year = filters["year"] ? Number(filters["year"]) : new Date().getFullYear();
+        const runConds = [
+          eq(payrollRunsTable.periodMonth, month),
+          eq(payrollRunsTable.periodYear, year),
+        ];
+        const [run] = await db.select().from(payrollRunsTable).where(and(...runConds)).limit(1);
+        if (!run) return [];
+        const recConds = [eq(payrollRecordsTable.payrollRunId, run.id)];
+        if (deptId) recConds.push(eq(employeesTable.departmentId, deptId));
+        const rows = await db.select({
+          employeeCode: employeesTable.employeeId,
+          employeeName: employeesTable.firstName,
+          grossEarnings: payrollRecordsTable.grossEarnings,
+          netPay: payrollRecordsTable.netPay,
+          department: departmentsTable.name,
+        }).from(payrollRecordsTable)
+          .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
+          .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+          .where(and(...recConds))
           .limit(500);
         return rows as Record<string, unknown>[];
       }
