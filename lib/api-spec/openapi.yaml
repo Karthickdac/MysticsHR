@@ -1894,8 +1894,611 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuditLogListResponse"
 
+  /shifts/templates:
+    get:
+      summary: List shift templates
+      tags: [Shifts]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - { name: departmentId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Shift templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShiftTemplate"
+    post:
+      summary: Create shift template
+      tags: [Shifts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShiftTemplateBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftTemplate"
+
+  /shifts/templates/{id}:
+    get:
+      summary: Get shift template
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Shift template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftTemplate"
+    patch:
+      summary: Update shift template
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShiftTemplateBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftTemplate"
+    delete:
+      summary: Delete shift template
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /employees/{id}/shift-assignments:
+    get:
+      summary: Get employee shift assignments
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Shift assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShiftAssignment"
+    post:
+      summary: Assign shift to employee
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShiftAssignmentBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftAssignment"
+
+  /shift-assignments/{id}:
+    delete:
+      summary: Delete shift assignment
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /shifts/calendar:
+    get:
+      summary: Get shift calendar for a date range
+      tags: [Shifts]
+      parameters:
+        - { name: month, in: query, required: true, schema: { type: string, description: "YYYY-MM" } }
+        - { name: departmentId, in: query, schema: { type: integer } }
+        - { name: employeeId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Calendar entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShiftCalendarEntry"
+
+  /shift-swaps:
+    get:
+      summary: List shift swap requests
+      tags: [Shifts]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [Pending, Approved, Rejected] } }
+        - { name: employeeId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Shift swap requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShiftSwap"
+    post:
+      summary: Submit shift swap request
+      tags: [Shifts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShiftSwapBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftSwap"
+
+  /shift-swaps/{id}/hod-action:
+    post:
+      summary: HOD approves or rejects shift swap
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShiftSwapActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftSwap"
+
+  /shift-swaps/{id}/hr-action:
+    post:
+      summary: HR approves or rejects shift swap
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShiftSwapActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftSwap"
+
+  /attendance:
+    get:
+      summary: List attendance records
+      tags: [Attendance]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: month, in: query, schema: { type: string, description: "YYYY-MM" } }
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: departmentId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+    post:
+      summary: Create/update attendance record
+      tags: [Attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAttendanceBody"
+      responses:
+        "201":
+          description: Created/Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/{id}:
+    get:
+      summary: Get attendance record
+      tags: [Attendance]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Attendance record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+    patch:
+      summary: HR override attendance record
+      tags: [Attendance]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendanceOverrideBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  /employees/{id}/attendance:
+    get:
+      summary: Get employee attendance records
+      tags: [Attendance]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: month, in: query, schema: { type: string, description: "YYYY-MM" } }
+      responses:
+        "200":
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/summary:
+    get:
+      summary: Monthly attendance summary for all employees
+      tags: [Attendance]
+      parameters:
+        - { name: month, in: query, required: true, schema: { type: string, description: "YYYY-MM" } }
+        - { name: departmentId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Monthly summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceMonthlySummary"
+
+  /attendance/regularizations:
+    get:
+      summary: List regularization requests
+      tags: [Attendance]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [Pending, Approved, Rejected] } }
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: month, in: query, schema: { type: string, description: "YYYY-MM" } }
+      responses:
+        "200":
+          description: Regularization requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRegularization"
+    post:
+      summary: Submit regularization request
+      tags: [Attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRegularizationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRegularization"
+
+  /attendance/regularizations/{id}/action:
+    post:
+      summary: HOD approves or rejects regularization
+      tags: [Attendance]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegularizationActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRegularization"
+
+  /employees/{id}/overtime:
+    get:
+      summary: Get employee overtime records
+      tags: [Attendance]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: month, in: query, schema: { type: string, description: "YYYY-MM" } }
+      responses:
+        "200":
+          description: Overtime records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OvertimeRecord"
+
 components:
   schemas:
+    ShiftTemplate:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        shiftType: { type: string, enum: [Fixed, Flexible, Rotational, "Night Shift"] }
+        startTime: { type: string }
+        endTime: { type: string }
+        gracePeriodMinutes: { type: integer }
+        breakDurationMinutes: { type: integer }
+        minWorkingHoursMinutes: { type: integer }
+        weeklyOff: { type: ["array", "null"], items: { type: string } }
+        departmentId: { type: ["integer", "null"] }
+        shiftRatePerHour: { type: ["string", "null"] }
+        nightDifferentialRate: { type: ["string", "null"] }
+        overtimeThresholdMinutes: { type: integer }
+        isActive: { type: boolean }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, shiftType, startTime, endTime, gracePeriodMinutes, breakDurationMinutes, minWorkingHoursMinutes, overtimeThresholdMinutes, isActive, createdAt, updatedAt]
+
+    CreateShiftTemplateBody:
+      type: object
+      required: [name, shiftType, startTime, endTime]
+      properties:
+        name: { type: string }
+        shiftType: { type: string, enum: [Fixed, Flexible, Rotational, "Night Shift"] }
+        startTime: { type: string }
+        endTime: { type: string }
+        gracePeriodMinutes: { type: integer, default: 0 }
+        breakDurationMinutes: { type: integer, default: 0 }
+        minWorkingHoursMinutes: { type: integer, default: 480 }
+        weeklyOff: { type: ["array", "null"], items: { type: string } }
+        departmentId: { type: ["integer", "null"] }
+        shiftRatePerHour: { type: ["string", "null"] }
+        nightDifferentialRate: { type: ["string", "null"] }
+        overtimeThresholdMinutes: { type: integer, default: 30 }
+        isActive: { type: boolean, default: true }
+        notes: { type: ["string", "null"] }
+
+    ShiftAssignment:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        shiftTemplateId: { type: integer }
+        shiftTemplateName: { type: ["string", "null"] }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+        assignedById: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, shiftTemplateId, effectiveFrom, createdAt, updatedAt]
+
+    CreateShiftAssignmentBody:
+      type: object
+      required: [shiftTemplateId, effectiveFrom]
+      properties:
+        shiftTemplateId: { type: integer }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: ["string", "null"], format: date }
+        notes: { type: ["string", "null"] }
+
+    ShiftCalendarEntry:
+      type: object
+      properties:
+        employeeId: { type: integer }
+        employeeName: { type: string }
+        employeeCode: { type: string }
+        date: { type: string, format: date }
+        shiftTemplateId: { type: ["integer", "null"] }
+        shiftName: { type: ["string", "null"] }
+        startTime: { type: ["string", "null"] }
+        endTime: { type: ["string", "null"] }
+        attendanceStatus: { type: ["string", "null"] }
+      required: [employeeId, employeeName, employeeCode, date]
+
+    ShiftSwap:
+      type: object
+      properties:
+        id: { type: integer }
+        requesterEmployeeId: { type: integer }
+        requesterName: { type: ["string", "null"] }
+        swapWithEmployeeId: { type: integer }
+        swapWithName: { type: ["string", "null"] }
+        swapDate: { type: string, format: date }
+        reason: { type: ["string", "null"] }
+        hodStatus: { type: string, enum: [Pending, Approved, Rejected] }
+        hodRemarks: { type: ["string", "null"] }
+        hodActionedAt: { type: ["string", "null"], format: date-time }
+        hrStatus: { type: string, enum: [Pending, Approved, Rejected] }
+        hrRemarks: { type: ["string", "null"] }
+        hrActionedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, requesterEmployeeId, swapWithEmployeeId, swapDate, hodStatus, hrStatus, createdAt, updatedAt]
+
+    CreateShiftSwapBody:
+      type: object
+      required: [swapWithEmployeeId, swapDate]
+      properties:
+        swapWithEmployeeId: { type: integer }
+        swapDate: { type: string, format: date }
+        reason: { type: ["string", "null"] }
+
+    ShiftSwapActionBody:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [Approved, Rejected] }
+        remarks: { type: ["string", "null"] }
+
+    AttendanceRecord:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+        attendanceDate: { type: string, format: date }
+        signInTime: { type: ["string", "null"], format: date-time }
+        signOutTime: { type: ["string", "null"], format: date-time }
+        totalMinutesWorked: { type: ["integer", "null"] }
+        breakDurationMinutes: { type: ["integer", "null"] }
+        overtimeMinutes: { type: ["integer", "null"] }
+        status: { type: string }
+        isHrOverride: { type: boolean }
+        overrideReason: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, attendanceDate, status, isHrOverride, createdAt, updatedAt]
+
+    CreateAttendanceBody:
+      type: object
+      required: [employeeId, attendanceDate, status]
+      properties:
+        employeeId: { type: integer }
+        attendanceDate: { type: string, format: date }
+        signInTime: { type: ["string", "null"], format: date-time }
+        signOutTime: { type: ["string", "null"], format: date-time }
+        breakDurationMinutes: { type: ["integer", "null"] }
+        status: { type: string }
+        notes: { type: ["string", "null"] }
+
+    AttendanceOverrideBody:
+      type: object
+      required: [overrideReason]
+      properties:
+        signInTime: { type: ["string", "null"], format: date-time }
+        signOutTime: { type: ["string", "null"], format: date-time }
+        breakDurationMinutes: { type: ["integer", "null"] }
+        status: { type: ["string", "null"] }
+        overrideReason: { type: string }
+        notes: { type: ["string", "null"] }
+
+    AttendanceMonthlySummary:
+      type: object
+      properties:
+        employeeId: { type: integer }
+        employeeName: { type: string }
+        employeeCode: { type: string }
+        month: { type: string }
+        totalPresent: { type: integer }
+        totalAbsent: { type: integer }
+        totalHalfDay: { type: integer }
+        totalOnLeave: { type: integer }
+        totalWeekOff: { type: integer }
+        totalHoliday: { type: integer }
+        totalOvertimeMinutes: { type: integer }
+        totalMinutesWorked: { type: integer }
+      required: [employeeId, employeeName, employeeCode, month, totalPresent, totalAbsent, totalHalfDay, totalOnLeave, totalWeekOff, totalHoliday, totalOvertimeMinutes, totalMinutesWorked]
+
+    AttendanceRegularization:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ["string", "null"] }
+        attendanceDate: { type: string, format: date }
+        requestedSignIn: { type: ["string", "null"], format: date-time }
+        requestedSignOut: { type: ["string", "null"], format: date-time }
+        reason: { type: string }
+        status: { type: string, enum: [Pending, Approved, Rejected] }
+        hodRemarks: { type: ["string", "null"] }
+        hodActionedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, attendanceDate, reason, status, createdAt, updatedAt]
+
+    CreateRegularizationBody:
+      type: object
+      required: [attendanceDate, reason]
+      properties:
+        attendanceDate: { type: string, format: date }
+        requestedSignIn: { type: ["string", "null"], format: date-time }
+        requestedSignOut: { type: ["string", "null"], format: date-time }
+        reason: { type: string }
+
+    RegularizationActionBody:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [Approved, Rejected] }
+        remarks: { type: ["string", "null"] }
+
+    OvertimeRecord:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        attendanceDate: { type: string, format: date }
+        overtimeMinutes: { type: integer }
+        ratePerHour: { type: ["string", "null"] }
+        totalAmount: { type: ["string", "null"] }
+        attendanceRecordId: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, employeeId, attendanceDate, overtimeMinutes, createdAt]
+
     HealthStatus:
       type: object
       properties:

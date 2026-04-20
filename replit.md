@@ -58,6 +58,12 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `onboarding_checklists`: employeeId, status, completionPct, idCardGeneratedAt
 - `onboarding_tasks`: checklistId, title, category (HR/IT/Department/Employee), assigneeRole, dueDate, completedAt, completedById, notes
 - `induction_sessions`: employeeId, sessionDate, trainerName, topics, notes, recordedById
+- `shift_templates`: name, shiftType (Fixed/Flexible/Rotational/Night Shift), startTime, endTime, gracePeriodMinutes, breakDurationMinutes, minWorkingHoursMinutes, weeklyOff (array), departmentId, shiftRatePerHour, nightDifferentialRate, overtimeThresholdMinutes, isActive
+- `shift_assignments`: employeeId, shiftTemplateId, effectiveFrom, effectiveTo, assignedById
+- `shift_swaps`: requesterEmployeeId, swapWithEmployeeId, swapDate, reason, hodStatus, hodRemarks, hodActionedById, hrStatus, hrRemarks, hrActionedById
+- `attendance_records`: employeeId, attendanceDate, signInTime, signOutTime, totalMinutesWorked, breakDurationMinutes, overtimeMinutes, status (Present/Absent/Half-Day/On Leave/On Permission/Holiday/Week Off/Regularization Pending), isHrOverride, overrideReason, overrideById
+- `attendance_regularizations`: employeeId, attendanceDate, requestedSignIn, requestedSignOut, reason, status (Pending/Approved/Rejected), hodActionedById, hodRemarks, attendanceRecordId
+- `overtime_records`: employeeId, attendanceDate, overtimeMinutes, ratePerHour, totalAmount, attendanceRecordId
 
 ## API Routes (all under /api)
 
@@ -94,6 +100,22 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `POST /api/onboarding/tasks/:id/uncomplete` — unmark task
 - `GET|POST /api/employees/:id/induction-sessions` — list/add induction sessions
 - `PUT|DELETE /api/induction-sessions/:id` — update/delete induction session
+- `GET /api/shifts/templates` — list shift templates (HR Read roles)
+- `POST /api/shifts/templates` — create shift template (HR roles)
+- `GET|PATCH|DELETE /api/shifts/templates/:id` — get/update/delete shift template
+- `GET|POST /api/employees/:id/shift-assignments` — list/assign shifts for employee
+- `DELETE /api/shift-assignments/:id` — remove shift assignment
+- `GET /api/shifts/calendar` — shift calendar for month (with dept/employee filter)
+- `GET|POST /api/shift-swaps` — list/create shift swap requests
+- `POST /api/shift-swaps/:id/hod-action` — HOD approve/reject swap
+- `POST /api/shift-swaps/:id/hr-action` — HR approve/reject swap
+- `GET|POST /api/attendance` — list/create attendance records
+- `GET|PATCH /api/attendance/:id` — get record; PATCH = HR override with required overrideReason
+- `GET /api/attendance/summary` — monthly summary (aggregated per employee)
+- `GET|POST /api/attendance/regularizations` — list/submit regularization requests
+- `POST /api/attendance/regularizations/:id/action` — HOD approve/reject regularization (applies times to attendance record on approval)
+- `GET /api/employees/:id/attendance` — employee attendance records (self-service: employee can only view own)
+- `GET /api/employees/:id/overtime` — employee overtime records
 
 ## Frontend Pages (artifacts/mysticshr/src/)
 
@@ -116,6 +138,11 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `/pre-onboarding/:id` — Document review (verify/reject) with auto completion %
 - `/onboarding` — Onboarding dashboard (checklists with progress bars)
 - `/onboarding/:id` — Onboarding detail (task completion per category, induction sessions, ID card download)
+- `/shifts` — Shift Management: 3 tabs — Shift Templates (CRUD cards), Assign Shifts (employee picker + template picker + date range), Swap Requests (HOD/HR action buttons)
+- `/shifts/calendar` — Monthly calendar grid showing each employee's shift + attendance status per day
+- `/attendance` — Daily attendance list with date/status filters; HR Record Attendance dialog + HR Override dialog (requires overrideReason)
+- `/attendance/regularization` — List regularization requests; employee submit dialog; HOD review dialog (Approve/Reject)
+- `/attendance/summary` — Monthly aggregated summary table (Present/Absent/Half-Day/On Leave/Week Off/Holiday/OT/Total) with CSV export
 
 ## Recruitment & Pre-Onboarding (Task #2)
 
@@ -136,6 +163,20 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Bulk CSV import: accepts `rows` array of key-value objects; skips duplicates by email; returns `{imported, skipped, errors[]}`
 - Onboarding checklist auto-seeds 10 default tasks across 4 categories: HR (3), IT (3), Department (2), Employee (2)
 - Completion % = (completed tasks / total tasks) × 100
+
+## Attendance & Shift Management (Task #4)
+
+- 6 DB tables: `shift_templates`, `shift_assignments`, `shift_swaps`, `attendance_records`, `attendance_regularizations`, `overtime_records`
+- Backend routes: `routes/shifts.ts` (templates, assignments, swaps) and `routes/attendance.ts` (daily records, override, regularization workflow, summary, overtime)
+- Shift types: Fixed, Flexible, Rotational, Night Shift
+- Attendance statuses: Present, Absent, Half-Day, On Leave, On Permission, Holiday, Week Off, Regularization Pending
+- Overtime auto-calculated when totalMinutesWorked > minWorkingHoursMinutes + overtimeThreshold; overtime record created automatically
+- Regularization workflow: Employee submits → HOD reviews (Approve/Reject) → on Approve, times applied to attendance_records
+- Shift swap workflow: Employee requests → HOD approves/rejects → HR approves/rejects (both steps required)
+- HR override: Any HR role can override sign-in/out/status on any attendance record; `overrideReason` is required; flagged with `isHrOverride=true`
+- Employee self-service: `/api/employees/:id/attendance` enforces ownership check (employee can only view own records)
+- Shift calendar endpoint generates per-day entries from active shift assignments, merged with attendance status for that day
+- Monthly summary aggregates counts per status per employee; CSV export on frontend
 
 ## Key Commands
 

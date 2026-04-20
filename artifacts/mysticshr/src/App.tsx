@@ -20,6 +20,11 @@ import PreOnboardingPage from "@/pages/pre-onboarding/index";
 import PreOnboardingDetailPage from "@/pages/pre-onboarding/detail";
 import OnboardingPage from "@/pages/onboarding/index";
 import OnboardingDetailPage from "@/pages/onboarding/detail";
+import ShiftsPage from "@/pages/shifts/index";
+import ShiftCalendarPage from "@/pages/shifts/calendar";
+import AttendancePage from "@/pages/attendance/index";
+import AttendanceRegularizationPage from "@/pages/attendance/regularization";
+import AttendanceSummaryPage from "@/pages/attendance/summary";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -329,6 +334,46 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
                 <OnboardingPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/shifts/calendar">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]}>
+                <ShiftCalendarPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/shifts">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]}>
+                <ShiftsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/attendance/regularization">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <AttendanceRegularizationPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/attendance/summary">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]}>
+                <AttendanceSummaryPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/attendance">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <AttendancePage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

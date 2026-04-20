@@ -12,6 +12,8 @@ import recruitmentRouter from "./recruitment";
 import preOnboardingRouter from "./pre-onboarding";
 import employeesExtendedRouter from "./employees-extended";
 import onboardingRouter from "./onboarding";
+import shiftsRouter from "./shifts";
+import attendanceRouter from "./attendance";
 
 const router: IRouter = Router();
 
@@ -27,6 +29,8 @@ router.use(recruitmentRouter);
 router.use(preOnboardingRouter);
 router.use(employeesExtendedRouter);
 router.use(onboardingRouter);
+router.use(shiftsRouter);
+router.use(attendanceRouter);
 router.use(auditLogsRouter);
 
 export default router;

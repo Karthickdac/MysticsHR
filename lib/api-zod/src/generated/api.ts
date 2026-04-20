@@ -2185,3 +2185,578 @@ export const ListAuditLogsResponse = zod.object({
   limit: zod.number(),
   offset: zod.number(),
 });
+
+/**
+ * @summary List shift templates
+ */
+export const GetShiftsTemplatesQueryParams = zod.object({
+  isActive: zod.coerce.boolean().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetShiftsTemplatesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  shiftType: zod.enum(["Fixed", "Flexible", "Rotational", "Night Shift"]),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  gracePeriodMinutes: zod.number(),
+  breakDurationMinutes: zod.number(),
+  minWorkingHoursMinutes: zod.number(),
+  weeklyOff: zod.array(zod.string()).nullish(),
+  departmentId: zod.number().nullish(),
+  shiftRatePerHour: zod.string().nullish(),
+  nightDifferentialRate: zod.string().nullish(),
+  overtimeThresholdMinutes: zod.number(),
+  isActive: zod.boolean(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetShiftsTemplatesResponse = zod.array(
+  GetShiftsTemplatesResponseItem,
+);
+
+/**
+ * @summary Create shift template
+ */
+export const postShiftsTemplatesBodyGracePeriodMinutesDefault = 0;
+export const postShiftsTemplatesBodyBreakDurationMinutesDefault = 0;
+export const postShiftsTemplatesBodyMinWorkingHoursMinutesDefault = 480;
+export const postShiftsTemplatesBodyOvertimeThresholdMinutesDefault = 30;
+export const postShiftsTemplatesBodyIsActiveDefault = true;
+
+export const PostShiftsTemplatesBody = zod.object({
+  name: zod.string(),
+  shiftType: zod.enum(["Fixed", "Flexible", "Rotational", "Night Shift"]),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  gracePeriodMinutes: zod
+    .number()
+    .default(postShiftsTemplatesBodyGracePeriodMinutesDefault),
+  breakDurationMinutes: zod
+    .number()
+    .default(postShiftsTemplatesBodyBreakDurationMinutesDefault),
+  minWorkingHoursMinutes: zod
+    .number()
+    .default(postShiftsTemplatesBodyMinWorkingHoursMinutesDefault),
+  weeklyOff: zod.array(zod.string()).nullish(),
+  departmentId: zod.number().nullish(),
+  shiftRatePerHour: zod.string().nullish(),
+  nightDifferentialRate: zod.string().nullish(),
+  overtimeThresholdMinutes: zod
+    .number()
+    .default(postShiftsTemplatesBodyOvertimeThresholdMinutesDefault),
+  isActive: zod.boolean().default(postShiftsTemplatesBodyIsActiveDefault),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Get shift template
+ */
+export const GetShiftsTemplatesIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetShiftsTemplatesIdResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  shiftType: zod.enum(["Fixed", "Flexible", "Rotational", "Night Shift"]),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  gracePeriodMinutes: zod.number(),
+  breakDurationMinutes: zod.number(),
+  minWorkingHoursMinutes: zod.number(),
+  weeklyOff: zod.array(zod.string()).nullish(),
+  departmentId: zod.number().nullish(),
+  shiftRatePerHour: zod.string().nullish(),
+  nightDifferentialRate: zod.string().nullish(),
+  overtimeThresholdMinutes: zod.number(),
+  isActive: zod.boolean(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update shift template
+ */
+export const PatchShiftsTemplatesIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const patchShiftsTemplatesIdBodyGracePeriodMinutesDefault = 0;
+export const patchShiftsTemplatesIdBodyBreakDurationMinutesDefault = 0;
+export const patchShiftsTemplatesIdBodyMinWorkingHoursMinutesDefault = 480;
+export const patchShiftsTemplatesIdBodyOvertimeThresholdMinutesDefault = 30;
+export const patchShiftsTemplatesIdBodyIsActiveDefault = true;
+
+export const PatchShiftsTemplatesIdBody = zod.object({
+  name: zod.string(),
+  shiftType: zod.enum(["Fixed", "Flexible", "Rotational", "Night Shift"]),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  gracePeriodMinutes: zod
+    .number()
+    .default(patchShiftsTemplatesIdBodyGracePeriodMinutesDefault),
+  breakDurationMinutes: zod
+    .number()
+    .default(patchShiftsTemplatesIdBodyBreakDurationMinutesDefault),
+  minWorkingHoursMinutes: zod
+    .number()
+    .default(patchShiftsTemplatesIdBodyMinWorkingHoursMinutesDefault),
+  weeklyOff: zod.array(zod.string()).nullish(),
+  departmentId: zod.number().nullish(),
+  shiftRatePerHour: zod.string().nullish(),
+  nightDifferentialRate: zod.string().nullish(),
+  overtimeThresholdMinutes: zod
+    .number()
+    .default(patchShiftsTemplatesIdBodyOvertimeThresholdMinutesDefault),
+  isActive: zod.boolean().default(patchShiftsTemplatesIdBodyIsActiveDefault),
+  notes: zod.string().nullish(),
+});
+
+export const PatchShiftsTemplatesIdResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  shiftType: zod.enum(["Fixed", "Flexible", "Rotational", "Night Shift"]),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  gracePeriodMinutes: zod.number(),
+  breakDurationMinutes: zod.number(),
+  minWorkingHoursMinutes: zod.number(),
+  weeklyOff: zod.array(zod.string()).nullish(),
+  departmentId: zod.number().nullish(),
+  shiftRatePerHour: zod.string().nullish(),
+  nightDifferentialRate: zod.string().nullish(),
+  overtimeThresholdMinutes: zod.number(),
+  isActive: zod.boolean(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete shift template
+ */
+export const DeleteShiftsTemplatesIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Get employee shift assignments
+ */
+export const GetEmployeesIdShiftAssignmentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdShiftAssignmentsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  shiftTemplateId: zod.number(),
+  shiftTemplateName: zod.string().nullish(),
+  effectiveFrom: zod.coerce.date(),
+  effectiveTo: zod.coerce.date().nullish(),
+  assignedById: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdShiftAssignmentsResponse = zod.array(
+  GetEmployeesIdShiftAssignmentsResponseItem,
+);
+
+/**
+ * @summary Assign shift to employee
+ */
+export const PostEmployeesIdShiftAssignmentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdShiftAssignmentsBody = zod.object({
+  shiftTemplateId: zod.number(),
+  effectiveFrom: zod.coerce.date(),
+  effectiveTo: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Delete shift assignment
+ */
+export const DeleteShiftAssignmentsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Get shift calendar for a date range
+ */
+export const GetShiftsCalendarQueryParams = zod.object({
+  month: zod.coerce.string(),
+  departmentId: zod.coerce.number().optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const GetShiftsCalendarResponseItem = zod.object({
+  employeeId: zod.number(),
+  employeeName: zod.string(),
+  employeeCode: zod.string(),
+  date: zod.coerce.date(),
+  shiftTemplateId: zod.number().nullish(),
+  shiftName: zod.string().nullish(),
+  startTime: zod.string().nullish(),
+  endTime: zod.string().nullish(),
+  attendanceStatus: zod.string().nullish(),
+});
+export const GetShiftsCalendarResponse = zod.array(
+  GetShiftsCalendarResponseItem,
+);
+
+/**
+ * @summary List shift swap requests
+ */
+export const GetShiftSwapsQueryParams = zod.object({
+  status: zod.enum(["Pending", "Approved", "Rejected"]).optional(),
+  employeeId: zod.coerce.number().optional(),
+});
+
+export const GetShiftSwapsResponseItem = zod.object({
+  id: zod.number(),
+  requesterEmployeeId: zod.number(),
+  requesterName: zod.string().nullish(),
+  swapWithEmployeeId: zod.number(),
+  swapWithName: zod.string().nullish(),
+  swapDate: zod.coerce.date(),
+  reason: zod.string().nullish(),
+  hodStatus: zod.enum(["Pending", "Approved", "Rejected"]),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrStatus: zod.enum(["Pending", "Approved", "Rejected"]),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetShiftSwapsResponse = zod.array(GetShiftSwapsResponseItem);
+
+/**
+ * @summary Submit shift swap request
+ */
+export const PostShiftSwapsBody = zod.object({
+  swapWithEmployeeId: zod.number(),
+  swapDate: zod.coerce.date(),
+  reason: zod.string().nullish(),
+});
+
+/**
+ * @summary HOD approves or rejects shift swap
+ */
+export const PostShiftSwapsIdHodActionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostShiftSwapsIdHodActionBody = zod.object({
+  action: zod.enum(["Approved", "Rejected"]),
+  remarks: zod.string().nullish(),
+});
+
+export const PostShiftSwapsIdHodActionResponse = zod.object({
+  id: zod.number(),
+  requesterEmployeeId: zod.number(),
+  requesterName: zod.string().nullish(),
+  swapWithEmployeeId: zod.number(),
+  swapWithName: zod.string().nullish(),
+  swapDate: zod.coerce.date(),
+  reason: zod.string().nullish(),
+  hodStatus: zod.enum(["Pending", "Approved", "Rejected"]),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrStatus: zod.enum(["Pending", "Approved", "Rejected"]),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary HR approves or rejects shift swap
+ */
+export const PostShiftSwapsIdHrActionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostShiftSwapsIdHrActionBody = zod.object({
+  action: zod.enum(["Approved", "Rejected"]),
+  remarks: zod.string().nullish(),
+});
+
+export const PostShiftSwapsIdHrActionResponse = zod.object({
+  id: zod.number(),
+  requesterEmployeeId: zod.number(),
+  requesterName: zod.string().nullish(),
+  swapWithEmployeeId: zod.number(),
+  swapWithName: zod.string().nullish(),
+  swapDate: zod.coerce.date(),
+  reason: zod.string().nullish(),
+  hodStatus: zod.enum(["Pending", "Approved", "Rejected"]),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrStatus: zod.enum(["Pending", "Approved", "Rejected"]),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List attendance records
+ */
+export const GetAttendanceQueryParams = zod.object({
+  date: zod.date().optional(),
+  month: zod.coerce.string().optional(),
+  employeeId: zod.coerce.number().optional(),
+  departmentId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+});
+
+export const GetAttendanceResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  attendanceDate: zod.coerce.date(),
+  signInTime: zod.coerce.date().nullish(),
+  signOutTime: zod.coerce.date().nullish(),
+  totalMinutesWorked: zod.number().nullish(),
+  breakDurationMinutes: zod.number().nullish(),
+  overtimeMinutes: zod.number().nullish(),
+  status: zod.string(),
+  isHrOverride: zod.boolean(),
+  overrideReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetAttendanceResponse = zod.array(GetAttendanceResponseItem);
+
+/**
+ * @summary Create/update attendance record
+ */
+export const PostAttendanceBody = zod.object({
+  employeeId: zod.number(),
+  attendanceDate: zod.coerce.date(),
+  signInTime: zod.coerce.date().nullish(),
+  signOutTime: zod.coerce.date().nullish(),
+  breakDurationMinutes: zod.number().nullish(),
+  status: zod.string(),
+  notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Get attendance record
+ */
+export const GetAttendanceIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAttendanceIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  attendanceDate: zod.coerce.date(),
+  signInTime: zod.coerce.date().nullish(),
+  signOutTime: zod.coerce.date().nullish(),
+  totalMinutesWorked: zod.number().nullish(),
+  breakDurationMinutes: zod.number().nullish(),
+  overtimeMinutes: zod.number().nullish(),
+  status: zod.string(),
+  isHrOverride: zod.boolean(),
+  overrideReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary HR override attendance record
+ */
+export const PatchAttendanceIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchAttendanceIdBody = zod.object({
+  signInTime: zod.coerce.date().nullish(),
+  signOutTime: zod.coerce.date().nullish(),
+  breakDurationMinutes: zod.number().nullish(),
+  status: zod.string().nullish(),
+  overrideReason: zod.string(),
+  notes: zod.string().nullish(),
+});
+
+export const PatchAttendanceIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  attendanceDate: zod.coerce.date(),
+  signInTime: zod.coerce.date().nullish(),
+  signOutTime: zod.coerce.date().nullish(),
+  totalMinutesWorked: zod.number().nullish(),
+  breakDurationMinutes: zod.number().nullish(),
+  overtimeMinutes: zod.number().nullish(),
+  status: zod.string(),
+  isHrOverride: zod.boolean(),
+  overrideReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get employee attendance records
+ */
+export const GetEmployeesIdAttendanceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdAttendanceQueryParams = zod.object({
+  month: zod.coerce.string().optional(),
+});
+
+export const GetEmployeesIdAttendanceResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  attendanceDate: zod.coerce.date(),
+  signInTime: zod.coerce.date().nullish(),
+  signOutTime: zod.coerce.date().nullish(),
+  totalMinutesWorked: zod.number().nullish(),
+  breakDurationMinutes: zod.number().nullish(),
+  overtimeMinutes: zod.number().nullish(),
+  status: zod.string(),
+  isHrOverride: zod.boolean(),
+  overrideReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdAttendanceResponse = zod.array(
+  GetEmployeesIdAttendanceResponseItem,
+);
+
+/**
+ * @summary Monthly attendance summary for all employees
+ */
+export const GetAttendanceSummaryQueryParams = zod.object({
+  month: zod.coerce.string(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetAttendanceSummaryResponseItem = zod.object({
+  employeeId: zod.number(),
+  employeeName: zod.string(),
+  employeeCode: zod.string(),
+  month: zod.string(),
+  totalPresent: zod.number(),
+  totalAbsent: zod.number(),
+  totalHalfDay: zod.number(),
+  totalOnLeave: zod.number(),
+  totalWeekOff: zod.number(),
+  totalHoliday: zod.number(),
+  totalOvertimeMinutes: zod.number(),
+  totalMinutesWorked: zod.number(),
+});
+export const GetAttendanceSummaryResponse = zod.array(
+  GetAttendanceSummaryResponseItem,
+);
+
+/**
+ * @summary List regularization requests
+ */
+export const GetAttendanceRegularizationsQueryParams = zod.object({
+  status: zod.enum(["Pending", "Approved", "Rejected"]).optional(),
+  employeeId: zod.coerce.number().optional(),
+  month: zod.coerce.string().optional(),
+});
+
+export const GetAttendanceRegularizationsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  attendanceDate: zod.coerce.date(),
+  requestedSignIn: zod.coerce.date().nullish(),
+  requestedSignOut: zod.coerce.date().nullish(),
+  reason: zod.string(),
+  status: zod.enum(["Pending", "Approved", "Rejected"]),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetAttendanceRegularizationsResponse = zod.array(
+  GetAttendanceRegularizationsResponseItem,
+);
+
+/**
+ * @summary Submit regularization request
+ */
+export const PostAttendanceRegularizationsBody = zod.object({
+  attendanceDate: zod.coerce.date(),
+  requestedSignIn: zod.coerce.date().nullish(),
+  requestedSignOut: zod.coerce.date().nullish(),
+  reason: zod.string(),
+});
+
+/**
+ * @summary HOD approves or rejects regularization
+ */
+export const PostAttendanceRegularizationsIdActionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostAttendanceRegularizationsIdActionBody = zod.object({
+  action: zod.enum(["Approved", "Rejected"]),
+  remarks: zod.string().nullish(),
+});
+
+export const PostAttendanceRegularizationsIdActionResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  attendanceDate: zod.coerce.date(),
+  requestedSignIn: zod.coerce.date().nullish(),
+  requestedSignOut: zod.coerce.date().nullish(),
+  reason: zod.string(),
+  status: zod.enum(["Pending", "Approved", "Rejected"]),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get employee overtime records
+ */
+export const GetEmployeesIdOvertimeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdOvertimeQueryParams = zod.object({
+  month: zod.coerce.string().optional(),
+});
+
+export const GetEmployeesIdOvertimeResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  attendanceDate: zod.coerce.date(),
+  overtimeMinutes: zod.number(),
+  ratePerHour: zod.string().nullish(),
+  totalAmount: zod.string().nullish(),
+  attendanceRecordId: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const GetEmployeesIdOvertimeResponse = zod.array(
+  GetEmployeesIdOvertimeResponseItem,
+);

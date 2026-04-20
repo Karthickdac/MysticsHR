@@ -5,6 +5,319 @@
  * MysticsHR API specification
  * OpenAPI spec version: 0.1.0
  */
+export type ShiftTemplateShiftType =
+  (typeof ShiftTemplateShiftType)[keyof typeof ShiftTemplateShiftType];
+
+export const ShiftTemplateShiftType = {
+  Fixed: "Fixed",
+  Flexible: "Flexible",
+  Rotational: "Rotational",
+  Night_Shift: "Night Shift",
+} as const;
+
+export interface ShiftTemplate {
+  id: number;
+  name: string;
+  shiftType: ShiftTemplateShiftType;
+  startTime: string;
+  endTime: string;
+  gracePeriodMinutes: number;
+  breakDurationMinutes: number;
+  minWorkingHoursMinutes: number;
+  /** @nullable */
+  weeklyOff?: string[] | null;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  shiftRatePerHour?: string | null;
+  /** @nullable */
+  nightDifferentialRate?: string | null;
+  overtimeThresholdMinutes: number;
+  isActive: boolean;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateShiftTemplateBodyShiftType =
+  (typeof CreateShiftTemplateBodyShiftType)[keyof typeof CreateShiftTemplateBodyShiftType];
+
+export const CreateShiftTemplateBodyShiftType = {
+  Fixed: "Fixed",
+  Flexible: "Flexible",
+  Rotational: "Rotational",
+  Night_Shift: "Night Shift",
+} as const;
+
+export interface CreateShiftTemplateBody {
+  name: string;
+  shiftType: CreateShiftTemplateBodyShiftType;
+  startTime: string;
+  endTime: string;
+  gracePeriodMinutes?: number;
+  breakDurationMinutes?: number;
+  minWorkingHoursMinutes?: number;
+  /** @nullable */
+  weeklyOff?: string[] | null;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  shiftRatePerHour?: string | null;
+  /** @nullable */
+  nightDifferentialRate?: string | null;
+  overtimeThresholdMinutes?: number;
+  isActive?: boolean;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface ShiftAssignment {
+  id: number;
+  employeeId: number;
+  shiftTemplateId: number;
+  /** @nullable */
+  shiftTemplateName?: string | null;
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+  /** @nullable */
+  assignedById?: number | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateShiftAssignmentBody {
+  shiftTemplateId: number;
+  effectiveFrom: string;
+  /** @nullable */
+  effectiveTo?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface ShiftCalendarEntry {
+  employeeId: number;
+  employeeName: string;
+  employeeCode: string;
+  date: string;
+  /** @nullable */
+  shiftTemplateId?: number | null;
+  /** @nullable */
+  shiftName?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  /** @nullable */
+  attendanceStatus?: string | null;
+}
+
+export type ShiftSwapHodStatus =
+  (typeof ShiftSwapHodStatus)[keyof typeof ShiftSwapHodStatus];
+
+export const ShiftSwapHodStatus = {
+  Pending: "Pending",
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export type ShiftSwapHrStatus =
+  (typeof ShiftSwapHrStatus)[keyof typeof ShiftSwapHrStatus];
+
+export const ShiftSwapHrStatus = {
+  Pending: "Pending",
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface ShiftSwap {
+  id: number;
+  requesterEmployeeId: number;
+  /** @nullable */
+  requesterName?: string | null;
+  swapWithEmployeeId: number;
+  /** @nullable */
+  swapWithName?: string | null;
+  swapDate: string;
+  /** @nullable */
+  reason?: string | null;
+  hodStatus: ShiftSwapHodStatus;
+  /** @nullable */
+  hodRemarks?: string | null;
+  /** @nullable */
+  hodActionedAt?: string | null;
+  hrStatus: ShiftSwapHrStatus;
+  /** @nullable */
+  hrRemarks?: string | null;
+  /** @nullable */
+  hrActionedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateShiftSwapBody {
+  swapWithEmployeeId: number;
+  swapDate: string;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export type ShiftSwapActionBodyAction =
+  (typeof ShiftSwapActionBodyAction)[keyof typeof ShiftSwapActionBodyAction];
+
+export const ShiftSwapActionBodyAction = {
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface ShiftSwapActionBody {
+  action: ShiftSwapActionBodyAction;
+  /** @nullable */
+  remarks?: string | null;
+}
+
+export interface AttendanceRecord {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  attendanceDate: string;
+  /** @nullable */
+  signInTime?: string | null;
+  /** @nullable */
+  signOutTime?: string | null;
+  /** @nullable */
+  totalMinutesWorked?: number | null;
+  /** @nullable */
+  breakDurationMinutes?: number | null;
+  /** @nullable */
+  overtimeMinutes?: number | null;
+  status: string;
+  isHrOverride: boolean;
+  /** @nullable */
+  overrideReason?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAttendanceBody {
+  employeeId: number;
+  attendanceDate: string;
+  /** @nullable */
+  signInTime?: string | null;
+  /** @nullable */
+  signOutTime?: string | null;
+  /** @nullable */
+  breakDurationMinutes?: number | null;
+  status: string;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface AttendanceOverrideBody {
+  /** @nullable */
+  signInTime?: string | null;
+  /** @nullable */
+  signOutTime?: string | null;
+  /** @nullable */
+  breakDurationMinutes?: number | null;
+  /** @nullable */
+  status?: string | null;
+  overrideReason: string;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface AttendanceMonthlySummary {
+  employeeId: number;
+  employeeName: string;
+  employeeCode: string;
+  month: string;
+  totalPresent: number;
+  totalAbsent: number;
+  totalHalfDay: number;
+  totalOnLeave: number;
+  totalWeekOff: number;
+  totalHoliday: number;
+  totalOvertimeMinutes: number;
+  totalMinutesWorked: number;
+}
+
+export type AttendanceRegularizationStatus =
+  (typeof AttendanceRegularizationStatus)[keyof typeof AttendanceRegularizationStatus];
+
+export const AttendanceRegularizationStatus = {
+  Pending: "Pending",
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface AttendanceRegularization {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  attendanceDate: string;
+  /** @nullable */
+  requestedSignIn?: string | null;
+  /** @nullable */
+  requestedSignOut?: string | null;
+  reason: string;
+  status: AttendanceRegularizationStatus;
+  /** @nullable */
+  hodRemarks?: string | null;
+  /** @nullable */
+  hodActionedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRegularizationBody {
+  attendanceDate: string;
+  /** @nullable */
+  requestedSignIn?: string | null;
+  /** @nullable */
+  requestedSignOut?: string | null;
+  reason: string;
+}
+
+export type RegularizationActionBodyAction =
+  (typeof RegularizationActionBodyAction)[keyof typeof RegularizationActionBodyAction];
+
+export const RegularizationActionBodyAction = {
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface RegularizationActionBody {
+  action: RegularizationActionBodyAction;
+  /** @nullable */
+  remarks?: string | null;
+}
+
+export interface OvertimeRecord {
+  id: number;
+  employeeId: number;
+  attendanceDate: string;
+  overtimeMinutes: number;
+  /** @nullable */
+  ratePerHour?: string | null;
+  /** @nullable */
+  totalAmount?: string | null;
+  /** @nullable */
+  attendanceRecordId?: number | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -1182,4 +1495,83 @@ export type ListAuditLogsParams = {
   userId?: number | null;
   limit?: number;
   offset?: number;
+};
+
+export type GetShiftsTemplatesParams = {
+  isActive?: boolean;
+  departmentId?: number;
+};
+
+export type GetShiftsCalendarParams = {
+  /**
+   * YYYY-MM
+   */
+  month: string;
+  departmentId?: number;
+  employeeId?: number;
+};
+
+export type GetShiftSwapsParams = {
+  status?: GetShiftSwapsStatus;
+  employeeId?: number;
+};
+
+export type GetShiftSwapsStatus =
+  (typeof GetShiftSwapsStatus)[keyof typeof GetShiftSwapsStatus];
+
+export const GetShiftSwapsStatus = {
+  Pending: "Pending",
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export type GetAttendanceParams = {
+  date?: string;
+  /**
+   * YYYY-MM
+   */
+  month?: string;
+  employeeId?: number;
+  departmentId?: number;
+  status?: string;
+};
+
+export type GetEmployeesIdAttendanceParams = {
+  /**
+   * YYYY-MM
+   */
+  month?: string;
+};
+
+export type GetAttendanceSummaryParams = {
+  /**
+   * YYYY-MM
+   */
+  month: string;
+  departmentId?: number;
+};
+
+export type GetAttendanceRegularizationsParams = {
+  status?: GetAttendanceRegularizationsStatus;
+  employeeId?: number;
+  /**
+   * YYYY-MM
+   */
+  month?: string;
+};
+
+export type GetAttendanceRegularizationsStatus =
+  (typeof GetAttendanceRegularizationsStatus)[keyof typeof GetAttendanceRegularizationsStatus];
+
+export const GetAttendanceRegularizationsStatus = {
+  Pending: "Pending",
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export type GetEmployeesIdOvertimeParams = {
+  /**
+   * YYYY-MM
+   */
+  month?: string;
 };

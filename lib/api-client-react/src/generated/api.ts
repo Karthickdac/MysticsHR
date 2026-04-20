@@ -20,9 +20,14 @@ import type {
   AcceptOfferResponse,
   ActivityItem,
   ApproveRequisitionBody,
+  AttendanceMonthlySummary,
+  AttendanceOverrideBody,
+  AttendanceRecord,
+  AttendanceRegularization,
   AuditLogListResponse,
   BulkImportResult,
   Candidate,
+  CreateAttendanceBody,
   CreateCandidateBody,
   CreateDepartmentBody,
   CreateDesignationBody,
@@ -34,7 +39,11 @@ import type {
   CreateInductionSessionBody,
   CreateOfferBody,
   CreateOnboardingTaskBody,
+  CreateRegularizationBody,
   CreateRequisitionBody,
+  CreateShiftAssignmentBody,
+  CreateShiftSwapBody,
+  CreateShiftTemplateBody,
   CreateUserBody,
   DashboardKpis,
   Department,
@@ -46,8 +55,16 @@ import type {
   EmployeeListResponse,
   EmployeeProfile,
   EmployeeWorkExperience,
+  GetAttendanceParams,
+  GetAttendanceRegularizationsParams,
+  GetAttendanceSummaryParams,
   GetDashboardRecentActivityParams,
+  GetEmployeesIdAttendanceParams,
+  GetEmployeesIdOvertimeParams,
   GetOnboardingChecklistsParams,
+  GetShiftSwapsParams,
+  GetShiftsCalendarParams,
+  GetShiftsTemplatesParams,
   HeadcountByDepartment,
   HealthStatus,
   HrmsUser,
@@ -67,6 +84,7 @@ import type {
   OnboardingChecklist,
   OnboardingChecklistDetail,
   OnboardingTask,
+  OvertimeRecord,
   PatchOnboardingChecklistsIdBody,
   PostEmployeesBulkImportBody,
   PostEmployeesIdOnboardingChecklistBody,
@@ -74,11 +92,17 @@ import type {
   PostOnboardingTasksIdCompleteBody,
   PreOnboardingDocument,
   PreOnboardingRecord,
+  RegularizationActionBody,
   RejectOfferBody,
   RejectPreOnboardingDocumentBody,
   RejectRequisitionBody,
   Role,
   ScheduleInterviewBody,
+  ShiftAssignment,
+  ShiftCalendarEntry,
+  ShiftSwap,
+  ShiftSwapActionBody,
+  ShiftTemplate,
   StatusCount,
   SubmitFeedbackBody,
   UpdateCandidateBody,
@@ -8293,6 +8317,2164 @@ export function useListAuditLogs<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListAuditLogsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List shift templates
+ */
+export const getGetShiftsTemplatesUrl = (params?: GetShiftsTemplatesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/shifts/templates?${stringifiedParams}`
+    : `/api/shifts/templates`;
+};
+
+export const getShiftsTemplates = async (
+  params?: GetShiftsTemplatesParams,
+  options?: RequestInit,
+): Promise<ShiftTemplate[]> => {
+  return customFetch<ShiftTemplate[]>(getGetShiftsTemplatesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetShiftsTemplatesQueryKey = (
+  params?: GetShiftsTemplatesParams,
+) => {
+  return [`/api/shifts/templates`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetShiftsTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getShiftsTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetShiftsTemplatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftsTemplates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetShiftsTemplatesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getShiftsTemplates>>
+  > = ({ signal }) => getShiftsTemplates(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getShiftsTemplates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetShiftsTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getShiftsTemplates>>
+>;
+export type GetShiftsTemplatesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List shift templates
+ */
+
+export function useGetShiftsTemplates<
+  TData = Awaited<ReturnType<typeof getShiftsTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetShiftsTemplatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftsTemplates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetShiftsTemplatesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create shift template
+ */
+export const getPostShiftsTemplatesUrl = () => {
+  return `/api/shifts/templates`;
+};
+
+export const postShiftsTemplates = async (
+  createShiftTemplateBody: CreateShiftTemplateBody,
+  options?: RequestInit,
+): Promise<ShiftTemplate> => {
+  return customFetch<ShiftTemplate>(getPostShiftsTemplatesUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createShiftTemplateBody),
+  });
+};
+
+export const getPostShiftsTemplatesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftsTemplates>>,
+    TError,
+    { data: BodyType<CreateShiftTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postShiftsTemplates>>,
+  TError,
+  { data: BodyType<CreateShiftTemplateBody> },
+  TContext
+> => {
+  const mutationKey = ["postShiftsTemplates"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postShiftsTemplates>>,
+    { data: BodyType<CreateShiftTemplateBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postShiftsTemplates(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostShiftsTemplatesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postShiftsTemplates>>
+>;
+export type PostShiftsTemplatesMutationBody = BodyType<CreateShiftTemplateBody>;
+export type PostShiftsTemplatesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create shift template
+ */
+export const usePostShiftsTemplates = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftsTemplates>>,
+    TError,
+    { data: BodyType<CreateShiftTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postShiftsTemplates>>,
+  TError,
+  { data: BodyType<CreateShiftTemplateBody> },
+  TContext
+> => {
+  return useMutation(getPostShiftsTemplatesMutationOptions(options));
+};
+
+/**
+ * @summary Get shift template
+ */
+export const getGetShiftsTemplatesIdUrl = (id: number) => {
+  return `/api/shifts/templates/${id}`;
+};
+
+export const getShiftsTemplatesId = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ShiftTemplate> => {
+  return customFetch<ShiftTemplate>(getGetShiftsTemplatesIdUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetShiftsTemplatesIdQueryKey = (id: number) => {
+  return [`/api/shifts/templates/${id}`] as const;
+};
+
+export const getGetShiftsTemplatesIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof getShiftsTemplatesId>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftsTemplatesId>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetShiftsTemplatesIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getShiftsTemplatesId>>
+  > = ({ signal }) => getShiftsTemplatesId(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getShiftsTemplatesId>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetShiftsTemplatesIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getShiftsTemplatesId>>
+>;
+export type GetShiftsTemplatesIdQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get shift template
+ */
+
+export function useGetShiftsTemplatesId<
+  TData = Awaited<ReturnType<typeof getShiftsTemplatesId>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftsTemplatesId>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetShiftsTemplatesIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update shift template
+ */
+export const getPatchShiftsTemplatesIdUrl = (id: number) => {
+  return `/api/shifts/templates/${id}`;
+};
+
+export const patchShiftsTemplatesId = async (
+  id: number,
+  createShiftTemplateBody: CreateShiftTemplateBody,
+  options?: RequestInit,
+): Promise<ShiftTemplate> => {
+  return customFetch<ShiftTemplate>(getPatchShiftsTemplatesIdUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createShiftTemplateBody),
+  });
+};
+
+export const getPatchShiftsTemplatesIdMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchShiftsTemplatesId>>,
+    TError,
+    { id: number; data: BodyType<CreateShiftTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof patchShiftsTemplatesId>>,
+  TError,
+  { id: number; data: BodyType<CreateShiftTemplateBody> },
+  TContext
+> => {
+  const mutationKey = ["patchShiftsTemplatesId"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof patchShiftsTemplatesId>>,
+    { id: number; data: BodyType<CreateShiftTemplateBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return patchShiftsTemplatesId(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PatchShiftsTemplatesIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchShiftsTemplatesId>>
+>;
+export type PatchShiftsTemplatesIdMutationBody =
+  BodyType<CreateShiftTemplateBody>;
+export type PatchShiftsTemplatesIdMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update shift template
+ */
+export const usePatchShiftsTemplatesId = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchShiftsTemplatesId>>,
+    TError,
+    { id: number; data: BodyType<CreateShiftTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof patchShiftsTemplatesId>>,
+  TError,
+  { id: number; data: BodyType<CreateShiftTemplateBody> },
+  TContext
+> => {
+  return useMutation(getPatchShiftsTemplatesIdMutationOptions(options));
+};
+
+/**
+ * @summary Delete shift template
+ */
+export const getDeleteShiftsTemplatesIdUrl = (id: number) => {
+  return `/api/shifts/templates/${id}`;
+};
+
+export const deleteShiftsTemplatesId = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteShiftsTemplatesIdUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteShiftsTemplatesIdMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteShiftsTemplatesId>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteShiftsTemplatesId>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteShiftsTemplatesId"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteShiftsTemplatesId>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteShiftsTemplatesId(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteShiftsTemplatesIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteShiftsTemplatesId>>
+>;
+
+export type DeleteShiftsTemplatesIdMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete shift template
+ */
+export const useDeleteShiftsTemplatesId = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteShiftsTemplatesId>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteShiftsTemplatesId>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteShiftsTemplatesIdMutationOptions(options));
+};
+
+/**
+ * @summary Get employee shift assignments
+ */
+export const getGetEmployeesIdShiftAssignmentsUrl = (id: number) => {
+  return `/api/employees/${id}/shift-assignments`;
+};
+
+export const getEmployeesIdShiftAssignments = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ShiftAssignment[]> => {
+  return customFetch<ShiftAssignment[]>(
+    getGetEmployeesIdShiftAssignmentsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmployeesIdShiftAssignmentsQueryKey = (id: number) => {
+  return [`/api/employees/${id}/shift-assignments`] as const;
+};
+
+export const getGetEmployeesIdShiftAssignmentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmployeesIdShiftAssignments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmployeesIdShiftAssignments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmployeesIdShiftAssignmentsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmployeesIdShiftAssignments>>
+  > = ({ signal }) =>
+    getEmployeesIdShiftAssignments(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeesIdShiftAssignments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmployeesIdShiftAssignmentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmployeesIdShiftAssignments>>
+>;
+export type GetEmployeesIdShiftAssignmentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get employee shift assignments
+ */
+
+export function useGetEmployeesIdShiftAssignments<
+  TData = Awaited<ReturnType<typeof getEmployeesIdShiftAssignments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmployeesIdShiftAssignments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmployeesIdShiftAssignmentsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Assign shift to employee
+ */
+export const getPostEmployeesIdShiftAssignmentsUrl = (id: number) => {
+  return `/api/employees/${id}/shift-assignments`;
+};
+
+export const postEmployeesIdShiftAssignments = async (
+  id: number,
+  createShiftAssignmentBody: CreateShiftAssignmentBody,
+  options?: RequestInit,
+): Promise<ShiftAssignment> => {
+  return customFetch<ShiftAssignment>(
+    getPostEmployeesIdShiftAssignmentsUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createShiftAssignmentBody),
+    },
+  );
+};
+
+export const getPostEmployeesIdShiftAssignmentsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdShiftAssignments>>,
+    TError,
+    { id: number; data: BodyType<CreateShiftAssignmentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postEmployeesIdShiftAssignments>>,
+  TError,
+  { id: number; data: BodyType<CreateShiftAssignmentBody> },
+  TContext
+> => {
+  const mutationKey = ["postEmployeesIdShiftAssignments"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postEmployeesIdShiftAssignments>>,
+    { id: number; data: BodyType<CreateShiftAssignmentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postEmployeesIdShiftAssignments(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostEmployeesIdShiftAssignmentsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postEmployeesIdShiftAssignments>>
+>;
+export type PostEmployeesIdShiftAssignmentsMutationBody =
+  BodyType<CreateShiftAssignmentBody>;
+export type PostEmployeesIdShiftAssignmentsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Assign shift to employee
+ */
+export const usePostEmployeesIdShiftAssignments = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdShiftAssignments>>,
+    TError,
+    { id: number; data: BodyType<CreateShiftAssignmentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postEmployeesIdShiftAssignments>>,
+  TError,
+  { id: number; data: BodyType<CreateShiftAssignmentBody> },
+  TContext
+> => {
+  return useMutation(
+    getPostEmployeesIdShiftAssignmentsMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Delete shift assignment
+ */
+export const getDeleteShiftAssignmentsIdUrl = (id: number) => {
+  return `/api/shift-assignments/${id}`;
+};
+
+export const deleteShiftAssignmentsId = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteShiftAssignmentsIdUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteShiftAssignmentsIdMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteShiftAssignmentsId>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteShiftAssignmentsId>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteShiftAssignmentsId"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteShiftAssignmentsId>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteShiftAssignmentsId(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteShiftAssignmentsIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteShiftAssignmentsId>>
+>;
+
+export type DeleteShiftAssignmentsIdMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete shift assignment
+ */
+export const useDeleteShiftAssignmentsId = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteShiftAssignmentsId>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteShiftAssignmentsId>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteShiftAssignmentsIdMutationOptions(options));
+};
+
+/**
+ * @summary Get shift calendar for a date range
+ */
+export const getGetShiftsCalendarUrl = (params: GetShiftsCalendarParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/shifts/calendar?${stringifiedParams}`
+    : `/api/shifts/calendar`;
+};
+
+export const getShiftsCalendar = async (
+  params: GetShiftsCalendarParams,
+  options?: RequestInit,
+): Promise<ShiftCalendarEntry[]> => {
+  return customFetch<ShiftCalendarEntry[]>(getGetShiftsCalendarUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetShiftsCalendarQueryKey = (
+  params?: GetShiftsCalendarParams,
+) => {
+  return [`/api/shifts/calendar`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetShiftsCalendarQueryOptions = <
+  TData = Awaited<ReturnType<typeof getShiftsCalendar>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetShiftsCalendarParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftsCalendar>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetShiftsCalendarQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getShiftsCalendar>>
+  > = ({ signal }) => getShiftsCalendar(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getShiftsCalendar>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetShiftsCalendarQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getShiftsCalendar>>
+>;
+export type GetShiftsCalendarQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get shift calendar for a date range
+ */
+
+export function useGetShiftsCalendar<
+  TData = Awaited<ReturnType<typeof getShiftsCalendar>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetShiftsCalendarParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftsCalendar>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetShiftsCalendarQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List shift swap requests
+ */
+export const getGetShiftSwapsUrl = (params?: GetShiftSwapsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/shift-swaps?${stringifiedParams}`
+    : `/api/shift-swaps`;
+};
+
+export const getShiftSwaps = async (
+  params?: GetShiftSwapsParams,
+  options?: RequestInit,
+): Promise<ShiftSwap[]> => {
+  return customFetch<ShiftSwap[]>(getGetShiftSwapsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetShiftSwapsQueryKey = (params?: GetShiftSwapsParams) => {
+  return [`/api/shift-swaps`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetShiftSwapsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getShiftSwaps>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetShiftSwapsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftSwaps>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetShiftSwapsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getShiftSwaps>>> = ({
+    signal,
+  }) => getShiftSwaps(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getShiftSwaps>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetShiftSwapsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getShiftSwaps>>
+>;
+export type GetShiftSwapsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List shift swap requests
+ */
+
+export function useGetShiftSwaps<
+  TData = Awaited<ReturnType<typeof getShiftSwaps>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetShiftSwapsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getShiftSwaps>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetShiftSwapsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit shift swap request
+ */
+export const getPostShiftSwapsUrl = () => {
+  return `/api/shift-swaps`;
+};
+
+export const postShiftSwaps = async (
+  createShiftSwapBody: CreateShiftSwapBody,
+  options?: RequestInit,
+): Promise<ShiftSwap> => {
+  return customFetch<ShiftSwap>(getPostShiftSwapsUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createShiftSwapBody),
+  });
+};
+
+export const getPostShiftSwapsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftSwaps>>,
+    TError,
+    { data: BodyType<CreateShiftSwapBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postShiftSwaps>>,
+  TError,
+  { data: BodyType<CreateShiftSwapBody> },
+  TContext
+> => {
+  const mutationKey = ["postShiftSwaps"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postShiftSwaps>>,
+    { data: BodyType<CreateShiftSwapBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postShiftSwaps(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostShiftSwapsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postShiftSwaps>>
+>;
+export type PostShiftSwapsMutationBody = BodyType<CreateShiftSwapBody>;
+export type PostShiftSwapsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit shift swap request
+ */
+export const usePostShiftSwaps = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftSwaps>>,
+    TError,
+    { data: BodyType<CreateShiftSwapBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postShiftSwaps>>,
+  TError,
+  { data: BodyType<CreateShiftSwapBody> },
+  TContext
+> => {
+  return useMutation(getPostShiftSwapsMutationOptions(options));
+};
+
+/**
+ * @summary HOD approves or rejects shift swap
+ */
+export const getPostShiftSwapsIdHodActionUrl = (id: number) => {
+  return `/api/shift-swaps/${id}/hod-action`;
+};
+
+export const postShiftSwapsIdHodAction = async (
+  id: number,
+  shiftSwapActionBody: ShiftSwapActionBody,
+  options?: RequestInit,
+): Promise<ShiftSwap> => {
+  return customFetch<ShiftSwap>(getPostShiftSwapsIdHodActionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(shiftSwapActionBody),
+  });
+};
+
+export const getPostShiftSwapsIdHodActionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftSwapsIdHodAction>>,
+    TError,
+    { id: number; data: BodyType<ShiftSwapActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postShiftSwapsIdHodAction>>,
+  TError,
+  { id: number; data: BodyType<ShiftSwapActionBody> },
+  TContext
+> => {
+  const mutationKey = ["postShiftSwapsIdHodAction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postShiftSwapsIdHodAction>>,
+    { id: number; data: BodyType<ShiftSwapActionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postShiftSwapsIdHodAction(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostShiftSwapsIdHodActionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postShiftSwapsIdHodAction>>
+>;
+export type PostShiftSwapsIdHodActionMutationBody =
+  BodyType<ShiftSwapActionBody>;
+export type PostShiftSwapsIdHodActionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HOD approves or rejects shift swap
+ */
+export const usePostShiftSwapsIdHodAction = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftSwapsIdHodAction>>,
+    TError,
+    { id: number; data: BodyType<ShiftSwapActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postShiftSwapsIdHodAction>>,
+  TError,
+  { id: number; data: BodyType<ShiftSwapActionBody> },
+  TContext
+> => {
+  return useMutation(getPostShiftSwapsIdHodActionMutationOptions(options));
+};
+
+/**
+ * @summary HR approves or rejects shift swap
+ */
+export const getPostShiftSwapsIdHrActionUrl = (id: number) => {
+  return `/api/shift-swaps/${id}/hr-action`;
+};
+
+export const postShiftSwapsIdHrAction = async (
+  id: number,
+  shiftSwapActionBody: ShiftSwapActionBody,
+  options?: RequestInit,
+): Promise<ShiftSwap> => {
+  return customFetch<ShiftSwap>(getPostShiftSwapsIdHrActionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(shiftSwapActionBody),
+  });
+};
+
+export const getPostShiftSwapsIdHrActionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftSwapsIdHrAction>>,
+    TError,
+    { id: number; data: BodyType<ShiftSwapActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postShiftSwapsIdHrAction>>,
+  TError,
+  { id: number; data: BodyType<ShiftSwapActionBody> },
+  TContext
+> => {
+  const mutationKey = ["postShiftSwapsIdHrAction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postShiftSwapsIdHrAction>>,
+    { id: number; data: BodyType<ShiftSwapActionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postShiftSwapsIdHrAction(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostShiftSwapsIdHrActionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postShiftSwapsIdHrAction>>
+>;
+export type PostShiftSwapsIdHrActionMutationBody =
+  BodyType<ShiftSwapActionBody>;
+export type PostShiftSwapsIdHrActionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HR approves or rejects shift swap
+ */
+export const usePostShiftSwapsIdHrAction = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postShiftSwapsIdHrAction>>,
+    TError,
+    { id: number; data: BodyType<ShiftSwapActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postShiftSwapsIdHrAction>>,
+  TError,
+  { id: number; data: BodyType<ShiftSwapActionBody> },
+  TContext
+> => {
+  return useMutation(getPostShiftSwapsIdHrActionMutationOptions(options));
+};
+
+/**
+ * @summary List attendance records
+ */
+export const getGetAttendanceUrl = (params?: GetAttendanceParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/attendance?${stringifiedParams}`
+    : `/api/attendance`;
+};
+
+export const getAttendance = async (
+  params?: GetAttendanceParams,
+  options?: RequestInit,
+): Promise<AttendanceRecord[]> => {
+  return customFetch<AttendanceRecord[]>(getGetAttendanceUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAttendanceQueryKey = (params?: GetAttendanceParams) => {
+  return [`/api/attendance`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAttendanceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAttendance>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAttendanceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAttendanceQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAttendance>>> = ({
+    signal,
+  }) => getAttendance(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendance>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAttendanceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAttendance>>
+>;
+export type GetAttendanceQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List attendance records
+ */
+
+export function useGetAttendance<
+  TData = Awaited<ReturnType<typeof getAttendance>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAttendanceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAttendanceQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create/update attendance record
+ */
+export const getPostAttendanceUrl = () => {
+  return `/api/attendance`;
+};
+
+export const postAttendance = async (
+  createAttendanceBody: CreateAttendanceBody,
+  options?: RequestInit,
+): Promise<AttendanceRecord> => {
+  return customFetch<AttendanceRecord>(getPostAttendanceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createAttendanceBody),
+  });
+};
+
+export const getPostAttendanceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postAttendance>>,
+    TError,
+    { data: BodyType<CreateAttendanceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postAttendance>>,
+  TError,
+  { data: BodyType<CreateAttendanceBody> },
+  TContext
+> => {
+  const mutationKey = ["postAttendance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postAttendance>>,
+    { data: BodyType<CreateAttendanceBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postAttendance(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostAttendanceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postAttendance>>
+>;
+export type PostAttendanceMutationBody = BodyType<CreateAttendanceBody>;
+export type PostAttendanceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create/update attendance record
+ */
+export const usePostAttendance = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postAttendance>>,
+    TError,
+    { data: BodyType<CreateAttendanceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postAttendance>>,
+  TError,
+  { data: BodyType<CreateAttendanceBody> },
+  TContext
+> => {
+  return useMutation(getPostAttendanceMutationOptions(options));
+};
+
+/**
+ * @summary Get attendance record
+ */
+export const getGetAttendanceIdUrl = (id: number) => {
+  return `/api/attendance/${id}`;
+};
+
+export const getAttendanceId = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AttendanceRecord> => {
+  return customFetch<AttendanceRecord>(getGetAttendanceIdUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAttendanceIdQueryKey = (id: number) => {
+  return [`/api/attendance/${id}`] as const;
+};
+
+export const getGetAttendanceIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAttendanceId>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceId>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAttendanceIdQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAttendanceId>>> = ({
+    signal,
+  }) => getAttendanceId(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendanceId>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAttendanceIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAttendanceId>>
+>;
+export type GetAttendanceIdQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get attendance record
+ */
+
+export function useGetAttendanceId<
+  TData = Awaited<ReturnType<typeof getAttendanceId>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceId>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAttendanceIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary HR override attendance record
+ */
+export const getPatchAttendanceIdUrl = (id: number) => {
+  return `/api/attendance/${id}`;
+};
+
+export const patchAttendanceId = async (
+  id: number,
+  attendanceOverrideBody: AttendanceOverrideBody,
+  options?: RequestInit,
+): Promise<AttendanceRecord> => {
+  return customFetch<AttendanceRecord>(getPatchAttendanceIdUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(attendanceOverrideBody),
+  });
+};
+
+export const getPatchAttendanceIdMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchAttendanceId>>,
+    TError,
+    { id: number; data: BodyType<AttendanceOverrideBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof patchAttendanceId>>,
+  TError,
+  { id: number; data: BodyType<AttendanceOverrideBody> },
+  TContext
+> => {
+  const mutationKey = ["patchAttendanceId"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof patchAttendanceId>>,
+    { id: number; data: BodyType<AttendanceOverrideBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return patchAttendanceId(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PatchAttendanceIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchAttendanceId>>
+>;
+export type PatchAttendanceIdMutationBody = BodyType<AttendanceOverrideBody>;
+export type PatchAttendanceIdMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HR override attendance record
+ */
+export const usePatchAttendanceId = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof patchAttendanceId>>,
+    TError,
+    { id: number; data: BodyType<AttendanceOverrideBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof patchAttendanceId>>,
+  TError,
+  { id: number; data: BodyType<AttendanceOverrideBody> },
+  TContext
+> => {
+  return useMutation(getPatchAttendanceIdMutationOptions(options));
+};
+
+/**
+ * @summary Get employee attendance records
+ */
+export const getGetEmployeesIdAttendanceUrl = (
+  id: number,
+  params?: GetEmployeesIdAttendanceParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/employees/${id}/attendance?${stringifiedParams}`
+    : `/api/employees/${id}/attendance`;
+};
+
+export const getEmployeesIdAttendance = async (
+  id: number,
+  params?: GetEmployeesIdAttendanceParams,
+  options?: RequestInit,
+): Promise<AttendanceRecord[]> => {
+  return customFetch<AttendanceRecord[]>(
+    getGetEmployeesIdAttendanceUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmployeesIdAttendanceQueryKey = (
+  id: number,
+  params?: GetEmployeesIdAttendanceParams,
+) => {
+  return [
+    `/api/employees/${id}/attendance`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetEmployeesIdAttendanceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmployeesIdAttendance>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetEmployeesIdAttendanceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmployeesIdAttendance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmployeesIdAttendanceQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmployeesIdAttendance>>
+  > = ({ signal }) =>
+    getEmployeesIdAttendance(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeesIdAttendance>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmployeesIdAttendanceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmployeesIdAttendance>>
+>;
+export type GetEmployeesIdAttendanceQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get employee attendance records
+ */
+
+export function useGetEmployeesIdAttendance<
+  TData = Awaited<ReturnType<typeof getEmployeesIdAttendance>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetEmployeesIdAttendanceParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmployeesIdAttendance>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmployeesIdAttendanceQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Monthly attendance summary for all employees
+ */
+export const getGetAttendanceSummaryUrl = (
+  params: GetAttendanceSummaryParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/attendance/summary?${stringifiedParams}`
+    : `/api/attendance/summary`;
+};
+
+export const getAttendanceSummary = async (
+  params: GetAttendanceSummaryParams,
+  options?: RequestInit,
+): Promise<AttendanceMonthlySummary[]> => {
+  return customFetch<AttendanceMonthlySummary[]>(
+    getGetAttendanceSummaryUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAttendanceSummaryQueryKey = (
+  params?: GetAttendanceSummaryParams,
+) => {
+  return [`/api/attendance/summary`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAttendanceSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAttendanceSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetAttendanceSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAttendanceSummaryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAttendanceSummary>>
+  > = ({ signal }) =>
+    getAttendanceSummary(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendanceSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAttendanceSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAttendanceSummary>>
+>;
+export type GetAttendanceSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Monthly attendance summary for all employees
+ */
+
+export function useGetAttendanceSummary<
+  TData = Awaited<ReturnType<typeof getAttendanceSummary>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetAttendanceSummaryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAttendanceSummaryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List regularization requests
+ */
+export const getGetAttendanceRegularizationsUrl = (
+  params?: GetAttendanceRegularizationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/attendance/regularizations?${stringifiedParams}`
+    : `/api/attendance/regularizations`;
+};
+
+export const getAttendanceRegularizations = async (
+  params?: GetAttendanceRegularizationsParams,
+  options?: RequestInit,
+): Promise<AttendanceRegularization[]> => {
+  return customFetch<AttendanceRegularization[]>(
+    getGetAttendanceRegularizationsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAttendanceRegularizationsQueryKey = (
+  params?: GetAttendanceRegularizationsParams,
+) => {
+  return [
+    `/api/attendance/regularizations`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAttendanceRegularizationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAttendanceRegularizations>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAttendanceRegularizationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceRegularizations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAttendanceRegularizationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAttendanceRegularizations>>
+  > = ({ signal }) =>
+    getAttendanceRegularizations(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendanceRegularizations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAttendanceRegularizationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAttendanceRegularizations>>
+>;
+export type GetAttendanceRegularizationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List regularization requests
+ */
+
+export function useGetAttendanceRegularizations<
+  TData = Awaited<ReturnType<typeof getAttendanceRegularizations>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetAttendanceRegularizationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceRegularizations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAttendanceRegularizationsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit regularization request
+ */
+export const getPostAttendanceRegularizationsUrl = () => {
+  return `/api/attendance/regularizations`;
+};
+
+export const postAttendanceRegularizations = async (
+  createRegularizationBody: CreateRegularizationBody,
+  options?: RequestInit,
+): Promise<AttendanceRegularization> => {
+  return customFetch<AttendanceRegularization>(
+    getPostAttendanceRegularizationsUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createRegularizationBody),
+    },
+  );
+};
+
+export const getPostAttendanceRegularizationsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postAttendanceRegularizations>>,
+    TError,
+    { data: BodyType<CreateRegularizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postAttendanceRegularizations>>,
+  TError,
+  { data: BodyType<CreateRegularizationBody> },
+  TContext
+> => {
+  const mutationKey = ["postAttendanceRegularizations"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postAttendanceRegularizations>>,
+    { data: BodyType<CreateRegularizationBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postAttendanceRegularizations(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostAttendanceRegularizationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postAttendanceRegularizations>>
+>;
+export type PostAttendanceRegularizationsMutationBody =
+  BodyType<CreateRegularizationBody>;
+export type PostAttendanceRegularizationsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit regularization request
+ */
+export const usePostAttendanceRegularizations = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postAttendanceRegularizations>>,
+    TError,
+    { data: BodyType<CreateRegularizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postAttendanceRegularizations>>,
+  TError,
+  { data: BodyType<CreateRegularizationBody> },
+  TContext
+> => {
+  return useMutation(getPostAttendanceRegularizationsMutationOptions(options));
+};
+
+/**
+ * @summary HOD approves or rejects regularization
+ */
+export const getPostAttendanceRegularizationsIdActionUrl = (id: number) => {
+  return `/api/attendance/regularizations/${id}/action`;
+};
+
+export const postAttendanceRegularizationsIdAction = async (
+  id: number,
+  regularizationActionBody: RegularizationActionBody,
+  options?: RequestInit,
+): Promise<AttendanceRegularization> => {
+  return customFetch<AttendanceRegularization>(
+    getPostAttendanceRegularizationsIdActionUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(regularizationActionBody),
+    },
+  );
+};
+
+export const getPostAttendanceRegularizationsIdActionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postAttendanceRegularizationsIdAction>>,
+    TError,
+    { id: number; data: BodyType<RegularizationActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postAttendanceRegularizationsIdAction>>,
+  TError,
+  { id: number; data: BodyType<RegularizationActionBody> },
+  TContext
+> => {
+  const mutationKey = ["postAttendanceRegularizationsIdAction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postAttendanceRegularizationsIdAction>>,
+    { id: number; data: BodyType<RegularizationActionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postAttendanceRegularizationsIdAction(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostAttendanceRegularizationsIdActionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postAttendanceRegularizationsIdAction>>
+>;
+export type PostAttendanceRegularizationsIdActionMutationBody =
+  BodyType<RegularizationActionBody>;
+export type PostAttendanceRegularizationsIdActionMutationError =
+  ErrorType<unknown>;
+
+/**
+ * @summary HOD approves or rejects regularization
+ */
+export const usePostAttendanceRegularizationsIdAction = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postAttendanceRegularizationsIdAction>>,
+    TError,
+    { id: number; data: BodyType<RegularizationActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postAttendanceRegularizationsIdAction>>,
+  TError,
+  { id: number; data: BodyType<RegularizationActionBody> },
+  TContext
+> => {
+  return useMutation(
+    getPostAttendanceRegularizationsIdActionMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Get employee overtime records
+ */
+export const getGetEmployeesIdOvertimeUrl = (
+  id: number,
+  params?: GetEmployeesIdOvertimeParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/employees/${id}/overtime?${stringifiedParams}`
+    : `/api/employees/${id}/overtime`;
+};
+
+export const getEmployeesIdOvertime = async (
+  id: number,
+  params?: GetEmployeesIdOvertimeParams,
+  options?: RequestInit,
+): Promise<OvertimeRecord[]> => {
+  return customFetch<OvertimeRecord[]>(
+    getGetEmployeesIdOvertimeUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmployeesIdOvertimeQueryKey = (
+  id: number,
+  params?: GetEmployeesIdOvertimeParams,
+) => {
+  return [
+    `/api/employees/${id}/overtime`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetEmployeesIdOvertimeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmployeesIdOvertime>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetEmployeesIdOvertimeParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmployeesIdOvertime>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmployeesIdOvertimeQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmployeesIdOvertime>>
+  > = ({ signal }) =>
+    getEmployeesIdOvertime(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmployeesIdOvertime>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmployeesIdOvertimeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmployeesIdOvertime>>
+>;
+export type GetEmployeesIdOvertimeQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get employee overtime records
+ */
+
+export function useGetEmployeesIdOvertime<
+  TData = Awaited<ReturnType<typeof getEmployeesIdOvertime>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  params?: GetEmployeesIdOvertimeParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEmployeesIdOvertime>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmployeesIdOvertimeQueryOptions(
+    id,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
