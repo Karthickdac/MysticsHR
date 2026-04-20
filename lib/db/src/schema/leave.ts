@@ -33,6 +33,26 @@ export const leaveTypesTable = pgTable("leave_types", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// leave_policies: configurable behaviour layer per leave type (1:1 with leave_types).
+// Authoritative source for approval workflow, eligibility, accrual, and consecutive-day rules.
+export const leavePoliciesTable = pgTable("leave_policies", {
+  id: serial("id").primaryKey(),
+  leaveTypeId: integer("leave_type_id").notNull().unique().references(() => leaveTypesTable.id),
+  requiresHodApproval: boolean("requires_hod_approval").notNull().default(true),
+  requiresHrApproval: boolean("requires_hr_approval").notNull().default(true),
+  advanceNoticeDays: integer("advance_notice_days").notNull().default(0),
+  minConsecutiveDays: numeric("min_consecutive_days", { precision: 3, scale: 1 }).default("0.5"),
+  maxConsecutiveDays: numeric("max_consecutive_days", { precision: 5, scale: 1 }),
+  allowHalfDay: boolean("allow_half_day").notNull().default(true),
+  lopByDefault: boolean("lop_by_default").notNull().default(false),
+  carryForwardEnabled: boolean("carry_forward_enabled").notNull().default(false),
+  carryForwardMax: numeric("carry_forward_max", { precision: 5, scale: 1 }),
+  encashmentEnabled: boolean("encashment_enabled").notNull().default(false),
+  applicableEmploymentTypes: text("applicable_employment_types").array(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const leaveBalancesTable = pgTable("leave_balances", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull().references(() => employeesTable.id),

@@ -40,7 +40,7 @@ export default function LeavePoliciesPage() {
     if (!editing) return;
     setSaving(true);
     try {
-      await updatePolicy({ typeId: editing.id, data: form });
+      await updatePolicy({ typeId: editing.leaveTypeId, data: form });
       toast({ title: "Policy saved", description: `Policy for ${editing.leaveTypeName} updated.` });
       setEditing(null);
       refetch();

@@ -2938,6 +2938,7 @@ export const DeleteLeaveTypeResponse = zod.object({
  */
 export const ListLeavePoliciesResponseItem = zod.object({
   id: zod.number(),
+  leaveTypeId: zod.number(),
   leaveTypeName: zod.string(),
   leaveTypeCode: zod.string(),
   isActive: zod.boolean(),
@@ -2952,6 +2953,8 @@ export const ListLeavePoliciesResponseItem = zod.object({
   carryForwardMax: zod.string().nullish(),
   encashmentEnabled: zod.boolean(),
   applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
 });
 export const ListLeavePoliciesResponse = zod.array(
   ListLeavePoliciesResponseItem,
@@ -2966,6 +2969,7 @@ export const GetLeavePolicyParams = zod.object({
 
 export const GetLeavePolicyResponse = zod.object({
   id: zod.number(),
+  leaveTypeId: zod.number(),
   leaveTypeName: zod.string(),
   leaveTypeCode: zod.string(),
   isActive: zod.boolean(),
@@ -2980,6 +2984,8 @@ export const GetLeavePolicyResponse = zod.object({
   carryForwardMax: zod.string().nullish(),
   encashmentEnabled: zod.boolean(),
   applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
 });
 
 /**

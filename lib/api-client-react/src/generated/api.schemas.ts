@@ -1394,6 +1394,7 @@ export interface CreateLeaveTypeBody {
 
 export interface LeavePolicy {
   id: number;
+  leaveTypeId: number;
   leaveTypeName: string;
   leaveTypeCode: string;
   isActive: boolean;
@@ -1412,6 +1413,8 @@ export interface LeavePolicy {
   encashmentEnabled: boolean;
   /** @nullable */
   applicableEmploymentTypes?: string[] | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UpdateLeavePolicyBody {

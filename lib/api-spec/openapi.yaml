@@ -4516,6 +4516,7 @@ components:
       type: object
       properties:
         id: { type: integer }
+        leaveTypeId: { type: integer }
         leaveTypeName: { type: string }
         leaveTypeCode: { type: string }
         isActive: { type: boolean }
@@ -4530,7 +4531,9 @@ components:
         carryForwardMax: { type: ["string", "null"] }
         encashmentEnabled: { type: boolean }
         applicableEmploymentTypes: { type: ["array", "null"], items: { type: string } }
-      required: [id, leaveTypeName, leaveTypeCode, isActive, requiresHodApproval, requiresHrApproval, advanceNoticeDays, allowHalfDay, lopByDefault, carryForwardEnabled, encashmentEnabled]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, leaveTypeId, leaveTypeName, leaveTypeCode, isActive, requiresHodApproval, requiresHrApproval, advanceNoticeDays, allowHalfDay, lopByDefault, carryForwardEnabled, encashmentEnabled, createdAt, updatedAt]
 
     UpdateLeavePolicyBody:
       type: object

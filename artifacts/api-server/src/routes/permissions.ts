@@ -270,7 +270,23 @@ router.post("/permissions", requireHrmsUser, requireRole(...ALL_ROLES), async (r
     const month = permDate.getMonth() + 1;
 
     const register = await getOrCreateRegister(employeeId, year, month);
-    const remaining = register.limitMinutes - register.usedMinutes;
+
+    // Compute effective remaining: subtract both approved (usedMinutes) AND pending requests
+    // so that multiple pending submissions cannot together exceed the limit.
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const monthEnd = new Date(year, month, 0); // last day of month
+    const monthEndStr = `${year}-${String(month).padStart(2, "0")}-${String(monthEnd.getDate()).padStart(2, "0")}`;
+    const pendingPerms = await db.select({ dur: permissionApplicationsTable.durationMinutes })
+      .from(permissionApplicationsTable)
+      .where(and(
+        eq(permissionApplicationsTable.employeeId, employeeId),
+        eq(permissionApplicationsTable.status, "Pending"),
+        gte(permissionApplicationsTable.permissionDate, monthStart),
+        lte(permissionApplicationsTable.permissionDate, monthEndStr),
+      ));
+    const pendingMinutes = pendingPerms.reduce((sum, p) => sum + p.dur, 0);
+    const effectiveUsed = register.usedMinutes + pendingMinutes;
+    const remaining = register.limitMinutes - effectiveUsed;
 
     // Only HR roles may set isOverride=true
     const isHrRole = ["super_admin", "hr_manager", "hr_executive"].includes(req.hrmsUser.role);
@@ -286,8 +302,9 @@ router.post("/permissions", requireHrmsUser, requireRole(...ALL_ROLES), async (r
     // Block if exceeds limit — applies to ALL roles including HR; override flag + justification required to bypass
     if (durationMinutes > remaining && !isOverride) {
       res.status(422).json({
-        error: `Monthly permission limit exceeded. Used: ${register.usedMinutes} min, Limit: ${register.limitMinutes} min, Remaining: ${remaining} min. HR can re-submit with isOverride=true and a justification.`,
+        error: `Monthly permission limit exceeded. Used (approved+pending): ${effectiveUsed} min, Limit: ${register.limitMinutes} min, Remaining: ${remaining} min. HR can re-submit with isOverride=true and a justification.`,
         usedMinutes: register.usedMinutes,
+        pendingMinutes,
         limitMinutes: register.limitMinutes,
         remainingMinutes: remaining,
       });
@@ -339,10 +356,23 @@ router.post("/permissions/:id/action", requireHrmsUser, requireRole("super_admin
         const permDate = new Date(perm.permissionDate as string);
         const year = permDate.getFullYear();
         const month = permDate.getMonth() + 1;
-        const register = await getOrCreateRegister(perm.employeeId, year, month);
+        // Use getOrCreateRegister to ensure row exists, then re-read INSIDE transaction for atomic check
+        await getOrCreateRegister(perm.employeeId, year, month);
+        const [liveReg] = await tx.select().from(permissionRegistersTable)
+          .where(and(
+            eq(permissionRegistersTable.employeeId, perm.employeeId),
+            eq(permissionRegistersTable.year, year),
+            eq(permissionRegistersTable.month, month),
+          ))
+          .for("update"); // row-level lock prevents race conditions
+        if (!liveReg) throw new Error("Permission register not found");
+        // Re-validate limit inside transaction (non-override permissions must respect cap)
+        if (!perm.isOverride && liveReg.usedMinutes + perm.durationMinutes > liveReg.limitMinutes) {
+          throw Object.assign(new Error("LIMIT_EXCEEDED"), { statusCode: 422 });
+        }
         await tx.update(permissionRegistersTable)
-          .set({ usedMinutes: register.usedMinutes + perm.durationMinutes, updatedAt: new Date() })
-          .where(eq(permissionRegistersTable.id, register.id));
+          .set({ usedMinutes: liveReg.usedMinutes + perm.durationMinutes, updatedAt: new Date() })
+          .where(eq(permissionRegistersTable.id, liveReg.id));
 
         // Reflect approved permission in attendance record for that day
         const permDateStr = perm.permissionDate as string;
@@ -372,7 +402,14 @@ router.post("/permissions/:id/action", requireHrmsUser, requireRole("super_admin
 
     await logAudit({ user: req.hrmsUser, action: `${action.toUpperCase()}_PERMISSION`, module: "Permissions", recordId: permId, newValue: action, ipAddress: req.ip });
     res.json(updated);
-  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "LIMIT_EXCEEDED") {
+      res.status(422).json({ error: "Monthly permission limit would be exceeded by this approval. Approve only override-flagged permissions." });
+    } else {
+      console.error(err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
 });
 
 router.post("/permissions/:id/cancel", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {

@@ -4,6 +4,7 @@ import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import {
   leaveTypesTable,
+  leavePoliciesTable,
   leaveBalancesTable,
   leaveApplicationsTable,
   leaveAccrualHistoryTable,
@@ -124,6 +125,21 @@ router.post("/leave/types", requireHrmsUser, requireRole(...HR_ROLES), async (re
       lopByDefault: body.lopByDefault ?? false,
       isActive: body.isActive ?? true,
     }).returning();
+    // Auto-create a corresponding leave_policies record (1:1) seeded from the type's initial policy values
+    await db.insert(leavePoliciesTable).values({
+      leaveTypeId: type.id,
+      requiresHodApproval: body.requiresHodApproval ?? true,
+      requiresHrApproval: body.requiresHrApproval ?? true,
+      advanceNoticeDays: body.advanceNoticeDays ?? 0,
+      minConsecutiveDays: body.minConsecutiveDays,
+      maxConsecutiveDays: body.maxConsecutiveDays,
+      allowHalfDay: body.allowHalfDay ?? true,
+      lopByDefault: body.lopByDefault ?? false,
+      carryForwardEnabled: body.carryForwardEnabled ?? false,
+      carryForwardMax: body.carryForwardMax,
+      encashmentEnabled: body.encashmentEnabled ?? false,
+      applicableEmploymentTypes: body.applicableEmploymentTypes,
+    }).onConflictDoNothing();
     await logAudit({ user: req.hrmsUser, action: "CREATE_LEAVE_TYPE", module: "Leave", recordId: type.id, newValue: type.name, ipAddress: req.ip });
     res.status(201).json(type);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -159,42 +175,73 @@ router.delete("/leave/types/:id", requireHrmsUser, requireRole(...HR_ROLES), asy
 // These endpoints expose CRUD for policy-specific fields independently of
 // the leave type's base attributes (name, code, quota, active flag).
 
-const POLICY_FIELDS = {
-  requiresHodApproval: leaveTypesTable.requiresHodApproval,
-  requiresHrApproval: leaveTypesTable.requiresHrApproval,
-  advanceNoticeDays: leaveTypesTable.advanceNoticeDays,
-  minConsecutiveDays: leaveTypesTable.minConsecutiveDays,
-  maxConsecutiveDays: leaveTypesTable.maxConsecutiveDays,
-  allowHalfDay: leaveTypesTable.allowHalfDay,
-  lopByDefault: leaveTypesTable.lopByDefault,
-  carryForwardEnabled: leaveTypesTable.carryForwardEnabled,
-  carryForwardMax: leaveTypesTable.carryForwardMax,
-  encashmentEnabled: leaveTypesTable.encashmentEnabled,
-  applicableEmploymentTypes: leaveTypesTable.applicableEmploymentTypes,
+const POLICY_SHAPE = {
+  id: leavePoliciesTable.id,
+  leaveTypeId: leavePoliciesTable.leaveTypeId,
+  leaveTypeName: leaveTypesTable.name,
+  leaveTypeCode: leaveTypesTable.code,
+  isActive: leaveTypesTable.isActive,
+  requiresHodApproval: leavePoliciesTable.requiresHodApproval,
+  requiresHrApproval: leavePoliciesTable.requiresHrApproval,
+  advanceNoticeDays: leavePoliciesTable.advanceNoticeDays,
+  minConsecutiveDays: leavePoliciesTable.minConsecutiveDays,
+  maxConsecutiveDays: leavePoliciesTable.maxConsecutiveDays,
+  allowHalfDay: leavePoliciesTable.allowHalfDay,
+  lopByDefault: leavePoliciesTable.lopByDefault,
+  carryForwardEnabled: leavePoliciesTable.carryForwardEnabled,
+  carryForwardMax: leavePoliciesTable.carryForwardMax,
+  encashmentEnabled: leavePoliciesTable.encashmentEnabled,
+  applicableEmploymentTypes: leavePoliciesTable.applicableEmploymentTypes,
+  createdAt: leavePoliciesTable.createdAt,
+  updatedAt: leavePoliciesTable.updatedAt,
 };
+
+// Helper: upsert a policy row so the endpoint never returns 404 for seed data
+async function getOrCreatePolicy(leaveTypeId: number) {
+  const [existing] = await db.select().from(leavePoliciesTable).where(eq(leavePoliciesTable.leaveTypeId, leaveTypeId));
+  if (existing) return existing;
+  const [lt] = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.id, leaveTypeId));
+  if (!lt) return null;
+  const [created] = await db.insert(leavePoliciesTable).values({
+    leaveTypeId,
+    requiresHodApproval: lt.requiresHodApproval,
+    requiresHrApproval: lt.requiresHrApproval,
+    advanceNoticeDays: lt.advanceNoticeDays,
+    minConsecutiveDays: lt.minConsecutiveDays ?? undefined,
+    maxConsecutiveDays: lt.maxConsecutiveDays ?? undefined,
+    allowHalfDay: lt.allowHalfDay,
+    lopByDefault: lt.lopByDefault,
+    carryForwardEnabled: lt.carryForwardEnabled,
+    carryForwardMax: lt.carryForwardMax ?? undefined,
+    encashmentEnabled: lt.encashmentEnabled,
+    applicableEmploymentTypes: lt.applicableEmploymentTypes ?? undefined,
+  }).onConflictDoNothing().returning();
+  return created ?? null;
+}
 
 router.get("/leave/policies", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
-    const policies = await db.select({
-      id: leaveTypesTable.id,
-      leaveTypeName: leaveTypesTable.name,
-      leaveTypeCode: leaveTypesTable.code,
-      isActive: leaveTypesTable.isActive,
-      ...POLICY_FIELDS,
-    }).from(leaveTypesTable).orderBy(leaveTypesTable.name);
+    // Ensure policy records exist for all active leave types (handles pre-existing types)
+    const allTypes = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.isActive, true));
+    for (const lt of allTypes) {
+      await getOrCreatePolicy(lt.id);
+    }
+    const policies = await db.select(POLICY_SHAPE)
+      .from(leavePoliciesTable)
+      .innerJoin(leaveTypesTable, eq(leavePoliciesTable.leaveTypeId, leaveTypesTable.id))
+      .orderBy(leaveTypesTable.name);
     res.json(policies);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
 router.get("/leave/policies/:typeId", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
-    const [policy] = await db.select({
-      id: leaveTypesTable.id,
-      leaveTypeName: leaveTypesTable.name,
-      leaveTypeCode: leaveTypesTable.code,
-      isActive: leaveTypesTable.isActive,
-      ...POLICY_FIELDS,
-    }).from(leaveTypesTable).where(eq(leaveTypesTable.id, Number(req.params.typeId)));
+    const typeId = Number(req.params.typeId);
+    await getOrCreatePolicy(typeId);
+    const [policy] = await db.select(POLICY_SHAPE)
+      .from(leavePoliciesTable)
+      .innerJoin(leaveTypesTable, eq(leavePoliciesTable.leaveTypeId, leaveTypesTable.id))
+      .where(eq(leavePoliciesTable.leaveTypeId, typeId));
     if (!policy) { res.status(404).json({ error: "Leave type not found" }); return; }
     res.json(policy);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
@@ -202,19 +249,27 @@ router.get("/leave/policies/:typeId", requireHrmsUser, requireRole(...ALL_ROLES)
 
 router.put("/leave/policies/:typeId", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
+    const typeId = Number(req.params.typeId);
     const body = req.body as {
       requiresHodApproval?: boolean; requiresHrApproval?: boolean; advanceNoticeDays?: number;
-      minConsecutiveDays?: string; maxConsecutiveDays?: string | null; allowHalfDay?: boolean;
+      minConsecutiveDays?: string | null; maxConsecutiveDays?: string | null; allowHalfDay?: boolean;
       lopByDefault?: boolean; carryForwardEnabled?: boolean; carryForwardMax?: string | null;
       encashmentEnabled?: boolean; applicableEmploymentTypes?: string[] | null;
     };
-    const [updated] = await db.update(leaveTypesTable)
+    await getOrCreatePolicy(typeId);
+    const [updatedPolicy] = await db.update(leavePoliciesTable)
       .set({ ...body, updatedAt: new Date() })
-      .where(eq(leaveTypesTable.id, Number(req.params.typeId)))
+      .where(eq(leavePoliciesTable.leaveTypeId, typeId))
       .returning();
-    if (!updated) { res.status(404).json({ error: "Leave type not found" }); return; }
-    await logAudit({ user: req.hrmsUser, action: "UPDATE_LEAVE_POLICY", module: "Leave", recordId: updated.id, newValue: updated.name, ipAddress: req.ip });
-    res.json(updated);
+    if (!updatedPolicy) { res.status(404).json({ error: "Leave policy not found" }); return; }
+    // Sync policy changes back to leave_types to keep the tables consistent
+    await db.update(leaveTypesTable).set({ ...body, updatedAt: new Date() }).where(eq(leaveTypesTable.id, typeId));
+    await logAudit({ user: req.hrmsUser, action: "UPDATE_LEAVE_POLICY", module: "Leave", recordId: typeId, newValue: String(typeId), ipAddress: req.ip });
+    const [result] = await db.select(POLICY_SHAPE)
+      .from(leavePoliciesTable)
+      .innerJoin(leaveTypesTable, eq(leavePoliciesTable.leaveTypeId, leaveTypesTable.id))
+      .where(eq(leavePoliciesTable.leaveTypeId, typeId));
+    res.json(result);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
@@ -938,16 +993,15 @@ router.get("/leave/calendar", requireHrmsUser, requireRole(...HR_READ_ROLES, "em
 
     if (req.hrmsUser.role === "employee") {
       const emp = await getEmployeeForUser(req.hrmsUser.id);
-      if (emp) conds.push(eq(leaveApplicationsTable.employeeId, emp.id));
+      if (!emp) { res.json([]); return; }
+      conds.push(eq(leaveApplicationsTable.employeeId, emp.id));
     } else if (req.hrmsUser.role === "hod") {
       const hodEmp = await getEmployeeForUser(req.hrmsUser.id);
-      if (hodEmp?.departmentId) {
-        const deptEmps = await db.select({ id: employeesTable.id }).from(employeesTable)
-          .where(and(eq(employeesTable.departmentId, hodEmp.departmentId), isNull(employeesTable.deletedAt)));
-        if (deptEmps.length > 0) {
-          conds.push(sql`${leaveApplicationsTable.employeeId} = ANY(ARRAY[${sql.join(deptEmps.map(e => sql`${e.id}`), sql`, `)}]::int[])`);
-        }
-      }
+      if (!hodEmp?.departmentId) { res.json([]); return; }
+      const deptEmps = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(and(eq(employeesTable.departmentId, hodEmp.departmentId), isNull(employeesTable.deletedAt)));
+      if (deptEmps.length === 0) { res.json([]); return; }
+      conds.push(sql`${leaveApplicationsTable.employeeId} = ANY(ARRAY[${sql.join(deptEmps.map(e => sql`${e.id}`), sql`, `)}]::int[])`);
     } else if (departmentId) {
       const deptEmps = await db.select({ id: employeesTable.id }).from(employeesTable)
         .where(and(eq(employeesTable.departmentId, Number(departmentId)), isNull(employeesTable.deletedAt)));
