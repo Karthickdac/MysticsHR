@@ -4666,6 +4666,10 @@ paths:
         - { in: query, name: toDate, schema: { type: string } }
         - { in: query, name: departmentId, schema: { type: integer } }
         - { in: query, name: employeeId, schema: { type: integer } }
+        - { in: query, name: designationId, schema: { type: integer } }
+        - { in: query, name: employmentType, schema: { type: string } }
+        - { in: query, name: location, schema: { type: string } }
+        - { in: query, name: employeeStatus, schema: { type: string } }
       responses:
         "200":
           description: Attendance summary
@@ -4687,6 +4691,10 @@ paths:
         - { in: query, name: toDate, schema: { type: string } }
         - { in: query, name: departmentId, schema: { type: integer } }
         - { in: query, name: leaveType, schema: { type: string } }
+        - { in: query, name: designationId, schema: { type: integer } }
+        - { in: query, name: employmentType, schema: { type: string } }
+        - { in: query, name: location, schema: { type: string } }
+        - { in: query, name: leaveStatus, schema: { type: string } }
       responses:
         "200":
           description: Leave utilization data
@@ -4707,6 +4715,9 @@ paths:
         - { in: query, name: month, schema: { type: string } }
         - { in: query, name: year, schema: { type: integer } }
         - { in: query, name: departmentId, schema: { type: integer } }
+        - { in: query, name: designationId, schema: { type: integer } }
+        - { in: query, name: employmentType, schema: { type: string } }
+        - { in: query, name: location, schema: { type: string } }
       responses:
         "200":
           description: Payroll register data
@@ -4727,6 +4738,9 @@ paths:
         - { in: query, name: fromDate, schema: { type: string } }
         - { in: query, name: toDate, schema: { type: string } }
         - { in: query, name: departmentId, schema: { type: integer } }
+        - { in: query, name: employmentType, schema: { type: string } }
+        - { in: query, name: location, schema: { type: string } }
+        - { in: query, name: employeeStatus, schema: { type: string } }
       responses:
         "200":
           description: Headcount analytics
@@ -4747,6 +4761,10 @@ paths:
         - { in: query, name: fromDate, schema: { type: string } }
         - { in: query, name: toDate, schema: { type: string } }
         - { in: query, name: departmentId, schema: { type: integer } }
+        - { in: query, name: designationId, schema: { type: integer } }
+        - { in: query, name: employmentType, schema: { type: string } }
+        - { in: query, name: location, schema: { type: string } }
+        - { in: query, name: exitType, schema: { type: string } }
       responses:
         "200":
           description: Attrition analytics

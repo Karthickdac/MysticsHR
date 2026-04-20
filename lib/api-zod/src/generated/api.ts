@@ -5823,6 +5823,10 @@ export const GetAttendanceSummaryReportQueryParams = zod.object({
   toDate: zod.coerce.string().optional(),
   departmentId: zod.coerce.number().optional(),
   employeeId: zod.coerce.number().optional(),
+  designationId: zod.coerce.number().optional(),
+  employmentType: zod.coerce.string().optional(),
+  location: zod.coerce.string().optional(),
+  employeeStatus: zod.coerce.string().optional(),
 });
 
 export const GetAttendanceSummaryReportResponse = zod.object({
@@ -5838,6 +5842,10 @@ export const GetLeaveUtilizationReportQueryParams = zod.object({
   toDate: zod.coerce.string().optional(),
   departmentId: zod.coerce.number().optional(),
   leaveType: zod.coerce.string().optional(),
+  designationId: zod.coerce.number().optional(),
+  employmentType: zod.coerce.string().optional(),
+  location: zod.coerce.string().optional(),
+  leaveStatus: zod.coerce.string().optional(),
 });
 
 export const GetLeaveUtilizationReportResponse = zod.object({
@@ -5852,6 +5860,9 @@ export const GetPayrollRegisterReportQueryParams = zod.object({
   month: zod.coerce.string().optional(),
   year: zod.coerce.number().optional(),
   departmentId: zod.coerce.number().optional(),
+  designationId: zod.coerce.number().optional(),
+  employmentType: zod.coerce.string().optional(),
+  location: zod.coerce.string().optional(),
 });
 
 export const GetPayrollRegisterReportResponse = zod.object({
@@ -5866,6 +5877,9 @@ export const GetHeadcountReportQueryParams = zod.object({
   fromDate: zod.coerce.string().optional(),
   toDate: zod.coerce.string().optional(),
   departmentId: zod.coerce.number().optional(),
+  employmentType: zod.coerce.string().optional(),
+  location: zod.coerce.string().optional(),
+  employeeStatus: zod.coerce.string().optional(),
 });
 
 export const GetHeadcountReportResponse = zod.object({
@@ -5880,6 +5894,10 @@ export const GetAttritionReportQueryParams = zod.object({
   fromDate: zod.coerce.string().optional(),
   toDate: zod.coerce.string().optional(),
   departmentId: zod.coerce.number().optional(),
+  designationId: zod.coerce.number().optional(),
+  employmentType: zod.coerce.string().optional(),
+  location: zod.coerce.string().optional(),
+  exitType: zod.coerce.string().optional(),
 });
 
 export const GetAttritionReportResponse = zod.object({

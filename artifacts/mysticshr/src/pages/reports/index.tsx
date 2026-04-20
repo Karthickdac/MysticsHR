@@ -19,6 +19,7 @@ import {
   useDeleteSavedReportTemplate,
   useRunCustomReport,
   useListDepartments,
+  useListDesignations,
   getListReportSchedulesQueryKey,
   getListSavedReportTemplatesQueryKey,
   getGetEmployeeDirectoryReportQueryKey,
@@ -128,16 +129,54 @@ function ReportFilterPanel({
   filters: Record<string, string>;
   onChange: (key: string, value: string) => void;
 }) {
+  const { data: departments = [] } = useListDepartments();
+  const { data: designations = [] } = useListDesignations();
   const today = new Date().toISOString().split("T")[0];
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
 
-  const common = (
-    <>
-      <div>
-        <Label className="text-xs">Department ID</Label>
-        <Input type="number" placeholder="Any" value={filters.departmentId ?? ""} onChange={(e) => onChange("departmentId", e.target.value)} className="h-8 text-sm" />
-      </div>
-    </>
+  const deptSelect = (
+    <div>
+      <Label className="text-xs">Department</Label>
+      <Select value={filters.departmentId ?? "all"} onValueChange={(v) => onChange("departmentId", v === "all" ? "" : v)}>
+        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          {(departments as Array<{ id: number; name: string }>).map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const designationSelect = (
+    <div>
+      <Label className="text-xs">Designation</Label>
+      <Select value={filters.designationId ?? "all"} onValueChange={(v) => onChange("designationId", v === "all" ? "" : v)}>
+        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          {(designations as Array<{ id: number; title: string }>).map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.title}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const employmentTypeSelect = (
+    <div>
+      <Label className="text-xs">Employment Type</Label>
+      <Select value={filters.employmentType ?? "all"} onValueChange={(v) => onChange("employmentType", v === "all" ? "" : v)}>
+        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
+        <SelectContent>
+          {["all", "Permanent", "Contract", "Probation", "Intern"].map((t) => <SelectItem key={t} value={t}>{t === "all" ? "All" : t}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const locationInput = (
+    <div>
+      <Label className="text-xs">Location</Label>
+      <Input placeholder="Any" value={filters.location ?? ""} onChange={(e) => onChange("location", e.target.value)} className="h-8 text-sm" />
+    </div>
   );
 
   const dateRange = (
@@ -153,13 +192,62 @@ function ReportFilterPanel({
     </>
   );
 
-  if (reportId === "attendance-summary" || reportId === "leave-utilization" || reportId === "headcount" || reportId === "attrition" || reportId === "recruitment-pipeline") {
-    return <>{common}{dateRange}</>;
+  if (reportId === "employee-directory") {
+    return (
+      <>
+        {deptSelect}{designationSelect}{employmentTypeSelect}{locationInput}
+        <div>
+          <Label className="text-xs">Employee Status</Label>
+          <Select value={filters.status ?? "all"} onValueChange={(v) => onChange("status", v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
+            <SelectContent>
+              {["all", "Active", "Notice Period", "Separated"].map((s) => <SelectItem key={s} value={s}>{s === "all" ? "All" : s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </>
+    );
+  }
+  if (reportId === "attendance-summary") {
+    return (
+      <>
+        {dateRange}{deptSelect}{designationSelect}{employmentTypeSelect}{locationInput}
+        <div>
+          <Label className="text-xs">Employee Status</Label>
+          <Select value={filters.employeeStatus ?? "all"} onValueChange={(v) => onChange("employeeStatus", v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
+            <SelectContent>
+              {["all", "Active", "Notice Period", "Separated"].map((s) => <SelectItem key={s} value={s}>{s === "all" ? "All" : s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </>
+    );
+  }
+  if (reportId === "leave-utilization") {
+    return (
+      <>
+        {dateRange}{deptSelect}{designationSelect}{employmentTypeSelect}{locationInput}
+        <div>
+          <Label className="text-xs">Leave Type</Label>
+          <Input placeholder="Any" value={filters.leaveType ?? ""} onChange={(e) => onChange("leaveType", e.target.value)} className="h-8 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs">Leave Status</Label>
+          <Select value={filters.leaveStatus ?? "all"} onValueChange={(v) => onChange("leaveStatus", v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
+            <SelectContent>
+              {["all", "Approved", "Pending", "Rejected"].map((s) => <SelectItem key={s} value={s}>{s === "all" ? "All" : s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </>
+    );
   }
   if (reportId === "payroll-register") {
     return (
       <>
-        {common}
+        {deptSelect}{designationSelect}{employmentTypeSelect}{locationInput}
         <div>
           <Label className="text-xs">Month (1–12)</Label>
           <Input type="number" min={1} max={12} value={filters.month ?? String(new Date().getMonth() + 1)} onChange={(e) => onChange("month", e.target.value)} className="h-8 text-sm" />
@@ -171,23 +259,54 @@ function ReportFilterPanel({
       </>
     );
   }
-  if (reportId === "employee-directory") {
+  if (reportId === "headcount") {
     return (
       <>
-        {common}
+        {dateRange}{deptSelect}{employmentTypeSelect}{locationInput}
         <div>
-          <Label className="text-xs">Status</Label>
-          <Select value={filters.status ?? "_all"} onValueChange={(v) => onChange("status", v === "_all" ? "" : v)}>
+          <Label className="text-xs">Employee Status</Label>
+          <Select value={filters.employeeStatus ?? "all"} onValueChange={(v) => onChange("employeeStatus", v === "all" ? "" : v)}>
             <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
             <SelectContent>
-              {["_all", "Active", "Notice Period", "Separated"].map((s) => <SelectItem key={s} value={s}>{s === "_all" ? "All" : s}</SelectItem>)}
+              {["all", "Active", "Notice Period", "Separated"].map((s) => <SelectItem key={s} value={s}>{s === "all" ? "All" : s}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </>
     );
   }
-  return common;
+  if (reportId === "attrition") {
+    return (
+      <>
+        {dateRange}{deptSelect}{designationSelect}{employmentTypeSelect}{locationInput}
+        <div>
+          <Label className="text-xs">Exit Type</Label>
+          <Select value={filters.exitType ?? "all"} onValueChange={(v) => onChange("exitType", v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All" /></SelectTrigger>
+            <SelectContent>
+              {["all", "Resignation", "Termination", "Retirement", "Contract Expiry"].map((t) => <SelectItem key={t} value={t}>{t === "all" ? "All" : t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </>
+    );
+  }
+  if (reportId === "recruitment-pipeline") {
+    return <>{dateRange}{deptSelect}</>;
+  }
+  if (reportId === "performance-summary") {
+    return <>{deptSelect}<div><Label className="text-xs">Cycle ID</Label><Input type="number" placeholder="Any" value={filters.cycleId ?? ""} onChange={(e) => onChange("cycleId", e.target.value)} className="h-8 text-sm" /></div></>;
+  }
+  if (reportId === "statutory-compliance") {
+    return (
+      <>
+        {deptSelect}
+        <div><Label className="text-xs">Month</Label><Input type="number" min={1} max={12} value={filters.month ?? String(new Date().getMonth() + 1)} onChange={(e) => onChange("month", e.target.value)} className="h-8 text-sm" /></div>
+        <div><Label className="text-xs">Year</Label><Input type="number" value={filters.year ?? String(new Date().getFullYear())} onChange={(e) => onChange("year", e.target.value)} className="h-8 text-sm" /></div>
+      </>
+    );
+  }
+  return <>{dateRange}{deptSelect}</>;
 }
 
 function ReportCatalog() {
@@ -205,22 +324,40 @@ function ReportCatalog() {
   const attParams: GetAttendanceSummaryReportParams = {
     ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
     departmentId: toNum(filters.departmentId), employeeId: toNum(filters.employeeId),
+    designationId: toNum(filters.designationId),
+    employmentType: filters.employmentType || undefined,
+    location: filters.location || undefined,
+    employeeStatus: filters.employeeStatus || undefined,
   };
   const leaveParams: GetLeaveUtilizationReportParams = {
     ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
-    departmentId: toNum(filters.departmentId), leaveType: filters.leaveType,
+    departmentId: toNum(filters.departmentId), leaveType: filters.leaveType || undefined,
+    designationId: toNum(filters.designationId),
+    employmentType: filters.employmentType || undefined,
+    location: filters.location || undefined,
+    leaveStatus: filters.leaveStatus || undefined,
   };
   const payParams: GetPayrollRegisterReportParams = {
     month: filters.month ?? String(new Date().getMonth() + 1),
     year: toNum(filters.year) ?? new Date().getFullYear(),
     departmentId: toNum(filters.departmentId),
+    designationId: toNum(filters.designationId),
+    employmentType: filters.employmentType || undefined,
+    location: filters.location || undefined,
   };
   const hcParams: GetHeadcountReportParams = {
     ...dateFilters(filters, {}), departmentId: toNum(filters.departmentId),
+    employmentType: filters.employmentType || undefined,
+    location: filters.location || undefined,
+    employeeStatus: filters.employeeStatus || undefined,
   };
   const attrParams: GetAttritionReportParams = {
     ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
     departmentId: toNum(filters.departmentId),
+    designationId: toNum(filters.designationId),
+    employmentType: filters.employmentType || undefined,
+    location: filters.location || undefined,
+    exitType: filters.exitType || undefined,
   };
   const perfParams: GetPerformanceSummaryReportParams = {
     cycleId: toNum(filters.cycleId), departmentId: toNum(filters.departmentId),

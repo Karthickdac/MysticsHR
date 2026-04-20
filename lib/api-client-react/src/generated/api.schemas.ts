@@ -3361,6 +3361,10 @@ export type GetAttendanceSummaryReportParams = {
   toDate?: string;
   departmentId?: number;
   employeeId?: number;
+  designationId?: number;
+  employmentType?: string;
+  location?: string;
+  employeeStatus?: string;
 };
 
 export type GetAttendanceSummaryReport200DataItem = { [key: string]: unknown };
@@ -3375,6 +3379,10 @@ export type GetLeaveUtilizationReportParams = {
   toDate?: string;
   departmentId?: number;
   leaveType?: string;
+  designationId?: number;
+  employmentType?: string;
+  location?: string;
+  leaveStatus?: string;
 };
 
 export type GetLeaveUtilizationReport200DataItem = { [key: string]: unknown };
@@ -3388,6 +3396,9 @@ export type GetPayrollRegisterReportParams = {
   month?: string;
   year?: number;
   departmentId?: number;
+  designationId?: number;
+  employmentType?: string;
+  location?: string;
 };
 
 export type GetPayrollRegisterReport200DataItem = { [key: string]: unknown };
@@ -3401,6 +3412,9 @@ export type GetHeadcountReportParams = {
   fromDate?: string;
   toDate?: string;
   departmentId?: number;
+  employmentType?: string;
+  location?: string;
+  employeeStatus?: string;
 };
 
 export type GetHeadcountReport200DataItem = { [key: string]: unknown };
@@ -3414,6 +3428,10 @@ export type GetAttritionReportParams = {
   fromDate?: string;
   toDate?: string;
   departmentId?: number;
+  designationId?: number;
+  employmentType?: string;
+  location?: string;
+  exitType?: string;
 };
 
 export type GetAttritionReport200DataItem = { [key: string]: unknown };
