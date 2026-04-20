@@ -11,8 +11,15 @@ export default function SlaReportPage() {
   if (isLoading) return <div className="p-8 text-muted-foreground">Loading SLA report…</div>;
   if (!report) return <div className="p-8 text-muted-foreground">No data available.</div>;
 
-  const breachRate = report.totalTickets > 0
-    ? Math.round((report.slaBreachedCount / report.totalTickets) * 100)
+  const totalTickets = report.totalTickets ?? 0;
+  const slaBreachedCount = report.slaBreachedCount ?? 0;
+  const openTickets = report.openTickets ?? 0;
+  const resolvedTickets = report.resolvedTickets ?? 0;
+  const byPriority = report.byPriority ?? [];
+  const byCategory = report.byCategory ?? [];
+
+  const breachRate = totalTickets > 0
+    ? Math.round((slaBreachedCount / totalTickets) * 100)
     : 0;
 
   return (
@@ -34,7 +41,7 @@ export default function SlaReportPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground uppercase tracking-wide">Total Tickets</span>
             </div>
-            <div className="text-3xl font-bold">{report.totalTickets}</div>
+            <div className="text-3xl font-bold">{totalTickets}</div>
           </CardContent>
         </Card>
 
@@ -44,7 +51,7 @@ export default function SlaReportPage() {
               <Clock className="h-4 w-4 text-blue-500" />
               <span className="text-xs text-muted-foreground uppercase tracking-wide">Open</span>
             </div>
-            <div className="text-3xl font-bold text-blue-600">{report.openTickets}</div>
+            <div className="text-3xl font-bold text-blue-600">{openTickets}</div>
           </CardContent>
         </Card>
 
@@ -54,7 +61,7 @@ export default function SlaReportPage() {
               <CheckCircle className="h-4 w-4 text-green-500" />
               <span className="text-xs text-muted-foreground uppercase tracking-wide">Resolved</span>
             </div>
-            <div className="text-3xl font-bold text-green-600">{report.resolvedTickets}</div>
+            <div className="text-3xl font-bold text-green-600">{resolvedTickets}</div>
           </CardContent>
         </Card>
 
@@ -64,7 +71,7 @@ export default function SlaReportPage() {
               <AlertTriangle className="h-4 w-4 text-red-500" />
               <span className="text-xs text-muted-foreground uppercase tracking-wide">SLA Breached</span>
             </div>
-            <div className="text-3xl font-bold text-red-600">{report.slaBreachedCount}</div>
+            <div className="text-3xl font-bold text-red-600">{slaBreachedCount}</div>
             <div className="text-xs text-muted-foreground mt-1">{breachRate}% breach rate</div>
           </CardContent>
         </Card>
@@ -75,9 +82,9 @@ export default function SlaReportPage() {
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground mb-1">Average Resolution Time</div>
             <div className="text-2xl font-semibold">
-              {report.avgResolutionHours < 24
+              {(report.avgResolutionHours ?? 0) < 24
                 ? `${report.avgResolutionHours}h`
-                : `${Math.round((report.avgResolutionHours / 24) * 10) / 10} days`}
+                : `${Math.round(((report.avgResolutionHours ?? 0) / 24) * 10) / 10} days`}
             </div>
           </CardContent>
         </Card>
@@ -87,9 +94,9 @@ export default function SlaReportPage() {
         <Card>
           <CardHeader><CardTitle className="text-base">By Priority</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {report.byPriority.length === 0 ? (
+            {byPriority.length === 0 ? (
               <p className="text-sm text-muted-foreground">No data</p>
-            ) : report.byPriority.map((row) => (
+            ) : byPriority.map((row) => (
               <div key={row.priority} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge variant={
@@ -97,9 +104,9 @@ export default function SlaReportPage() {
                     row.priority === "High" ? "default" :
                     "secondary"
                   }>{row.priority}</Badge>
-                  <span className="text-sm">{row.count} tickets</span>
+                  <span className="text-sm">{row.total ?? 0} tickets</span>
                 </div>
-                {row.breached > 0 && (
+                {(row.breached ?? 0) > 0 && (
                   <span className="text-xs text-red-600 font-medium">{row.breached} breached</span>
                 )}
               </div>
@@ -110,12 +117,12 @@ export default function SlaReportPage() {
         <Card>
           <CardHeader><CardTitle className="text-base">By Category</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {report.byCategory.length === 0 ? (
+            {byCategory.length === 0 ? (
               <p className="text-sm text-muted-foreground">No data</p>
-            ) : report.byCategory.map((row) => (
+            ) : byCategory.map((row) => (
               <div key={row.category} className="flex items-center justify-between">
                 <Badge variant="outline">{row.category}</Badge>
-                <span className="text-sm font-medium">{row.count}</span>
+                <span className="text-sm font-medium">{row.total ?? 0}</span>
               </div>
             ))}
           </CardContent>

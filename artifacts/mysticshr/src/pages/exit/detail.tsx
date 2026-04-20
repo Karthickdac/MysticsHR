@@ -13,6 +13,8 @@ import {
   type UpdateExitRequestBody,
   type UpdateClearanceTaskBody,
   type SubmitExitInterviewBody,
+  type ComputeFnfBody,
+  type ApproveFnfBody,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
@@ -58,7 +60,7 @@ export default function ExitDetailPage() {
   const [, params] = useRoute("/exit/:id");
   const id = Number(params?.id);
   const { hrmsUser } = useCurrentHrmsUser();
-  const isHr = HR_ROLES.includes(hrmsUser?.role as any);
+  const isHr = hrmsUser?.role != null && (HR_ROLES as readonly string[]).includes(hrmsUser.role);
   const qc = useQueryClient();
 
   const { data: exitReq, isLoading } = useGetExitRequest(id);
@@ -93,12 +95,12 @@ export default function ExitDetailPage() {
 
   function handleComputeFnf(e: React.FormEvent) {
     e.preventDefault();
-    computeFnf.mutate({ id, data: fnfForm as any }, { onSuccess: () => setFnfModal(false) });
+    computeFnf.mutate({ id, data: fnfForm as ComputeFnfBody }, { onSuccess: () => setFnfModal(false) });
   }
 
   function handleApproveFnf() {
-    // approverRole is derived server-side from the user's session role
-    approveFnf.mutate({ id, data: {} as any });
+    // approverRole is derived server-side from the user's session role — body only carries optional remarks
+    approveFnf.mutate({ id, data: {} as ApproveFnfBody });
   }
 
   function handleSubmitInterview(e: React.FormEvent) {
@@ -113,9 +115,9 @@ export default function ExitDetailPage() {
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
   if (!exitReq) return <div className="p-8 text-center text-gray-500">Exit request not found.</div>;
 
-  const clearanceTasks = (exitReq as any).clearanceTasks ?? [];
+  const clearanceTasks = exitReq.clearanceTasks ?? [];
   const totalTasks = clearanceTasks.length;
-  const completedTasks = clearanceTasks.filter((t: any) => t.status === "Completed" || t.status === "Waived").length;
+  const completedTasks = clearanceTasks.filter((t) => t.status === "Completed" || t.status === "Waived").length;
   const clearanceProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   return (
@@ -140,11 +142,11 @@ export default function ExitDetailPage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">
-                    {(exitReq as any).employeeName ?? `Employee #${exitReq.employeeId}`}
+                    {exitReq.employeeName ?? `Employee #${exitReq.employeeId}`}
                   </h1>
                   <div className="text-sm text-gray-500 flex gap-2">
-                    {(exitReq as any).departmentName && <span>{(exitReq as any).departmentName}</span>}
-                    {(exitReq as any).employeeCode && <span>· {(exitReq as any).employeeCode}</span>}
+                    {exitReq.departmentName && <span>{exitReq.departmentName}</span>}
+                    {exitReq.employeeCode && <span>· {exitReq.employeeCode}</span>}
                   </div>
                 </div>
               </div>
@@ -224,7 +226,7 @@ export default function ExitDetailPage() {
               <div className="p-6 text-center text-gray-400 text-sm">Clearance tasks will appear here once the exit is approved.</div>
             ) : (
               <div className="divide-y">
-                {(clearanceTasks as any[]).map((task) => (
+                {clearanceTasks.map((task) => (
                   <div key={task.id} className="px-4 py-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -379,8 +381,8 @@ export default function ExitDetailPage() {
               </div>
               {isHr && Array.isArray(interview.responses) && interview.responses.length > 0 && (
                 <div className="space-y-3">
-                  {(interview.questions as any[]).map((q: any) => {
-                    const resp = (interview.responses as any[]).find((r: any) => r.questionId === q.id);
+                  {(interview.questions ?? []).map((q) => {
+                    const resp = (interview.responses ?? []).find((r) => r.questionId === q.id);
                     return resp ? (
                       <div key={q.id} className="bg-gray-50 rounded-lg p-3">
                         <div className="text-xs font-medium text-gray-600 mb-1">{q.question}</div>
@@ -408,21 +410,23 @@ export default function ExitDetailPage() {
           </DialogHeader>
           <form onSubmit={handleComputeFnf} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              {[
-                { key: "pendingSalary", label: "Pending Salary (₹)", positive: true },
-                { key: "leaveEncashment", label: "Leave Encashment (₹)", positive: true },
-                { key: "gratuity", label: "Gratuity (₹)", positive: true },
-                { key: "bonusProration", label: "Bonus Proration (₹)", positive: true },
-                { key: "noticePeriodLop", label: "Notice Period LOP (₹)", positive: false },
-                { key: "otherDeductions", label: "Other Deductions (₹)", positive: false },
-              ].map(({ key, label }) => (
+              {(
+                [
+                  { key: "pendingSalary", label: "Pending Salary (₹)", positive: true },
+                  { key: "leaveEncashment", label: "Leave Encashment (₹)", positive: true },
+                  { key: "gratuity", label: "Gratuity (₹)", positive: true },
+                  { key: "bonusProration", label: "Bonus Proration (₹)", positive: true },
+                  { key: "noticePeriodLop", label: "Notice Period LOP (₹)", positive: false },
+                  { key: "otherDeductions", label: "Other Deductions (₹)", positive: false },
+                ] as Array<{ key: keyof typeof fnfForm; label: string; positive: boolean }>
+              ).map(({ key, label }) => (
                 <div key={key}>
                   <Label className="text-xs">{label}</Label>
                   <Input
                     type="number"
                     min={0}
                     step={0.01}
-                    value={(fnfForm as any)[key]}
+                    value={fnfForm[key]}
                     onChange={(e) => setFnfForm((f) => ({ ...f, [key]: Number(e.target.value) }))}
                   />
                 </div>
@@ -455,7 +459,7 @@ export default function ExitDetailPage() {
             <DialogTitle>Exit Interview</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitInterview} className="space-y-4">
-            {interview && Array.isArray(interview.questions) && (interview.questions as any[]).map((q: any) => (
+            {interview && Array.isArray(interview.questions) && (interview.questions ?? []).map((q) => (
               <div key={q.id}>
                 <Label className="text-sm">{q.question}</Label>
                 <Textarea

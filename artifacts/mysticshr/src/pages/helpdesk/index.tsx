@@ -131,25 +131,25 @@ function SlaReport() {
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <Card>
         <CardContent className="p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{report.totalTickets}</div>
+          <div className="text-2xl font-bold text-blue-600">{report.totalTickets ?? 0}</div>
           <div className="text-sm text-muted-foreground">Total Tickets</div>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4 text-center">
-          <div className="text-2xl font-bold text-orange-600">{report.openTickets}</div>
+          <div className="text-2xl font-bold text-orange-600">{report.openTickets ?? 0}</div>
           <div className="text-sm text-muted-foreground">Open</div>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{report.resolvedTickets}</div>
+          <div className="text-2xl font-bold text-green-600">{report.resolvedTickets ?? 0}</div>
           <div className="text-sm text-muted-foreground">Resolved</div>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{report.slaBreachedCount}</div>
+          <div className="text-2xl font-bold text-red-600">{report.slaBreachedCount ?? 0}</div>
           <div className="text-sm text-muted-foreground">SLA Breached</div>
         </CardContent>
       </Card>

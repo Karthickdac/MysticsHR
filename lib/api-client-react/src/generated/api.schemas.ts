@@ -2636,21 +2636,33 @@ export interface FnfComputation {
   remarks?: string | null;
 }
 
-export type ExitInterviewQuestionsItem = { [key: string]: unknown };
+export interface ExitInterviewQuestion {
+  id: number;
+  question: string;
+}
 
-export type ExitInterviewResponsesItem = { [key: string]: unknown };
+export interface ExitInterviewResponse {
+  questionId: number;
+  answer: string;
+}
 
 export interface ExitInterview {
   id: number;
   exitRequestId: number;
   employeeId: number;
-  questions?: ExitInterviewQuestionsItem[];
-  responses?: ExitInterviewResponsesItem[];
+  questions?: ExitInterviewQuestion[];
+  responses?: ExitInterviewResponse[];
   /** @nullable */
   submittedAt?: string | null;
 }
 
 export type ExitRequestDetail = ExitRequest & {
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  departmentName?: string | null;
   clearanceTasks?: ClearanceTask[];
   fnfComputation?: FnfComputation | null;
   exitInterview?: ExitInterview | null;
@@ -2721,23 +2733,12 @@ export interface ComputeFnfBody {
   remarks?: string;
 }
 
-export type ApproveFnfBodyApproverRole =
-  (typeof ApproveFnfBodyApproverRole)[keyof typeof ApproveFnfBodyApproverRole];
-
-export const ApproveFnfBodyApproverRole = {
-  hr: "hr",
-  finance: "finance",
-} as const;
-
 export interface ApproveFnfBody {
-  approverRole: ApproveFnfBodyApproverRole;
   remarks?: string;
 }
 
-export type SubmitExitInterviewBodyResponsesItem = { [key: string]: unknown };
-
 export interface SubmitExitInterviewBody {
-  responses: SubmitExitInterviewBodyResponsesItem[];
+  responses: ExitInterviewResponse[];
 }
 
 export type DashboardAnalyticsByDepartmentItem = {
@@ -3283,6 +3284,54 @@ export type ListExitRequestsParams = {
   employeeId?: number;
 };
 
+export type GetFnfSuggestion200 = {
+  pendingSalary?: number;
+  leaveEncashment?: number;
+  gratuity?: number;
+  noticePeriodLop?: number;
+  totalSuggested?: number;
+};
+
+export type ConfigureExitInterviewQuestionsBodyQuestionsItem = {
+  id: number;
+  question: string;
+};
+
+export type ConfigureExitInterviewQuestionsBody = {
+  questions: ConfigureExitInterviewQuestionsBodyQuestionsItem[];
+};
+
+export type GetExitAlerts200RetirementAlertsItem = {
+  id?: number;
+  employeeId?: string;
+  firstName?: string;
+  lastName?: string;
+  /** @nullable */
+  dateOfBirth?: string | null;
+  retirementDate?: string;
+  daysToRetirement?: number;
+};
+
+export type GetExitAlerts200ContractExpiryAlertsItem = {
+  exitRequestId?: number;
+  employeeId?: number;
+  /** @nullable */
+  requestedLwd?: string | null;
+  /** @nullable */
+  actualLwd?: string | null;
+  status?: string;
+};
+
+export type GetExitAlerts200 = {
+  retirementAlerts?: GetExitAlerts200RetirementAlertsItem[];
+  contractExpiryAlerts?: GetExitAlerts200ContractExpiryAlertsItem[];
+};
+
+export type ProcessAccessRevocations200 = {
+  revokedCount?: number;
+  revokedEmployeeIds?: number[];
+};
+
 export type GetEmployeeDirectoryReportParams = {
   departmentId?: number;
   designationId?: number;
@@ -3406,4 +3455,68 @@ export type RunCustomReport200DataItem = { [key: string]: unknown };
 export type RunCustomReport200 = {
   data?: RunCustomReport200DataItem[];
   total?: number;
+};
+
+export type GetPermissionUsageReportParams = {
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+  employeeId?: number;
+};
+
+export type GetPermissionUsageReport200DataItem = { [key: string]: unknown };
+
+export type GetPermissionUsageReport200 = {
+  data?: GetPermissionUsageReport200DataItem[];
+  total?: number;
+};
+
+export type GetHelpdeskSlaReportParams = {
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+};
+
+export type GetHelpdeskSlaReport200DataItem = { [key: string]: unknown };
+
+export type GetHelpdeskSlaReport200ByPriorityItem = {
+  priority?: string;
+  total?: number;
+  breached?: number;
+  avgResolutionHours?: number | null;
+};
+
+export type GetHelpdeskSlaReport200ByCategoryItem = {
+  category?: string;
+  total?: number;
+  breached?: number;
+};
+
+export type GetHelpdeskSlaReport200 = {
+  data?: GetHelpdeskSlaReport200DataItem[];
+  total?: number;
+  totalTickets?: number;
+  openTickets?: number;
+  resolvedTickets?: number;
+  slaBreachedCount?: number;
+  avgResolutionHours?: number | null;
+  byPriority?: GetHelpdeskSlaReport200ByPriorityItem[];
+  byCategory?: GetHelpdeskSlaReport200ByCategoryItem[];
+};
+
+export type GetStatutoryComplianceReportParams = {
+  month?: string;
+  year?: string;
+  departmentId?: number;
+};
+
+export type GetStatutoryComplianceReport200DataItem = {
+  [key: string]: unknown;
+};
+
+export type GetStatutoryComplianceReport200 = {
+  data?: GetStatutoryComplianceReport200DataItem[];
+  total?: number;
+  pfTotal?: number;
+  esiTotal?: number;
 };

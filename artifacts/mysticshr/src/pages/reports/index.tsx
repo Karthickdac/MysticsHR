@@ -17,7 +17,23 @@ import {
   useRunCustomReport,
   getListReportSchedulesQueryKey,
   getListSavedReportTemplatesQueryKey,
+  getGetEmployeeDirectoryReportQueryKey,
+  getGetAttendanceSummaryReportQueryKey,
+  getGetLeaveUtilizationReportQueryKey,
+  getGetPayrollRegisterReportQueryKey,
+  getGetHeadcountReportQueryKey,
+  getGetAttritionReportQueryKey,
+  getGetPerformanceSummaryReportQueryKey,
+  getGetRecruitmentPipelineReportQueryKey,
   type CreateReportScheduleBody,
+  type GetEmployeeDirectoryReportParams,
+  type GetAttendanceSummaryReportParams,
+  type GetLeaveUtilizationReportParams,
+  type GetPayrollRegisterReportParams,
+  type GetHeadcountReportParams,
+  type GetAttritionReportParams,
+  type GetPerformanceSummaryReportParams,
+  type GetRecruitmentPipelineReportParams,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,13 +66,19 @@ type ReportType = (typeof REPORT_TYPES)[number]["id"];
 function exportToCsv(data: object[], filename: string) {
   if (!data.length) return;
   const headers = Object.keys(data[0]);
-  const rows = data.map((row) => headers.map((h) => JSON.stringify((row as any)[h] ?? "")).join(","));
+  const rows = data.map((row) => headers.map((h) => JSON.stringify((row as Record<string, unknown>)[h] ?? "")).join(","));
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
+}
+
+// Converts filter state (all-string Record) to properly typed report params
+function toNum(v: string | undefined): number | undefined { return v ? Number(v) : undefined; }
+function dateFilters(f: Record<string, string>, defaults: { fromDate?: string; toDate?: string }) {
+  return { fromDate: f.fromDate ?? defaults.fromDate, toDate: f.toDate ?? defaults.toDate };
 }
 
 function ReportFilterPanel({
@@ -137,42 +159,59 @@ function ReportCatalog() {
   const today = new Date().toISOString().split("T")[0];
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
 
-  const queries: Record<ReportType, any> = {
-    "employee-directory": useGetEmployeeDirectoryReport(
-      selected === "employee-directory" ? (filters as any) : undefined,
-      { query: { enabled: selected === "employee-directory" } as any }
-    ),
-    "attendance-summary": useGetAttendanceSummaryReport(
-      selected === "attendance-summary" ? ({ fromDate: monthStart, toDate: today, ...filters } as any) : undefined,
-      { query: { enabled: selected === "attendance-summary" } as any }
-    ),
-    "leave-utilization": useGetLeaveUtilizationReport(
-      selected === "leave-utilization" ? ({ fromDate: monthStart, toDate: today, ...filters } as any) : undefined,
-      { query: { enabled: selected === "leave-utilization" } as any }
-    ),
-    "payroll-register": useGetPayrollRegisterReport(
-      selected === "payroll-register" ? ({ month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()), ...filters } as any) : undefined,
-      { query: { enabled: selected === "payroll-register" } as any }
-    ),
-    "headcount": useGetHeadcountReport(
-      selected === "headcount" ? (filters as any) : undefined,
-      { query: { enabled: selected === "headcount" } as any }
-    ),
-    "attrition": useGetAttritionReport(
-      selected === "attrition" ? (filters as any) : undefined,
-      { query: { enabled: selected === "attrition" } as any }
-    ),
-    "performance-summary": useGetPerformanceSummaryReport(
-      selected === "performance-summary" ? (filters as any) : undefined,
-      { query: { enabled: selected === "performance-summary" } as any }
-    ),
-    "recruitment-pipeline": useGetRecruitmentPipelineReport(
-      selected === "recruitment-pipeline" ? (filters as any) : undefined,
-      { query: { enabled: selected === "recruitment-pipeline" } as any }
-    ),
+  // Build properly typed params for each report from the filter state
+  const dirParams: GetEmployeeDirectoryReportParams = {
+    departmentId: toNum(filters.departmentId), designationId: toNum(filters.designationId),
+    employmentType: filters.employmentType, status: filters.status, location: filters.location,
+  };
+  const attParams: GetAttendanceSummaryReportParams = {
+    ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
+    departmentId: toNum(filters.departmentId), employeeId: toNum(filters.employeeId),
+  };
+  const leaveParams: GetLeaveUtilizationReportParams = {
+    ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
+    departmentId: toNum(filters.departmentId), leaveType: filters.leaveType,
+  };
+  const payParams: GetPayrollRegisterReportParams = {
+    month: filters.month ?? String(new Date().getMonth() + 1),
+    year: toNum(filters.year) ?? new Date().getFullYear(),
+    departmentId: toNum(filters.departmentId),
+  };
+  const hcParams: GetHeadcountReportParams = {
+    ...dateFilters(filters, {}), departmentId: toNum(filters.departmentId),
+  };
+  const attrParams: GetAttritionReportParams = {
+    ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
+    departmentId: toNum(filters.departmentId),
+  };
+  const perfParams: GetPerformanceSummaryReportParams = {
+    cycleId: toNum(filters.cycleId), departmentId: toNum(filters.departmentId),
+  };
+  const recParams: GetRecruitmentPipelineReportParams = {
+    ...dateFilters(filters, {}), departmentId: toNum(filters.departmentId),
   };
 
-  const activeQuery = selected ? queries[selected] : null;
+  const empDirQuery = useGetEmployeeDirectoryReport(selected === "employee-directory" ? dirParams : undefined, { query: { enabled: selected === "employee-directory", queryKey: getGetEmployeeDirectoryReportQueryKey(dirParams) } });
+  const attQuery = useGetAttendanceSummaryReport(selected === "attendance-summary" ? attParams : undefined, { query: { enabled: selected === "attendance-summary", queryKey: getGetAttendanceSummaryReportQueryKey(attParams) } });
+  const leaveQuery = useGetLeaveUtilizationReport(selected === "leave-utilization" ? leaveParams : undefined, { query: { enabled: selected === "leave-utilization", queryKey: getGetLeaveUtilizationReportQueryKey(leaveParams) } });
+  const payQuery = useGetPayrollRegisterReport(selected === "payroll-register" ? payParams : undefined, { query: { enabled: selected === "payroll-register", queryKey: getGetPayrollRegisterReportQueryKey(payParams) } });
+  const hcQuery = useGetHeadcountReport(selected === "headcount" ? hcParams : undefined, { query: { enabled: selected === "headcount", queryKey: getGetHeadcountReportQueryKey(hcParams) } });
+  const attrQuery = useGetAttritionReport(selected === "attrition" ? attrParams : undefined, { query: { enabled: selected === "attrition", queryKey: getGetAttritionReportQueryKey(attrParams) } });
+  const perfQuery = useGetPerformanceSummaryReport(selected === "performance-summary" ? perfParams : undefined, { query: { enabled: selected === "performance-summary", queryKey: getGetPerformanceSummaryReportQueryKey(perfParams) } });
+  const recQuery = useGetRecruitmentPipelineReport(selected === "recruitment-pipeline" ? recParams : undefined, { query: { enabled: selected === "recruitment-pipeline", queryKey: getGetRecruitmentPipelineReportQueryKey(recParams) } });
+
+  const queryMap: Record<ReportType, { data?: { data?: object[]; total?: number }; isLoading?: boolean }> = {
+    "employee-directory": empDirQuery,
+    "attendance-summary": attQuery,
+    "leave-utilization": leaveQuery,
+    "payroll-register": payQuery,
+    "headcount": hcQuery,
+    "attrition": attrQuery,
+    "performance-summary": perfQuery,
+    "recruitment-pipeline": recQuery,
+  };
+
+  const activeQuery = selected ? queryMap[selected] : null;
   const reportData: object[] = (activeQuery?.data?.data ?? []) as object[];
   const reportTotal: number = activeQuery?.data?.total ?? 0;
 

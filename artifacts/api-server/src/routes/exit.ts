@@ -127,6 +127,12 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
     }
 
     const isHr = (HR_ROLES as readonly string[]).includes(u.role);
+
+    // Employees using self-service may only submit Resignations; other exit types are HR-initiated
+    if (!isHr && exitType !== "Resignation") {
+      res.status(403).json({ error: "Employees may only submit resignation requests via self-service" }); return;
+    }
+
     let empId: number;
 
     if (isHr && bodyEmployeeId) {
@@ -250,10 +256,22 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
 
     if (status === "Separated") {
       updates.separatedAt = new Date();
-      // Mark employee as Separated
-      await db.update(employeesTable)
-        .set({ status: "Separated", isActive: false, updatedAt: new Date() })
-        .where(eq(employeesTable.id, existing.employeeId));
+      const lwd = actualLwd ?? existing.actualLwd ?? existing.requestedLwd;
+      const lwdDate = lwd ? new Date(lwd) : new Date();
+      const lwdPlus1 = new Date(lwdDate);
+      lwdPlus1.setDate(lwdPlus1.getDate() + 1);
+      const now = new Date();
+      if (now >= lwdPlus1) {
+        // LWD+1 has passed — revoke system access immediately
+        await db.update(employeesTable)
+          .set({ status: "Separated", isActive: false, updatedAt: new Date() })
+          .where(eq(employeesTable.id, existing.employeeId));
+      } else {
+        // LWD+1 is in the future — mark as Separated but keep access until LWD+1
+        await db.update(employeesTable)
+          .set({ status: "Separated", updatedAt: new Date() })
+          .where(eq(employeesTable.id, existing.employeeId));
+      }
     }
 
     const [updated] = await db.update(exitRequestsTable).set(updates)
@@ -542,18 +560,25 @@ router.post("/exit/requests/:id/fnf", requireHrmsUser, requireRole(...HR_ROLES, 
 });
 
 // ─── APPROVE FnF ──────────────────────────────────────────────────────────────
-// approverRole is derived server-side from the user's session role — never trusted from the request body.
-// HR roles (super_admin, hr_manager, hr_executive) → provide HR approval
-// Finance roles (payroll_admin) → provide Finance approval
+// approverLane is derived server-side from the user's session role — never trusted from the request body.
+// HR Manager + Super Admin → HR approval lane
+// Payroll Admin → Finance approval lane
+// HR Executive → not permitted to approve FnF
 router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR_ROLES, "payroll_admin"), async (req, res) => {
   try {
     const u = req.hrmsUser!;
     const exitRequestId = Number(req.params.id);
     const { remarks } = req.body;
 
-    // Derive approver lane from session role — never trust client-supplied value
-    const isHrRole = (HR_ROLES as readonly string[]).includes(u.role);
-    const approverLane: "hr" | "finance" = isHrRole ? "hr" : "finance";
+    // Derive approver lane — only hr_manager/super_admin can approve as HR; payroll_admin as Finance
+    let approverLane: "hr" | "finance";
+    if (u.role === "hr_manager" || u.role === "super_admin") {
+      approverLane = "hr";
+    } else if (u.role === "payroll_admin") {
+      approverLane = "finance";
+    } else {
+      res.status(403).json({ error: "Only HR Manager, Super Admin, or Payroll Admin can approve FnF" }); return;
+    }
 
     const [fnf] = await db.select().from(fnfComputationsTable)
       .where(eq(fnfComputationsTable.exitRequestId, exitRequestId));
@@ -619,7 +644,7 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
       action: "approve_fnf",
       entityType: "fnf_computation",
       entityId: fnf.id,
-      changes: { approverRole, exitRequestId },
+      changes: { approverLane, exitRequestId },
     });
 
     res.json(updated);
@@ -667,13 +692,144 @@ router.get("/exit/requests/:id/interview", requireHrmsUser, requireRole(...ALL_R
 
       res.json(newInterview);
     } else {
-      // Non-HR only sees their own, without responses
-      if (!isHr) {
-        res.json({ ...interview, responses: interview.submittedAt ? [] : interview.responses });
+      // Only HR Manager and Super Admin can view interview responses (per policy)
+      const canSeeResponses = u.role === "hr_manager" || u.role === "super_admin";
+      if (!canSeeResponses) {
+        res.json({ ...interview, responses: [] });
       } else {
         res.json(interview);
       }
     }
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── CONFIGURE EXIT INTERVIEW QUESTIONS ───────────────────────────────────────
+// HR Manager / Super Admin can set custom interview questions for a specific request
+router.put("/exit/requests/:id/interview/questions", requireHrmsUser, requireRole("hr_manager", "super_admin"), async (req, res) => {
+  try {
+    const exitRequestId = Number(req.params.id);
+    const { questions } = req.body;
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      res.status(400).json({ error: "questions must be a non-empty array of { id, question } objects" }); return;
+    }
+
+    const [exitReq] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, exitRequestId));
+    if (!exitReq) { res.status(404).json({ error: "Exit request not found" }); return; }
+
+    const [existing] = await db.select().from(exitInterviewsTable)
+      .where(eq(exitInterviewsTable.exitRequestId, exitRequestId));
+
+    if (existing) {
+      const [updated] = await db.update(exitInterviewsTable)
+        .set({ questions, updatedAt: new Date() })
+        .where(eq(exitInterviewsTable.id, existing.id)).returning();
+      res.json(updated);
+    } else {
+      const [newInterview] = await db.insert(exitInterviewsTable).values({
+        exitRequestId,
+        employeeId: exitReq.employeeId,
+        questions,
+        responses: [],
+      }).returning();
+      res.json(newInterview);
+    }
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── RETIREMENT & CONTRACT EXPIRY ALERTS ──────────────────────────────────────
+// Returns employees approaching retirement (60 days to 60th birthday) and
+// Contract Expiry exit requests within the next 30 days.
+router.get("/exit/alerts", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const today = new Date();
+
+    // Retirement alerts: employees turning 60 within the next 60 days
+    const allActive = await db.select({
+      id: employeesTable.id,
+      employeeId: employeesTable.employeeId,
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      dateOfBirth: employeesTable.dateOfBirth,
+      dateOfJoining: employeesTable.dateOfJoining,
+      departmentId: employeesTable.departmentId,
+    }).from(employeesTable)
+      .where(and(eq(employeesTable.isActive, true), sql`date_of_birth IS NOT NULL`));
+
+    const retirementAlerts = allActive.filter(emp => {
+      if (!emp.dateOfBirth) return false;
+      const dob = new Date(emp.dateOfBirth);
+      const retirementDate = new Date(dob);
+      retirementDate.setFullYear(retirementDate.getFullYear() + 60);
+      const daysToRetirement = Math.ceil((retirementDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return daysToRetirement >= 0 && daysToRetirement <= 60;
+    }).map(emp => {
+      const dob = new Date(emp.dateOfBirth!);
+      const retirementDate = new Date(dob);
+      retirementDate.setFullYear(retirementDate.getFullYear() + 60);
+      const daysToRetirement = Math.ceil((retirementDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return { ...emp, retirementDate: retirementDate.toISOString().slice(0, 10), daysToRetirement };
+    });
+
+    // Contract expiry alerts: exit requests with exitType "Contract Expiry" and LWD within 30 days
+    const thirtyDaysFromNow = new Date(today);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const thirtyStr = thirtyDaysFromNow.toISOString().slice(0, 10);
+    const todayStr = today.toISOString().slice(0, 10);
+
+    const contractExpiries = await db.select({
+      exitRequestId: exitRequestsTable.id,
+      employeeId: exitRequestsTable.employeeId,
+      requestedLwd: exitRequestsTable.requestedLwd,
+      actualLwd: exitRequestsTable.actualLwd,
+      status: exitRequestsTable.status,
+    }).from(exitRequestsTable)
+      .where(and(
+        eq(exitRequestsTable.exitType, "Contract Expiry"),
+        sql`COALESCE(actual_lwd, requested_lwd) BETWEEN ${todayStr} AND ${thirtyStr}`,
+      ));
+
+    res.json({
+      retirementAlerts,
+      contractExpiryAlerts: contractExpiries,
+    });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── PROCESS LWD+1 ACCESS REVOCATIONS ─────────────────────────────────────────
+// HR or cron can call this daily to revoke system access for employees whose
+// last working day was yesterday (or earlier) and who are still active.
+router.post("/exit/process-access-revocations", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().slice(0, 10);
+
+    // Find exit requests where LWD < today and employee is still active
+    const pendingRevocations = await db.select({
+      exitRequestId: exitRequestsTable.id,
+      employeeId: exitRequestsTable.employeeId,
+      actualLwd: exitRequestsTable.actualLwd,
+      requestedLwd: exitRequestsTable.requestedLwd,
+    }).from(exitRequestsTable)
+      .leftJoin(employeesTable, eq(exitRequestsTable.employeeId, employeesTable.id))
+      .where(and(
+        sql`COALESCE(${exitRequestsTable.actualLwd}, ${exitRequestsTable.requestedLwd}) < ${todayStr}`,
+        eq(employeesTable.isActive, true),
+        or(
+          eq(exitRequestsTable.status, "Separated"),
+          eq(exitRequestsTable.status, "FnF Approved"),
+        ),
+      ));
+
+    const revokedIds: number[] = [];
+    for (const r of pendingRevocations) {
+      await db.update(employeesTable)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(employeesTable.id, r.employeeId));
+      revokedIds.push(r.employeeId);
+    }
+
+    res.json({ revokedCount: revokedIds.length, revokedEmployeeIds: revokedIds });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

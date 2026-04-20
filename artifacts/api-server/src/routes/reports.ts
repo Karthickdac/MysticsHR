@@ -213,7 +213,7 @@ router.get("/reports/attendance-summary", requireHrmsUser, requireRole(...MANAGE
         ...(conds.length ? conds : [sql`1=1`]),
         ...(departmentId ? [eq(employeesTable.departmentId, Number(departmentId))] : []),
       ))
-      .orderBy(desc(attendanceRecordsTable.date));
+      .orderBy(desc(attendanceRecordsTable.attendanceDate));
 
     const data = rows.map(r => ({
       ...r,
@@ -559,7 +559,23 @@ router.get("/reports/helpdesk-sla", requireHrmsUser, requireRole(...MANAGER_ROLE
       })(),
     }));
 
-    res.json({ data, total: data.length, breachSummary });
+    const totalTickets = data.length;
+    const openTickets = data.filter(r => r.status === "Open" || r.status === "In Progress").length;
+    const resolvedTickets = data.filter(r => r.status === "Resolved" || r.status === "Closed").length;
+    const slaBreachedCount = data.filter(r => r.slaBreached).length;
+    const resolvedWithHours = data.filter(r => r.resolutionHours !== null);
+    const avgResolutionHours = resolvedWithHours.length > 0
+      ? Math.round(resolvedWithHours.reduce((s, r) => s + (r.resolutionHours ?? 0), 0) / resolvedWithHours.length * 100) / 100
+      : null;
+    const byPriority = breachSummary;
+    const categories = [...new Set(data.map(r => r.category))];
+    const byCategory = categories.map(cat => ({
+      category: cat,
+      total: data.filter(r => r.category === cat).length,
+      breached: data.filter(r => r.category === cat && r.slaBreached).length,
+    }));
+
+    res.json({ data, total: totalTickets, totalTickets, openTickets, resolvedTickets, slaBreachedCount, avgResolutionHours, byPriority, byCategory });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

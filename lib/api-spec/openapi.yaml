@@ -4352,7 +4352,7 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: "#/components/schemas/ExitRequest" }
+                items: { $ref: "#/components/schemas/ExitRequestDetail" }
     post:
       operationId: createExitRequest
       tags: [exit]
@@ -4367,7 +4367,7 @@ paths:
           description: Exit request created
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ExitRequest" }
+              schema: { $ref: "#/components/schemas/ExitRequestDetail" }
 
   /exit/requests/{id}:
     get:
@@ -4515,6 +4515,109 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ExitInterview" }
+
+  /exit/requests/{id}/fnf/suggest:
+    get:
+      operationId: getFnfSuggestion
+      tags: [exit]
+      summary: Get auto-suggested FnF computation values from payroll and leave data
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: FnF suggestion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pendingSalary: { type: number }
+                  leaveEncashment: { type: number }
+                  gratuity: { type: number }
+                  noticePeriodLop: { type: number }
+                  totalSuggested: { type: number }
+
+  /exit/requests/{id}/interview/questions:
+    put:
+      operationId: configureExitInterviewQuestions
+      tags: [exit]
+      summary: Configure custom exit interview questions (HR Manager / Super Admin only)
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [questions]
+              properties:
+                questions:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, question]
+                    properties:
+                      id: { type: integer }
+                      question: { type: string }
+      responses:
+        "200":
+          description: Updated exit interview with configured questions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExitInterview" }
+
+  /exit/alerts:
+    get:
+      operationId: getExitAlerts
+      tags: [exit]
+      summary: Get retirement alerts (60 days) and contract expiry alerts (30 days)
+      responses:
+        "200":
+          description: Exit alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  retirementAlerts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        employeeId: { type: string }
+                        firstName: { type: string }
+                        lastName: { type: string }
+                        dateOfBirth: { type: ["string", "null"] }
+                        retirementDate: { type: string }
+                        daysToRetirement: { type: integer }
+                  contractExpiryAlerts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        exitRequestId: { type: integer }
+                        employeeId: { type: integer }
+                        requestedLwd: { type: ["string", "null"] }
+                        actualLwd: { type: ["string", "null"] }
+                        status: { type: string }
+
+  /exit/process-access-revocations:
+    post:
+      operationId: processAccessRevocations
+      tags: [exit]
+      summary: Process LWD+1 system access revocations for employees whose LWD has passed
+      responses:
+        "200":
+          description: Access revocation results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revokedCount: { type: integer }
+                  revokedEmployeeIds: { type: array, items: { type: integer } }
 
   # ─── ANALYTICS DASHBOARD ──────────────────────────────────────────────────────
   /analytics/dashboard:
@@ -4813,6 +4916,91 @@ paths:
                 properties:
                   data: { type: array, items: { type: object } }
                   total: { type: integer }
+
+  /reports/permission-usage:
+    get:
+      operationId: getPermissionUsageReport
+      tags: [reports]
+      summary: Permission (OD/short-leave) usage report with monthly register summary
+      parameters:
+        - { in: query, name: fromDate, schema: { type: string } }
+        - { in: query, name: toDate, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+        - { in: query, name: employeeId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Permission usage data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+
+  /reports/helpdesk-sla:
+    get:
+      operationId: getHelpdeskSlaReport
+      tags: [reports]
+      summary: Helpdesk ticket SLA breach analysis with avg resolution time by priority
+      parameters:
+        - { in: query, name: fromDate, schema: { type: string } }
+        - { in: query, name: toDate, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Helpdesk SLA data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+                  totalTickets: { type: integer }
+                  openTickets: { type: integer }
+                  resolvedTickets: { type: integer }
+                  slaBreachedCount: { type: integer }
+                  avgResolutionHours: { type: number, nullable: true }
+                  byPriority:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        priority: { type: string }
+                        total: { type: integer }
+                        breached: { type: integer }
+                        avgResolutionHours: { type: number, nullable: true }
+                  byCategory:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        category: { type: string }
+                        total: { type: integer }
+                        breached: { type: integer }
+
+  /reports/statutory-compliance:
+    get:
+      operationId: getStatutoryComplianceReport
+      tags: [reports]
+      summary: PF (12% on basic ≤15k) and ESI (3.25%/0.75% on gross ≤21k) statutory compliance report
+      parameters:
+        - { in: query, name: month, schema: { type: string } }
+        - { in: query, name: year, schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: integer } }
+      responses:
+        "200":
+          description: Statutory compliance data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+                  total: { type: integer }
+                  pfTotal: { type: number }
+                  esiTotal: { type: number }
 
   # ──────────────────────────────────────────────────────────────────────────────
 
@@ -7470,6 +7658,9 @@ components:
         - $ref: "#/components/schemas/ExitRequest"
         - type: object
           properties:
+            employeeName: { type: ["string", "null"] }
+            employeeCode: { type: ["string", "null"] }
+            departmentName: { type: ["string", "null"] }
             clearanceTasks:
               type: array
               items: { $ref: "#/components/schemas/ClearanceTask" }
@@ -7565,12 +7756,22 @@ components:
 
     ApproveFnfBody:
       type: object
-      required: [approverRole]
       properties:
-        approverRole:
-          type: string
-          enum: [hr, finance]
         remarks: { type: string }
+
+    ExitInterviewQuestion:
+      type: object
+      required: [id, question]
+      properties:
+        id: { type: integer }
+        question: { type: string }
+
+    ExitInterviewResponse:
+      type: object
+      required: [questionId, answer]
+      properties:
+        questionId: { type: integer }
+        answer: { type: string }
 
     ExitInterview:
       type: object
@@ -7578,8 +7779,12 @@ components:
         id: { type: integer }
         exitRequestId: { type: integer }
         employeeId: { type: integer }
-        questions: { type: array, items: { type: object } }
-        responses: { type: array, items: { type: object } }
+        questions:
+          type: array
+          items: { $ref: "#/components/schemas/ExitInterviewQuestion" }
+        responses:
+          type: array
+          items: { $ref: "#/components/schemas/ExitInterviewResponse" }
         submittedAt: { type: ['string', 'null'], format: date-time }
       required: [id, exitRequestId, employeeId]
 
@@ -7589,7 +7794,7 @@ components:
       properties:
         responses:
           type: array
-          items: { type: object }
+          items: { $ref: "#/components/schemas/ExitInterviewResponse" }
 
     DashboardAnalytics:
       type: object

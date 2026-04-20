@@ -5,7 +5,7 @@ import {
   useCreateExitRequest,
   getListExitRequestsQueryKey,
   type CreateExitRequestBody,
-  type ExitRequest,
+  type ExitRequestDetail,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
@@ -72,14 +72,8 @@ function ResignationModal({ open, onClose }: { open: boolean; onClose: () => voi
           <DialogTitle>Submit Resignation</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label>Exit Type *</Label>
-            <Select value={form.exitType} onValueChange={(v) => setForm((f) => ({ ...f, exitType: v as ExitType }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {EXIT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+            Submitting a resignation will start the official offboarding process. Your manager and HR will be notified.
           </div>
           <div>
             <Label>Reason for Leaving *</Label>
@@ -176,7 +170,7 @@ function HrInitiateModal({ open, onClose }: { open: boolean; onClose: () => void
 
 export default function ExitPage() {
   const { hrmsUser } = useCurrentHrmsUser();
-  const isHr = HR_ROLES.includes(hrmsUser?.role as any);
+  const isHr = hrmsUser?.role != null && (HR_ROLES as readonly string[]).includes(hrmsUser.role);
   const [resignModal, setResignModal] = useState(false);
   const [initiateModal, setInitiateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
@@ -185,13 +179,13 @@ export default function ExitPage() {
   const { data: requests = [], isLoading } = useListExitRequests({
     status: statusFilter || undefined,
     exitType: typeFilter || undefined,
-  } as any);
+  });
 
   const kpi = {
-    submitted: requests.filter((r: ExitRequest) => r.status === "Submitted").length,
-    noticePeriod: requests.filter((r: ExitRequest) => r.status === "Notice Period").length,
-    clearancePending: requests.filter((r: ExitRequest) => r.status === "Clearance Pending").length,
-    fnfPending: requests.filter((r: ExitRequest) => r.status === "FnF Pending").length,
+    submitted: requests.filter(r => r.status === "Submitted").length,
+    noticePeriod: requests.filter(r => r.status === "Notice Period").length,
+    clearancePending: requests.filter(r => r.status === "Clearance Pending").length,
+    fnfPending: requests.filter(r => r.status === "FnF Pending").length,
   };
 
   return (
@@ -304,12 +298,12 @@ export default function ExitPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {(requests as ExitRequest[]).map((r) => (
+                  {requests.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
                       {isHr && (
                         <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900">{(r as any).employeeName ?? `Emp #${r.employeeId}`}</div>
-                          {(r as any).departmentName && <div className="text-xs text-gray-500">{(r as any).departmentName}</div>}
+                          <div className="font-medium text-gray-900">{r.employeeName ?? `Emp #${r.employeeId}`}</div>
+                          {r.departmentName && <div className="text-xs text-gray-500">{r.departmentName}</div>}
                         </td>
                       )}
                       <td className="px-4 py-3">

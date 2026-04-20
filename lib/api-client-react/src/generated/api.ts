@@ -42,6 +42,7 @@ import type {
   ComputeAppraisalOutcomesBody,
   ComputeFnfBody,
   ComputePayrollRun200,
+  ConfigureExitInterviewQuestionsBody,
   CreateAttendanceBody,
   CreateBlackoutDateBody,
   CreateCandidateBody,
@@ -112,9 +113,13 @@ import type {
   GetEmployeesIdAttendanceParams,
   GetEmployeesIdOvertimeParams,
   GetEsiReportParams,
+  GetExitAlerts200,
+  GetFnfSuggestion200,
   GetForm16Report200,
   GetHeadcountReport200,
   GetHeadcountReportParams,
+  GetHelpdeskSlaReport200,
+  GetHelpdeskSlaReportParams,
   GetLeaveCalendarParams,
   GetLeaveUtilizationReport200,
   GetLeaveUtilizationReportParams,
@@ -124,6 +129,8 @@ import type {
   GetPerformanceSummaryReport200,
   GetPerformanceSummaryReportParams,
   GetPermissionRegisterParams,
+  GetPermissionUsageReport200,
+  GetPermissionUsageReportParams,
   GetPfEcrReportParams,
   GetPtReportParams,
   GetRecruitmentPipelineReport200,
@@ -131,12 +138,13 @@ import type {
   GetShiftSwapsParams,
   GetShiftsCalendarParams,
   GetShiftsTemplatesParams,
+  GetStatutoryComplianceReport200,
+  GetStatutoryComplianceReportParams,
   GetTdsSummaryReportParams,
   GoalProgress,
   GoalProgressBody,
   HeadcountByDepartment,
   HealthStatus,
-  HelpdeskSlaReport,
   HelpdeskTicket,
   HelpdeskTicketDetail,
   HrmsUser,
@@ -208,6 +216,7 @@ import type {
   PostOnboardingTasksIdCompleteBody,
   PreOnboardingDocument,
   PreOnboardingRecord,
+  ProcessAccessRevocations200,
   RegularizationActionBody,
   RejectOfferBody,
   RejectPreOnboardingDocumentBody,
@@ -19008,43 +19017,68 @@ export const useCreateTicketAssignment = <
 };
 
 /**
- * @summary SLA breach and resolution report
+ * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
  */
-export const getGetHelpdeskSlaReportUrl = () => {
-  return `/api/helpdesk/sla-report`;
+export const getGetHelpdeskSlaReportUrl = (
+  params?: GetHelpdeskSlaReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/helpdesk-sla?${stringifiedParams}`
+    : `/api/reports/helpdesk-sla`;
 };
 
 export const getHelpdeskSlaReport = async (
+  params?: GetHelpdeskSlaReportParams,
   options?: RequestInit,
-): Promise<HelpdeskSlaReport> => {
-  return customFetch<HelpdeskSlaReport>(getGetHelpdeskSlaReportUrl(), {
-    ...options,
-    method: "GET",
-  });
+): Promise<GetHelpdeskSlaReport200> => {
+  return customFetch<GetHelpdeskSlaReport200>(
+    getGetHelpdeskSlaReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getGetHelpdeskSlaReportQueryKey = () => {
-  return [`/api/helpdesk/sla-report`] as const;
+export const getGetHelpdeskSlaReportQueryKey = (
+  params?: GetHelpdeskSlaReportParams,
+) => {
+  return [`/api/reports/helpdesk-sla`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetHelpdeskSlaReportQueryOptions = <
   TData = Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: GetHelpdeskSlaReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetHelpdeskSlaReportQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getGetHelpdeskSlaReportQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getHelpdeskSlaReport>>
-  > = ({ signal }) => getHelpdeskSlaReport({ signal, ...requestOptions });
+  > = ({ signal }) =>
+    getHelpdeskSlaReport(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
@@ -19059,21 +19093,24 @@ export type GetHelpdeskSlaReportQueryResult = NonNullable<
 export type GetHelpdeskSlaReportQueryError = ErrorType<unknown>;
 
 /**
- * @summary SLA breach and resolution report
+ * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
  */
 
 export function useGetHelpdeskSlaReport<
   TData = Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetHelpdeskSlaReportQueryOptions(options);
+>(
+  params?: GetHelpdeskSlaReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHelpdeskSlaReportQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -19796,8 +19833,8 @@ export const getListExitRequestsUrl = (params?: ListExitRequestsParams) => {
 export const listExitRequests = async (
   params?: ListExitRequestsParams,
   options?: RequestInit,
-): Promise<ExitRequest[]> => {
-  return customFetch<ExitRequest[]>(getListExitRequestsUrl(params), {
+): Promise<ExitRequestDetail[]> => {
+  return customFetch<ExitRequestDetail[]>(getListExitRequestsUrl(params), {
     ...options,
     method: "GET",
   });
@@ -19881,8 +19918,8 @@ export const getCreateExitRequestUrl = () => {
 export const createExitRequest = async (
   createExitRequestBody: CreateExitRequestBody,
   options?: RequestInit,
-): Promise<ExitRequest> => {
-  return customFetch<ExitRequest>(getCreateExitRequestUrl(), {
+): Promise<ExitRequestDetail> => {
+  return customFetch<ExitRequestDetail>(getCreateExitRequestUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -20738,6 +20775,342 @@ export const useSubmitExitInterview = <
   TContext
 > => {
   return useMutation(getSubmitExitInterviewMutationOptions(options));
+};
+
+/**
+ * @summary Get auto-suggested FnF computation values from payroll and leave data
+ */
+export const getGetFnfSuggestionUrl = (id: number) => {
+  return `/api/exit/requests/${id}/fnf/suggest`;
+};
+
+export const getFnfSuggestion = async (
+  id: number,
+  options?: RequestInit,
+): Promise<GetFnfSuggestion200> => {
+  return customFetch<GetFnfSuggestion200>(getGetFnfSuggestionUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetFnfSuggestionQueryKey = (id: number) => {
+  return [`/api/exit/requests/${id}/fnf/suggest`] as const;
+};
+
+export const getGetFnfSuggestionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFnfSuggestion>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFnfSuggestion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetFnfSuggestionQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFnfSuggestion>>
+  > = ({ signal }) => getFnfSuggestion(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFnfSuggestion>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFnfSuggestionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFnfSuggestion>>
+>;
+export type GetFnfSuggestionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get auto-suggested FnF computation values from payroll and leave data
+ */
+
+export function useGetFnfSuggestion<
+  TData = Awaited<ReturnType<typeof getFnfSuggestion>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFnfSuggestion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFnfSuggestionQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Configure custom exit interview questions (HR Manager / Super Admin only)
+ */
+export const getConfigureExitInterviewQuestionsUrl = (id: number) => {
+  return `/api/exit/requests/${id}/interview/questions`;
+};
+
+export const configureExitInterviewQuestions = async (
+  id: number,
+  configureExitInterviewQuestionsBody: ConfigureExitInterviewQuestionsBody,
+  options?: RequestInit,
+): Promise<ExitInterview> => {
+  return customFetch<ExitInterview>(getConfigureExitInterviewQuestionsUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(configureExitInterviewQuestionsBody),
+  });
+};
+
+export const getConfigureExitInterviewQuestionsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof configureExitInterviewQuestions>>,
+    TError,
+    { id: number; data: BodyType<ConfigureExitInterviewQuestionsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof configureExitInterviewQuestions>>,
+  TError,
+  { id: number; data: BodyType<ConfigureExitInterviewQuestionsBody> },
+  TContext
+> => {
+  const mutationKey = ["configureExitInterviewQuestions"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof configureExitInterviewQuestions>>,
+    { id: number; data: BodyType<ConfigureExitInterviewQuestionsBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return configureExitInterviewQuestions(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConfigureExitInterviewQuestionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof configureExitInterviewQuestions>>
+>;
+export type ConfigureExitInterviewQuestionsMutationBody =
+  BodyType<ConfigureExitInterviewQuestionsBody>;
+export type ConfigureExitInterviewQuestionsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Configure custom exit interview questions (HR Manager / Super Admin only)
+ */
+export const useConfigureExitInterviewQuestions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof configureExitInterviewQuestions>>,
+    TError,
+    { id: number; data: BodyType<ConfigureExitInterviewQuestionsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof configureExitInterviewQuestions>>,
+  TError,
+  { id: number; data: BodyType<ConfigureExitInterviewQuestionsBody> },
+  TContext
+> => {
+  return useMutation(
+    getConfigureExitInterviewQuestionsMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Get retirement alerts (60 days) and contract expiry alerts (30 days)
+ */
+export const getGetExitAlertsUrl = () => {
+  return `/api/exit/alerts`;
+};
+
+export const getExitAlerts = async (
+  options?: RequestInit,
+): Promise<GetExitAlerts200> => {
+  return customFetch<GetExitAlerts200>(getGetExitAlertsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetExitAlertsQueryKey = () => {
+  return [`/api/exit/alerts`] as const;
+};
+
+export const getGetExitAlertsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getExitAlerts>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getExitAlerts>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetExitAlertsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getExitAlerts>>> = ({
+    signal,
+  }) => getExitAlerts({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getExitAlerts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetExitAlertsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getExitAlerts>>
+>;
+export type GetExitAlertsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get retirement alerts (60 days) and contract expiry alerts (30 days)
+ */
+
+export function useGetExitAlerts<
+  TData = Awaited<ReturnType<typeof getExitAlerts>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getExitAlerts>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetExitAlertsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Process LWD+1 system access revocations for employees whose LWD has passed
+ */
+export const getProcessAccessRevocationsUrl = () => {
+  return `/api/exit/process-access-revocations`;
+};
+
+export const processAccessRevocations = async (
+  options?: RequestInit,
+): Promise<ProcessAccessRevocations200> => {
+  return customFetch<ProcessAccessRevocations200>(
+    getProcessAccessRevocationsUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getProcessAccessRevocationsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof processAccessRevocations>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof processAccessRevocations>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["processAccessRevocations"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof processAccessRevocations>>,
+    void
+  > = () => {
+    return processAccessRevocations(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProcessAccessRevocationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof processAccessRevocations>>
+>;
+
+export type ProcessAccessRevocationsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Process LWD+1 system access revocations for employees whose LWD has passed
+ */
+export const useProcessAccessRevocations = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof processAccessRevocations>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof processAccessRevocations>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getProcessAccessRevocationsMutationOptions(options));
 };
 
 /**
@@ -22326,3 +22699,218 @@ export const useRunCustomReport = <
 > => {
   return useMutation(getRunCustomReportMutationOptions(options));
 };
+
+/**
+ * @summary Permission (OD/short-leave) usage report with monthly register summary
+ */
+export const getGetPermissionUsageReportUrl = (
+  params?: GetPermissionUsageReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/permission-usage?${stringifiedParams}`
+    : `/api/reports/permission-usage`;
+};
+
+export const getPermissionUsageReport = async (
+  params?: GetPermissionUsageReportParams,
+  options?: RequestInit,
+): Promise<GetPermissionUsageReport200> => {
+  return customFetch<GetPermissionUsageReport200>(
+    getGetPermissionUsageReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPermissionUsageReportQueryKey = (
+  params?: GetPermissionUsageReportParams,
+) => {
+  return [
+    `/api/reports/permission-usage`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetPermissionUsageReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPermissionUsageReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPermissionUsageReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPermissionUsageReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPermissionUsageReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPermissionUsageReport>>
+  > = ({ signal }) =>
+    getPermissionUsageReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPermissionUsageReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPermissionUsageReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPermissionUsageReport>>
+>;
+export type GetPermissionUsageReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Permission (OD/short-leave) usage report with monthly register summary
+ */
+
+export function useGetPermissionUsageReport<
+  TData = Awaited<ReturnType<typeof getPermissionUsageReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPermissionUsageReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPermissionUsageReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPermissionUsageReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary PF (12% on basic ≤15k) and ESI (3.25%/0.75% on gross ≤21k) statutory compliance report
+ */
+export const getGetStatutoryComplianceReportUrl = (
+  params?: GetStatutoryComplianceReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/statutory-compliance?${stringifiedParams}`
+    : `/api/reports/statutory-compliance`;
+};
+
+export const getStatutoryComplianceReport = async (
+  params?: GetStatutoryComplianceReportParams,
+  options?: RequestInit,
+): Promise<GetStatutoryComplianceReport200> => {
+  return customFetch<GetStatutoryComplianceReport200>(
+    getGetStatutoryComplianceReportUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetStatutoryComplianceReportQueryKey = (
+  params?: GetStatutoryComplianceReportParams,
+) => {
+  return [
+    `/api/reports/statutory-compliance`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetStatutoryComplianceReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStatutoryComplianceReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetStatutoryComplianceReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStatutoryComplianceReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetStatutoryComplianceReportQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStatutoryComplianceReport>>
+  > = ({ signal }) =>
+    getStatutoryComplianceReport(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStatutoryComplianceReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStatutoryComplianceReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStatutoryComplianceReport>>
+>;
+export type GetStatutoryComplianceReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary PF (12% on basic ≤15k) and ESI (3.25%/0.75% on gross ≤21k) statutory compliance report
+ */
+
+export function useGetStatutoryComplianceReport<
+  TData = Awaited<ReturnType<typeof getStatutoryComplianceReport>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetStatutoryComplianceReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStatutoryComplianceReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStatutoryComplianceReportQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
