@@ -13,13 +13,14 @@ import { Progress } from "@/components/ui/progress";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
 import { ArrowLeft, ChevronRight, Target, BarChart2 } from "lucide-react";
 
-const STAGES = ["Goal Setting", "Self Appraisal", "Manager Review", "Calibration", "Completed"] as const;
+const STAGES = ["Goal Setting", "Mid Review", "Self Appraisal", "Manager Evaluation", "Calibration", "Completed"] as const;
 type Stage = typeof STAGES[number];
 
 const STAGE_COLORS: Record<Stage, string> = {
   "Goal Setting": "bg-blue-100 text-blue-700",
+  "Mid Review": "bg-sky-100 text-sky-700",
   "Self Appraisal": "bg-amber-100 text-amber-700",
-  "Manager Review": "bg-orange-100 text-orange-700",
+  "Manager Evaluation": "bg-orange-100 text-orange-700",
   "Calibration": "bg-violet-100 text-violet-700",
   "Completed": "bg-green-100 text-green-700",
 };

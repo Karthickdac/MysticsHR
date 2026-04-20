@@ -33,6 +33,7 @@ export const employeeProfilesTable = pgTable("employee_profiles", {
   nationality: text("nationality"),
   permanentAddress: text("permanent_address"),
   currentAddress: text("current_address"),
+  personalEmail: text("personal_email"),
   linkedinUrl: text("linkedin_url"),
   emergencyContactName: text("emergency_contact_name"),
   emergencyContactPhone: text("emergency_contact_phone"),

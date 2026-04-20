@@ -282,7 +282,8 @@ router.get("/performance/self-appraisals", requireHrmsUser, requireRole(...ALL_R
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
-      if (emp) conds.push(eq(selfAppraisalsTable.employeeId, emp.id));
+      if (!emp) { res.json([]); return; } // Fail closed — no linked employee record
+      conds.push(eq(selfAppraisalsTable.employeeId, emp.id));
     }
 
     let query = db.select({
@@ -357,9 +358,25 @@ router.post("/performance/self-appraisals", requireHrmsUser, requireRole(...ALL_
 
 router.get("/performance/manager-evaluations", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
+    const u = req.hrmsUser!;
     const { cycleId, employeeId } = req.query as { cycleId?: string; employeeId?: string };
     const conds = [];
     if (employeeId) conds.push(eq(managerEvaluationsTable.employeeId, Number(employeeId)));
+
+    // HOD scope enforcement: only show evaluations for their direct reports.
+    // HR roles and super_admin have unrestricted read scope.
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
+    if (!isHrRole) {
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp) { res.json([]); return; } // No linked employee — fail closed
+      // Scope: only evaluations for employees who report to this HOD
+      const directReports = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(eq(employeesTable.managerId, hodEmp.id));
+      if (directReports.length === 0) { res.json([]); return; }
+      conds.push(inArray(managerEvaluationsTable.employeeId, directReports.map(r => r.id)));
+    }
 
     let rows;
     if (cycleId) {
@@ -538,7 +555,8 @@ router.get("/performance/outcomes", requireHrmsUser, requireRole(...ALL_ROLES), 
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
-      if (emp) conds.push(eq(appraisalOutcomesTable.employeeId, emp.id));
+      if (!emp) { res.json([]); return; } // Fail closed — no linked employee record
+      conds.push(eq(appraisalOutcomesTable.employeeId, emp.id));
     }
 
     const rows = await db.select({
@@ -637,6 +655,7 @@ router.get("/ess/me", requireHrmsUser, requireRole(...ALL_ROLES), async (req, re
       designation: designationsTable.name,
       department: departmentsTable.name,
       currentAddress: employeeProfilesTable.currentAddress,
+      personalEmail: employeeProfilesTable.personalEmail,
       emergencyContactName: employeeProfilesTable.emergencyContactName,
       emergencyContactPhone: employeeProfilesTable.emergencyContactPhone,
       emergencyContactRelation: employeeProfilesTable.emergencyContactRelation,
@@ -662,6 +681,7 @@ router.get("/ess/me", requireHrmsUser, requireRole(...ALL_ROLES), async (req, re
       department: emp.department ?? null,
       dateOfJoining: emp.dateOfJoining ?? null,
       phone: emp.phone ?? null,
+      personalEmail: emp.personalEmail ?? null,
       currentAddress: emp.currentAddress ?? null,
       emergencyContactName: emp.emergencyContactName ?? null,
       emergencyContactPhone: emp.emergencyContactPhone ?? null,
@@ -692,6 +712,7 @@ router.put("/ess/me", requireHrmsUser, requireRole(...ALL_ROLES), async (req, re
 
     // Upsert employee profile fields
     const profileUpdate: Record<string, string | null> = {};
+    if (personalEmail !== undefined) profileUpdate.personalEmail = personalEmail;
     if (currentAddress !== undefined) profileUpdate.currentAddress = currentAddress;
     if (emergencyContactName !== undefined) profileUpdate.emergencyContactName = emergencyContactName;
     if (emergencyContactPhone !== undefined) profileUpdate.emergencyContactPhone = emergencyContactPhone;
@@ -716,6 +737,7 @@ router.put("/ess/me", requireHrmsUser, requireRole(...ALL_ROLES), async (req, re
       lastName: employeesTable.lastName,
       email: employeesTable.email,
       phone: employeesTable.phone,
+      personalEmail: employeeProfilesTable.personalEmail,
       currentAddress: employeeProfilesTable.currentAddress,
       emergencyContactName: employeeProfilesTable.emergencyContactName,
       emergencyContactPhone: employeeProfilesTable.emergencyContactPhone,
@@ -729,6 +751,7 @@ router.put("/ess/me", requireHrmsUser, requireRole(...ALL_ROLES), async (req, re
       name: `${updated.firstName} ${updated.lastName}`,
       email: updated.email ?? u.email,
       phone: updated.phone,
+      personalEmail: updated.personalEmail ?? null,
       currentAddress: updated.currentAddress,
       emergencyContactName: updated.emergencyContactName,
       emergencyContactPhone: updated.emergencyContactPhone,
