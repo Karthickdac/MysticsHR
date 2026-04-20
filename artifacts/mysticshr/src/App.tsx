@@ -47,6 +47,7 @@ import CycleDetailPage from "@/pages/performance/cycle-detail";
 import EssPortalPage from "@/pages/ess/index";
 import HelpdeskPage from "@/pages/helpdesk/index";
 import TicketDetailPage from "@/pages/helpdesk/ticket-detail";
+import SlaReportPage from "@/pages/helpdesk/sla-report";
 import DocumentsPage from "@/pages/documents/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
@@ -557,6 +558,14 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
                 <EssPortalPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/helpdesk/sla-report">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <SlaReportPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

@@ -42,6 +42,57 @@ async function getEmployeeForUser(userId: number): Promise<{ id: number } | null
   return emp ?? null;
 }
 
+/**
+ * Verify the caller can access a specific ticket.
+ * Returns the ticket if access is granted, null otherwise.
+ */
+async function checkTicketAccess(
+  ticketId: number,
+  u: { id: number; role: string }
+): Promise<typeof helpdeskTicketsTable.$inferSelect | null> {
+  const [ticket] = await db.select().from(helpdeskTicketsTable)
+    .where(eq(helpdeskTicketsTable.id, ticketId));
+  if (!ticket) return null;
+
+  const isHrRole = (HR_ROLES as readonly string[]).includes(u.role);
+  if (isHrRole) return ticket;
+
+  const emp = await getEmployeeForUser(u.id);
+  if (!emp) return null;
+
+  if (ticket.raisedByEmployeeId === emp.id) return ticket;
+
+  if (u.role === "hod") {
+    const directReports = await db.select({ id: employeesTable.id }).from(employeesTable)
+      .where(eq(employeesTable.managerId, emp.id));
+    const teamIds = [emp.id, ...directReports.map(r => r.id)];
+    if (ticket.raisedByEmployeeId && teamIds.includes(ticket.raisedByEmployeeId)) return ticket;
+  }
+
+  return null;
+}
+
+/**
+ * Category-to-role routing: return first HR user of an appropriate role for auto-assignment.
+ * Falls back to any hr_manager if no specific match.
+ */
+async function autoAssignForCategory(category: string): Promise<number | null> {
+  const preferredRoles: Record<string, string[]> = {
+    IT: ["super_admin", "hr_manager"],
+    HR: ["hr_manager", "hr_executive"],
+    Finance: ["payroll_admin", "hr_manager"],
+    Admin: ["super_admin", "hr_manager"],
+    Other: ["hr_manager", "hr_executive"],
+  };
+  const roles = preferredRoles[category] ?? ["hr_manager"];
+  for (const role of roles) {
+    const [user] = await db.select({ id: hrmsUsersTable.id }).from(hrmsUsersTable)
+      .where(eq(hrmsUsersTable.role, role as "hr_manager")).limit(1);
+    if (user) return user.id;
+  }
+  return null;
+}
+
 async function enrichTicket(ticket: typeof helpdeskTicketsTable.$inferSelect) {
   const [raisedBy] = ticket.raisedByEmployeeId
     ? await db.select({ firstName: employeesTable.firstName, lastName: employeesTable.lastName })
@@ -123,6 +174,7 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
 
     const emp = await getEmployeeForUser(u.id);
     const slaDeadline = computeSlaDeadline(priority);
+    const assignedToUserId = await autoAssignForCategory(category);
 
     const [ticket] = await db.insert(helpdeskTicketsTable).values({
       subject,
@@ -130,6 +182,7 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
       category,
       priority,
       raisedByEmployeeId: emp?.id ?? null,
+      assignedToUserId,
       slaDeadline,
     }).returning();
 
@@ -229,7 +282,13 @@ router.get("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...ALL
   try {
     const ticketId = Number(req.params.id);
     const u = req.hrmsUser!;
-    const isHrRole = (MANAGER_ROLES as readonly string[]).includes(u.role);
+
+    const ticket = await checkTicketAccess(ticketId, u);
+    if (!ticket) {
+      res.status(404).json({ error: "Ticket not found or access denied" }); return;
+    }
+
+    const isManagerRole = (MANAGER_ROLES as readonly string[]).includes(u.role);
 
     const comments = await db.select({
       id: ticketCommentsTable.id,
@@ -244,7 +303,7 @@ router.get("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...ALL
       .where(eq(ticketCommentsTable.ticketId, ticketId))
       .orderBy(ticketCommentsTable.createdAt);
 
-    res.json(isHrRole ? comments : comments.filter(c => !c.isInternal));
+    res.json(isManagerRole ? comments : comments.filter(c => !c.isInternal));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
@@ -256,8 +315,13 @@ router.post("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...AL
     const { message, isInternal = false } = req.body;
     if (!message) { res.status(400).json({ error: "message is required" }); return; }
 
-    const isHrRole = (MANAGER_ROLES as readonly string[]).includes(u.role);
-    const internalFlag = isHrRole ? Boolean(isInternal) : false;
+    const ticket = await checkTicketAccess(ticketId, u);
+    if (!ticket) {
+      res.status(404).json({ error: "Ticket not found or access denied" }); return;
+    }
+
+    const isManagerRole = (MANAGER_ROLES as readonly string[]).includes(u.role);
+    const internalFlag = isManagerRole ? Boolean(isInternal) : false;
 
     const [comment] = await db.insert(ticketCommentsTable).values({
       ticketId,
@@ -266,7 +330,6 @@ router.post("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...AL
       isInternal: internalFlag,
     }).returning();
 
-    // Update ticket updatedAt and optionally change status
     await db.update(helpdeskTicketsTable).set({ updatedAt: new Date() })
       .where(eq(helpdeskTicketsTable.id, ticketId));
 
