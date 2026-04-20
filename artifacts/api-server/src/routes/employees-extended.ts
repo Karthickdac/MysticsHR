@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
+import { checkPayrollLock } from "../lib/payroll-lock";
 import {
   employeeProfilesTable,
   employeeEducationTable,
@@ -104,6 +105,15 @@ router.put(
     try {
       const id = parseInt(String(req.params.id), 10);
       const b = req.body;
+
+      // If the request touches bank account fields, enforce payroll lock
+      const hasBankUpdate = ["bankAccountName", "bankAccountNumber", "ifscCode", "bankName", "bankBranch"]
+        .some(f => Object.prototype.hasOwnProperty.call(b, f));
+      if (hasBankUpdate) {
+        const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_bank");
+        if (lockError) { res.status(422).json({ error: lockError }); return; }
+      }
+
       const [existing] = await db
         .select()
         .from(employeeProfilesTable)

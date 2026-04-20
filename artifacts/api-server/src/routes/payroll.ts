@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
+import { checkPayrollLock } from "../lib/payroll-lock";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import {
   salaryStructuresTable, salaryComponentsTable, payrollRunsTable, payrollRecordsTable,
@@ -116,27 +117,6 @@ router.get("/payroll/salary-structures/:id", requireHrmsUser, requireRole(...HR_
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-// Helper: check if current period is payroll-locked, allowing approved edit_salary exceptions
-async function checkSalaryEditLock(userId: number): Promise<string | null> {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const [lock] = await db.select().from(payrollLocksTable).where(
-    and(eq(payrollLocksTable.year, year), eq(payrollLocksTable.month, month), eq(payrollLocksTable.isLocked, true))
-  );
-  if (!lock) return null;
-  // Check if user has an approved edit_salary exception for this lock
-  const [exception] = await db.select().from(payrollLockExceptionsTable).where(
-    and(
-      eq(payrollLockExceptionsTable.payrollLockId, lock.id),
-      eq(payrollLockExceptionsTable.requestedById, userId),
-      eq(payrollLockExceptionsTable.exceptionType, "edit_salary"),
-      eq(payrollLockExceptionsTable.status, "Approved"),
-    )
-  );
-  if (exception) return null;
-  return "Payroll is locked for the current period. Raise a lock exception to proceed.";
-}
 
 router.post("/payroll/salary-structures", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
@@ -148,7 +128,7 @@ router.post("/payroll/salary-structures", requireHrmsUser, requireRole(...HR_ROL
       }>;
     };
 
-    const lockError = await checkSalaryEditLock(req.hrmsUser!.id);
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_salary");
     if (lockError) { res.status(422).json({ error: lockError }); return; }
 
     const [structure] = await db.insert(salaryStructuresTable).values({
@@ -192,7 +172,7 @@ router.put("/payroll/salary-structures/:id", requireHrmsUser, requireRole(...HR_
       }>;
     };
 
-    const lockError = await checkSalaryEditLock(req.hrmsUser!.id);
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_salary");
     if (lockError) { res.status(422).json({ error: lockError }); return; }
 
     const [updated] = await db.update(salaryStructuresTable).set({
@@ -632,9 +612,32 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
     await db.delete(payrollRecordsTable).where(eq(payrollRecordsTable.payrollRunId, runId));
 
     for (const emp of employees) {
-      const [structure] = await db.select().from(salaryStructuresTable).where(
-        and(eq(salaryStructuresTable.employeeId, emp.id), eq(salaryStructuresTable.isActive, true))
-      );
+      // Resolve salary structure: prefer an approved revision effective within the pay period
+      // over the generic active structure, so mid-period revisions are honoured correctly.
+      const approvedRevisions = await db
+        .select({ newStructureId: salaryRevisionsTable.newStructureId, effectiveDate: salaryRevisionsTable.effectiveDate })
+        .from(salaryRevisionsTable)
+        .where(and(
+          eq(salaryRevisionsTable.employeeId, emp.id),
+          eq(salaryRevisionsTable.status, "Approved"),
+          lte(salaryRevisionsTable.effectiveDate, periodEnd),
+        ))
+        .orderBy(desc(salaryRevisionsTable.effectiveDate));
+
+      // Pick the most recent approved revision whose effective date is on/before the period end.
+      // If the revision falls mid-period we still apply it for the whole period (standard practice
+      // for monthly payroll; the revision record itself documents the effective date).
+      let structureId: number | null = approvedRevisions[0]?.newStructureId ?? null;
+
+      let structure;
+      if (structureId) {
+        [structure] = await db.select().from(salaryStructuresTable).where(eq(salaryStructuresTable.id, structureId));
+      }
+      if (!structure) {
+        [structure] = await db.select().from(salaryStructuresTable).where(
+          and(eq(salaryStructuresTable.employeeId, emp.id), eq(salaryStructuresTable.isActive, true))
+        );
+      }
       if (!structure) continue;
 
       const components = await db.select().from(salaryComponentsTable).where(
@@ -680,6 +683,12 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
         }
       }
 
+      // Monetise overtime: daily rate = (monthly basic / working days), overtime factor = 2×
+      const dailyRate = workingDays > 0 ? Number(structure.grossCtc) / 12 / workingDays : 0;
+      const hourlyRate = dailyRate / 8;
+      const overtimePay = Math.round(overtimeHours * hourlyRate * 2);
+      otherEarnings += overtimePay;
+
       const grossEarnings = basic + hra + specialAllowance + travelAllowance + medicalAllowance +
         performanceBonus + shiftAllowance + nightDifferential + otherEarnings;
 
@@ -694,6 +703,7 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
         and(eq(taxRegimeDeclarationsTable.employeeId, emp.id), eq(taxRegimeDeclarationsTable.isCurrent, true))
       );
       const regime: "Old" | "New" = (taxDecl?.regime as "Old" | "New") ?? "New";
+      // Annual CTC for TDS: use annualCtc from the resolved structure (handles revisions correctly)
       const annualGross = Number(structure.annualCtc);
       const tds = computeTDS(annualGross, regime);
 
@@ -741,7 +751,11 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
         netPay: String(netPay.toFixed(2)),
         taxRegime: regime,
         status: "Pending" as const,
-        componentBreakdown: { components: components.map(c => ({ name: c.componentName, type: c.componentType, amount: c.amount, isEarning: c.isEarning })) },
+        componentBreakdown: {
+          components: components.map(c => ({ name: c.componentName, type: c.componentType, amount: c.amount, isEarning: c.isEarning })),
+          overtimePay,
+          overtimeHours: parseFloat(overtimeHours.toFixed(2)),
+        },
       };
       records.push(record);
     }

@@ -4,6 +4,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { extractError } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +79,7 @@ export default function TaxDeclarationPage() {
       qc.invalidateQueries({ queryKey: getListTaxDeclarationsQueryKey({}) });
       setShowDeclare(false);
       setForm(f => ({ ...f, investments: {} }));
-    } catch (e: any) { setError(e?.response?.data?.error ?? "Failed to submit"); }
+    } catch (err: unknown) { setError(extractError(err, "Failed to submit")); }
   }
 
   return (
@@ -152,7 +153,7 @@ export default function TaxDeclarationPage() {
             <Card key={d.id} className={`border-2 ${d.isCurrent ? "border-blue-200" : "border-transparent"}`}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
-                  {isHr && <p className="font-semibold">{(d as any).employeeName ?? `Employee #${d.employeeId}`}</p>}
+                  {isHr && <p className="font-semibold">{d.employeeName ?? `Employee #${d.employeeId}`}</p>}
                   <div className="flex items-center gap-2 mt-0.5">
                     <Badge className={`text-xs ${d.regime === "New" ? "bg-emerald-100 text-emerald-700" : "bg-purple-100 text-purple-700"}`}>
                       {d.regime} Regime
@@ -206,7 +207,7 @@ export default function TaxDeclarationPage() {
 
             <div className="space-y-3">
               <Label>Select Tax Regime</Label>
-              <RadioGroup value={form.regime} onValueChange={v => setForm(f => ({ ...f, regime: v as any }))}>
+              <RadioGroup value={form.regime} onValueChange={v => setForm(f => ({ ...f, regime: v as "Old" | "New" }))}>
                 <div className="flex items-center space-x-2 p-3 rounded-lg border cursor-pointer hover:bg-muted/30">
                   <RadioGroupItem value="New" id="regime-new" />
                   <Label htmlFor="regime-new" className="cursor-pointer">

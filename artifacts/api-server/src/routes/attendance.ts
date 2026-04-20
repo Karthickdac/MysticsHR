@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
+import { checkPayrollLock } from "../lib/payroll-lock";
 import {
   attendanceRecordsTable,
   attendanceRegularizationsTable,
@@ -201,6 +202,9 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
 
 router.post("/attendance", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance");
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
+
     const body = req.body;
     const signIn = body.signInTime ? new Date(body.signInTime) : null;
     const signOut = body.signOutTime ? new Date(body.signOutTime) : null;
@@ -517,6 +521,9 @@ router.get("/attendance/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), as
 
 router.patch("/attendance/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance");
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
+
     const body = req.body;
     if (!body.overrideReason) { res.status(400).json({ error: "overrideReason is required for HR override" }); return; }
     const id = Number(req.params.id);

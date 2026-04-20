@@ -6,6 +6,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { extractError } from "@/lib/utils";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +73,7 @@ export default function PayrollDashboardPage() {
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
       qc.invalidateQueries({ queryKey: getListPayrollLocksQueryKey({}) });
       setShowNew(false);
-    } catch (e: any) { setActionError(e?.response?.data?.error ?? "Failed to create run"); }
+    } catch (err: unknown) { setActionError(extractError(err, "Failed to create run")); }
   }
 
   async function handleCompute(id: number) {
@@ -80,7 +81,7 @@ export default function PayrollDashboardPage() {
     try {
       await computeRun.mutateAsync({ id });
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
-    } catch (e: any) { setActionError(e?.response?.data?.error ?? "Failed to compute"); }
+    } catch (err: unknown) { setActionError(extractError(err, "Failed to compute")); }
     finally { setBusy(null); }
   }
 
@@ -89,7 +90,7 @@ export default function PayrollDashboardPage() {
     try {
       await approveRun.mutateAsync({ id });
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
-    } catch (e: any) { setActionError(e?.response?.data?.error ?? "Failed to approve"); }
+    } catch (err: unknown) { setActionError(extractError(err, "Failed to approve")); }
     finally { setBusy(null); }
   }
 
@@ -98,7 +99,7 @@ export default function PayrollDashboardPage() {
     try {
       await finalizeRun.mutateAsync({ id });
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
-    } catch (e: any) { setActionError(e?.response?.data?.error ?? "Failed to finalize"); }
+    } catch (err: unknown) { setActionError(extractError(err, "Failed to finalize")); }
     finally { setBusy(null); }
   }
 
@@ -111,7 +112,7 @@ export default function PayrollDashboardPage() {
         await lockPayroll.mutateAsync({ year: currentYear, month: currentMonth });
       }
       qc.invalidateQueries({ queryKey: getListPayrollLocksQueryKey({}) });
-    } catch (e: any) { setActionError(e?.response?.data?.error ?? "Failed to toggle lock"); }
+    } catch (err: unknown) { setActionError(extractError(err, "Failed to toggle lock")); }
   }
 
   return (

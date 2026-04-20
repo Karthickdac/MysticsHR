@@ -5,6 +5,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { extractError } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -128,10 +129,11 @@ export default function SalaryStructuresPage() {
     // form will be populated via useEffect once editDetail loads
   }
 
-  function updateComp(idx: number, field: keyof Component, val: any) {
+  function updateComp(idx: number, field: keyof Component, val: string | boolean | number) {
     setForm(f => {
-      const comps = [...f.components];
-      (comps[idx] as any)[field] = val;
+      const comps = f.components.map((c, i) =>
+        i === idx ? { ...c, [field]: val } : c
+      );
       return { ...f, components: comps };
     });
   }
@@ -174,7 +176,7 @@ export default function SalaryStructuresPage() {
       });
       qc.invalidateQueries({ queryKey: getListSalaryStructuresQueryKey({}) });
       setShowCreate(false);
-    } catch (e: any) { setError(e?.response?.data?.error ?? "Failed to create"); }
+    } catch (err: unknown) { setError(extractError(err, "Failed to create")); }
   }
 
   async function handleUpdate() {
@@ -200,7 +202,7 @@ export default function SalaryStructuresPage() {
       });
       qc.invalidateQueries({ queryKey: getListSalaryStructuresQueryKey({}) });
       setEditId(null);
-    } catch (e: any) { setError(e?.response?.data?.error ?? "Failed to update"); }
+    } catch (err: unknown) { setError(extractError(err, "Failed to update")); }
   }
 
   const filtered = structures?.filter(s => !employeeFilter || (s.employeeName?.toLowerCase().includes(employeeFilter.toLowerCase()) || s.employeeCode?.toLowerCase().includes(employeeFilter.toLowerCase())));
@@ -269,13 +271,13 @@ export default function SalaryStructuresPage() {
           {viewDetail && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-muted-foreground">Employee: </span><span className="font-medium">{(viewDetail as any).employeeName ?? `#${viewDetail.employeeId}`}</span></div>
+                <div><span className="text-muted-foreground">Employee: </span><span className="font-medium">{viewDetail.employeeName ?? `#${viewDetail.employeeId}`}</span></div>
                 <div><span className="text-muted-foreground">Structure: </span><span className="font-medium">{viewDetail.name}</span></div>
                 <div><span className="text-muted-foreground">From: </span><span className="font-medium">{fmtDate(viewDetail.effectiveFrom)}</span></div>
                 <div><span className="text-muted-foreground">Gross CTC: </span><span className="font-semibold text-green-700">{fmt(viewDetail.grossCtc)}/mo</span></div>
                 <div><span className="text-muted-foreground">Annual CTC: </span><span className="font-semibold">{fmt(viewDetail.annualCtc)}</span></div>
               </div>
-              {(viewDetail as any).components?.length > 0 && (
+              {viewDetail.components && viewDetail.components.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-2">Components</h4>
                   <div className="rounded-lg border overflow-hidden">
@@ -288,7 +290,7 @@ export default function SalaryStructuresPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(viewDetail as any).components.map((c: any) => (
+                        {viewDetail.components.map((c) => (
                           <tr key={c.id} className="border-t">
                             <td className="p-2 pl-3">{c.componentName}</td>
                             <td className="p-2">

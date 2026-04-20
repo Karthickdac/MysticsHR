@@ -5,6 +5,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { extractError } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,7 @@ export default function SalaryRevisionsPage() {
       qc.invalidateQueries({ queryKey: getListSalaryRevisionsQueryKey({}) });
       setShowCreate(false);
       setForm({ employeeId: "", newStructureId: "", effectiveDate: new Date().toISOString().split("T")[0], reason: "" });
-    } catch (e: any) { setError(e?.response?.data?.error ?? "Failed"); }
+    } catch (err: unknown) { setError(extractError(err, "Failed")); }
   }
 
   async function handleAction() {
@@ -82,7 +83,7 @@ export default function SalaryRevisionsPage() {
       await actionMutation.mutateAsync({ id: actionRevision.id, data: { action: actionType, approvalRemarks: actionRemarks || undefined } });
       qc.invalidateQueries({ queryKey: getListSalaryRevisionsQueryKey({}) });
       setActionRevision(null); setActionRemarks("");
-    } catch (e: any) { setError(e?.response?.data?.error ?? "Failed"); }
+    } catch (err: unknown) { setError(extractError(err, "Failed")); }
   }
 
   return (
