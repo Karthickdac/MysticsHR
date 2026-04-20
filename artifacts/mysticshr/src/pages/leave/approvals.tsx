@@ -98,10 +98,15 @@ export default function LeaveApprovalsPage() {
 
   function getApprovalActions(app: LeaveApplication): Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> {
     const actions: Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> = [];
-    if ((isHod || isHr) && app.status === "Pending") {
-      actions.push({ type: "hod", action: "Approved" }, { type: "hod", action: "Rejected" });
+    if (app.status === "Pending") {
+      if (isHr) {
+        // HR users action Pending apps directly with HR-type so backend bypasses/replaces HOD step
+        actions.push({ type: "hr", action: "Approved" }, { type: "hr", action: "Rejected" });
+      } else if (isHod) {
+        actions.push({ type: "hod", action: "Approved" }, { type: "hod", action: "Rejected" });
+      }
     }
-    if (isHr && (app.status === "HOD Approved" || app.status === "Pending")) {
+    if (isHr && app.status === "HOD Approved") {
       actions.push({ type: "hr", action: "Approved" }, { type: "hr", action: "Rejected" });
     }
     return actions;

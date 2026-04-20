@@ -842,6 +842,21 @@ router.get("/leave/balances", requireHrmsUser, requireRole(...HR_READ_ROLES, "em
       const emp = await getEmployeeForUser(req.hrmsUser.id);
       if (!emp) { res.json([]); return; }
       conds.push(eq(leaveBalancesTable.employeeId, emp.id));
+    } else if (req.hrmsUser.role === "hod") {
+      // HOD may only see balances of employees in their department
+      const hodEmp = await getEmployeeForUser(req.hrmsUser.id);
+      if (!hodEmp?.departmentId) { res.json([]); return; }
+      const deptEmps = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(and(eq(employeesTable.departmentId, hodEmp.departmentId), isNull(employeesTable.deletedAt)));
+      if (deptEmps.length === 0) { res.json([]); return; }
+      const deptEmpIds = deptEmps.map(e => e.id);
+      if (employeeId) {
+        const empId = Number(employeeId);
+        if (!deptEmpIds.includes(empId)) { res.status(403).json({ error: "Employee is not in your department" }); return; }
+        conds.push(eq(leaveBalancesTable.employeeId, empId));
+      } else {
+        conds.push(inArray(leaveBalancesTable.employeeId, deptEmpIds));
+      }
     } else if (employeeId) {
       conds.push(eq(leaveBalancesTable.employeeId, Number(employeeId)));
     }

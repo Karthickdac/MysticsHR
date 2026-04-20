@@ -169,6 +169,17 @@ export default function LeavePoliciesPage() {
                     onChange={(e) => setForm({ ...form, maxConsecutiveDays: e.target.value || undefined })} />
                 </div>
               </div>
+              <div className="space-y-1">
+                <Label>Applicable Employment Types</Label>
+                <Input
+                  value={(form.applicableEmploymentTypes ?? []).join(", ")}
+                  placeholder="e.g. Full-Time, Part-Time (leave blank for all)"
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    setForm({ ...form, applicableEmploymentTypes: val ? val.split(",").map(s => s.trim()).filter(Boolean) : null });
+                  }} />
+                <p className="text-xs text-muted-foreground">Comma-separated. Leave blank to allow all employment types.</p>
+              </div>
             </div>
           )}
           <DialogFooter>
