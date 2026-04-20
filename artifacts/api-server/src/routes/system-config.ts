@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../lib/db";
 import { systemSettingsTable, approvalChainConfigsTable, hrmsUsersTable } from "@workspace/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 
 const router = Router();
@@ -228,8 +228,8 @@ router.get("/custom-fields", requireHrmsUser, requireRole("super_admin", "hr_man
       .where(eq(systemSettingsTable.category, "custom_employee_fields"))
       .orderBy(systemSettingsTable.key);
     const fields = rows.map(r => {
-      try { return { id: r.key, ...(JSON.parse(r.value) as object) }; }
-      catch { return { id: r.key }; }
+      const val = r.value && typeof r.value === "object" ? (r.value as Record<string, unknown>) : {};
+      return { id: r.key, ...val };
     });
     res.json(fields);
   } catch { res.status(500).json({ error: "Failed to fetch custom fields" }); }
@@ -237,35 +237,38 @@ router.get("/custom-fields", requireHrmsUser, requireRole("super_admin", "hr_man
 
 router.post("/custom-fields", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
   try {
-    const { name, type, required, options, placeholder } = req.body;
+    const { name, type, required, options, placeholder } = req.body as { name: string; type: string; required?: boolean; options?: unknown[]; placeholder?: string };
     if (!name || !type) { res.status(400).json({ error: "name and type are required" }); return; }
     const id = `field_${Date.now()}`;
+    const payload = { name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" };
     await db.insert(systemSettingsTable).values({
       category: "custom_employee_fields", key: id,
-      value: JSON.stringify({ name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" }),
+      value: payload,
     });
-    res.status(201).json({ id, name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" });
+    res.status(201).json({ id, ...payload });
   } catch { res.status(500).json({ error: "Failed to create custom field" }); }
 });
 
 router.put("/custom-fields/:id", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
   try {
-    const { name, type, required, options, placeholder } = req.body;
-    const key = req.params.id;
+    const { name, type, required, options, placeholder } = req.body as { name: string; type: string; required?: boolean; options?: unknown[]; placeholder?: string };
+    const key = req.params["id"] as string;
     const existing = await db.select({ id: systemSettingsTable.id }).from(systemSettingsTable)
       .where(and(eq(systemSettingsTable.category, "custom_employee_fields"), eq(systemSettingsTable.key, key))).limit(1);
     if (!existing.length) { res.status(404).json({ error: "Field not found" }); return; }
+    const payload = { name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" };
     await db.update(systemSettingsTable)
-      .set({ value: JSON.stringify({ name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" }) })
+      .set({ value: payload })
       .where(and(eq(systemSettingsTable.category, "custom_employee_fields"), eq(systemSettingsTable.key, key)));
-    res.json({ id: key, name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" });
+    res.json({ id: key, ...payload });
   } catch { res.status(500).json({ error: "Failed to update custom field" }); }
 });
 
 router.delete("/custom-fields/:id", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
   try {
+    const key = req.params["id"] as string;
     await db.delete(systemSettingsTable)
-      .where(and(eq(systemSettingsTable.category, "custom_employee_fields"), eq(systemSettingsTable.key, req.params.id)));
+      .where(and(eq(systemSettingsTable.category, "custom_employee_fields"), eq(systemSettingsTable.key, key)));
     res.status(204).end();
   } catch { res.status(500).json({ error: "Failed to delete custom field" }); }
 });
@@ -279,8 +282,8 @@ router.get("/leave-blackouts", requireHrmsUser, requireRole("super_admin", "hr_m
       .where(eq(systemSettingsTable.category, "leave_blackout_dates"))
       .orderBy(systemSettingsTable.key);
     const blackouts = rows.map(r => {
-      try { return { id: r.key, ...(JSON.parse(r.value) as object) }; }
-      catch { return { id: r.key }; }
+      const val = r.value && typeof r.value === "object" ? (r.value as Record<string, unknown>) : {};
+      return { id: r.key, ...val };
     });
     res.json(blackouts);
   } catch { res.status(500).json({ error: "Failed to fetch leave blackouts" }); }
@@ -288,21 +291,23 @@ router.get("/leave-blackouts", requireHrmsUser, requireRole("super_admin", "hr_m
 
 router.post("/leave-blackouts", requireHrmsUser, requireRole("super_admin", "hr_manager"), async (req, res) => {
   try {
-    const { name, startDate, endDate, reason } = req.body;
+    const { name, startDate, endDate, reason } = req.body as { name: string; startDate: string; endDate: string; reason?: string };
     if (!name || !startDate || !endDate) { res.status(400).json({ error: "name, startDate, and endDate are required" }); return; }
     const id = `blackout_${Date.now()}`;
+    const payload = { name, startDate, endDate, reason: reason ?? "" };
     await db.insert(systemSettingsTable).values({
       category: "leave_blackout_dates", key: id,
-      value: JSON.stringify({ name, startDate, endDate, reason: reason ?? "" }),
+      value: payload,
     });
-    res.status(201).json({ id, name, startDate, endDate, reason: reason ?? "" });
+    res.status(201).json({ id, ...payload });
   } catch { res.status(500).json({ error: "Failed to create leave blackout" }); }
 });
 
 router.delete("/leave-blackouts/:id", requireHrmsUser, requireRole("super_admin", "hr_manager"), async (req, res) => {
   try {
+    const key = req.params["id"] as string;
     await db.delete(systemSettingsTable)
-      .where(and(eq(systemSettingsTable.category, "leave_blackout_dates"), eq(systemSettingsTable.key, req.params.id)));
+      .where(and(eq(systemSettingsTable.category, "leave_blackout_dates"), eq(systemSettingsTable.key, key)));
     res.status(204).end();
   } catch { res.status(500).json({ error: "Failed to delete leave blackout" }); }
 });
@@ -313,7 +318,7 @@ export async function getUsersByRoles(roles: string[]): Promise<Array<{ id: numb
     .from(hrmsUsersTable)
     .where(and(
       eq(hrmsUsersTable.isActive, true),
-      inArray(hrmsUsersTable.role, roles),
+      sql`${hrmsUsersTable.role} = ANY(${roles})`,
     ));
   return users;
 }

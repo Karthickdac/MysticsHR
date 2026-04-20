@@ -20,6 +20,9 @@ import {
   preOnboardingRecordsTable,
   preOnboardingDocumentsTable,
   approvalChainConfigsTable,
+  shiftTemplatesTable,
+  shiftAssignmentsTable,
+  notificationLogsTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, isNotNull, ne, sql, lt, count, inArray } from "drizzle-orm";
 import { generateTablePdf } from "./pdf";
@@ -673,34 +676,164 @@ async function processConfiguredEscalations() {
   }
 }
 
-/** Alert employees who have no sign-out record for today (run after EOD) */
-async function alertNoSignOut() {
+// ─── Shift-aware attendance helper ───────────────────────────────────────────
+
+/**
+ * Parse an "HH:mm" shift time string into a Date for the given date string (YYYY-MM-DD).
+ * Returns null if the string cannot be parsed.
+ */
+function parseShiftTimeForDate(hhMm: string, dateStr: string): Date | null {
+  const parts = hhMm.split(":");
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0] ?? "0", 10);
+  const m = parseInt(parts[1] ?? "0", 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+/**
+ * Build a set of "eventType_email" keys for notifications already sent today.
+ * Used to prevent duplicate notifications per employee per event per day.
+ */
+async function buildTodayNotifiedSet(todayStart: Date, events: string[]): Promise<Set<string>> {
+  const logs = await db.select({ eventType: notificationLogsTable.eventType, recipientEmail: notificationLogsTable.recipientEmail })
+    .from(notificationLogsTable)
+    .where(and(
+      gte(notificationLogsTable.sentAt, todayStart),
+      inArray(notificationLogsTable.eventType, events),
+    ));
+  return new Set(logs.map(l => `${l.eventType}_${l.recipientEmail}`));
+}
+
+/**
+ * Shift-aware no-sign-in alert:
+ * Notifies each employee 30 minutes after their personal shift start time if they
+ * have no attendance record for today. Idempotent — sends at most once per day.
+ */
+async function alertShiftAwareNoSignIn() {
   try {
     const { dispatchNotification } = await import("../lib/notification-service");
-    const today = new Date().toISOString().slice(0, 10);
-    // Get all records with sign-in but no sign-out
-    const noSignOut = await db.select({
-      employeeId: attendanceRecordsTable.employeeId,
-    }).from(attendanceRecordsTable)
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const todayStart = new Date(`${today}T00:00:00`);
+    const TRIGGER_OFFSET_MINUTES = 30;
+
+    // Pre-load today's notification set to avoid duplicate sends
+    const alreadyNotified = await buildTodayNotifiedSet(todayStart, ["no_sign_in"]);
+
+    // Get all active employees with their current shift assignment
+    const empShifts = await db.select({
+      employeeId: employeesTable.id,
+      email: hrmsUsersTable.email,
+      name: hrmsUsersTable.name,
+      startTime: shiftTemplatesTable.startTime,
+    }).from(employeesTable)
+      .innerJoin(shiftAssignmentsTable, and(
+        eq(shiftAssignmentsTable.employeeId, employeesTable.id),
+        lte(shiftAssignmentsTable.effectiveFrom, today),
+        sql`(${shiftAssignmentsTable.effectiveTo} IS NULL OR ${shiftAssignmentsTable.effectiveTo} >= ${today})`,
+      ))
+      .innerJoin(shiftTemplatesTable, eq(shiftTemplatesTable.id, shiftAssignmentsTable.shiftTemplateId))
+      .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+      .where(eq(employeesTable.isActive, true));
+
+    // Get all attendance records for today (signed-in employees)
+    const todayAttendance = await db.select({ employeeId: attendanceRecordsTable.employeeId })
+      .from(attendanceRecordsTable)
+      .where(eq(attendanceRecordsTable.attendanceDate, today));
+    const signedInToday = new Set(todayAttendance.map(r => r.employeeId));
+
+    for (const emp of empShifts) {
+      if (!emp.email || signedInToday.has(emp.employeeId)) continue;
+      if (alreadyNotified.has(`no_sign_in_${emp.email}`)) continue;
+
+      // Parse shift start time and add trigger offset
+      const shiftStart = parseShiftTimeForDate(emp.startTime, today);
+      if (!shiftStart) continue;
+      const triggerTime = new Date(shiftStart.getTime() + TRIGGER_OFFSET_MINUTES * 60 * 1000);
+
+      // Only send if current time has passed the trigger point
+      if (now < triggerTime) continue;
+
+      await dispatchNotification({
+        eventType: "no_sign_in", module: "attendance",
+        recipientEmail: emp.email, recipientName: emp.name ?? "",
+        recipientEmployeeDbId: emp.employeeId,
+        variables: {
+          recipientName: emp.name ?? "",
+          shiftStart: emp.startTime,
+        },
+      }).catch(() => {});
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] alertShiftAwareNoSignIn error");
+  }
+}
+
+/**
+ * Shift-aware no-sign-out alert:
+ * Notifies each employee 30 minutes after their personal shift end time if they
+ * signed in but haven't signed out. Idempotent — sends at most once per day.
+ */
+async function alertShiftAwareNoSignOut() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const todayStart = new Date(`${today}T00:00:00`);
+    const TRIGGER_OFFSET_MINUTES = 30;
+
+    const alreadyNotified = await buildTodayNotifiedSet(todayStart, ["no_sign_out"]);
+
+    const empShifts = await db.select({
+      employeeId: employeesTable.id,
+      email: hrmsUsersTable.email,
+      name: hrmsUsersTable.name,
+      endTime: shiftTemplatesTable.endTime,
+    }).from(employeesTable)
+      .innerJoin(shiftAssignmentsTable, and(
+        eq(shiftAssignmentsTable.employeeId, employeesTable.id),
+        lte(shiftAssignmentsTable.effectiveFrom, today),
+        sql`(${shiftAssignmentsTable.effectiveTo} IS NULL OR ${shiftAssignmentsTable.effectiveTo} >= ${today})`,
+      ))
+      .innerJoin(shiftTemplatesTable, eq(shiftTemplatesTable.id, shiftAssignmentsTable.shiftTemplateId))
+      .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+      .where(eq(employeesTable.isActive, true));
+
+    // Get employees who signed in but haven't signed out
+    const noSignOut = await db.select({ employeeId: attendanceRecordsTable.employeeId })
+      .from(attendanceRecordsTable)
       .where(and(
         eq(attendanceRecordsTable.attendanceDate, today),
         isNotNull(attendanceRecordsTable.signInTime),
         sql`${attendanceRecordsTable.signOutTime} IS NULL`,
       ));
+    const missingSignOut = new Set(noSignOut.map(r => r.employeeId));
 
-    for (const record of noSignOut) {
-      const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
-        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, record.employeeId)).limit(1);
-      if (!empUser?.email) continue;
+    for (const emp of empShifts) {
+      if (!emp.email || !missingSignOut.has(emp.employeeId)) continue;
+      if (alreadyNotified.has(`no_sign_out_${emp.email}`)) continue;
+
+      const shiftEnd = parseShiftTimeForDate(emp.endTime, today);
+      if (!shiftEnd) continue;
+      const triggerTime = new Date(shiftEnd.getTime() + TRIGGER_OFFSET_MINUTES * 60 * 1000);
+
+      if (now < triggerTime) continue;
+
       await dispatchNotification({
         eventType: "no_sign_out", module: "attendance",
-        recipientEmail: empUser.email, recipientName: empUser.name ?? "",
-        recipientEmployeeDbId: record.employeeId,
-        variables: { recipientName: empUser.name ?? "" },
+        recipientEmail: emp.email, recipientName: emp.name ?? "",
+        recipientEmployeeDbId: emp.employeeId,
+        variables: {
+          recipientName: emp.name ?? "",
+          shiftEnd: emp.endTime,
+        },
       }).catch(() => {});
     }
   } catch (e) {
-    logger.error({ err: e }, "[scheduler] alertNoSignOut error");
+    logger.error({ err: e }, "[scheduler] alertShiftAwareNoSignOut error");
   }
 }
 
@@ -843,43 +976,7 @@ async function remindPreOnboardingPending() {
   }
 }
 
-/** Alert employees who have no attendance record for today */
-async function alertAttendanceAnomalies() {
-  try {
-    const { dispatchNotification } = await import("../lib/notification-service");
-    const today = new Date().toISOString().slice(0, 10);
-    const hour = new Date().getHours();
-
-    // Only run end-of-day check (after 18:00)
-    if (hour < 18) return;
-
-    const allActive = await db.select({
-      id: employeesTable.id,
-      email: hrmsUsersTable.email,
-      name: hrmsUsersTable.name,
-    }).from(employeesTable)
-      .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
-      .where(eq(employeesTable.isActive, true));
-
-    const todayRecords = await db.select({ employeeId: attendanceRecordsTable.employeeId })
-      .from(attendanceRecordsTable)
-      .where(eq(attendanceRecordsTable.attendanceDate, today));
-
-    const presentIds = new Set(todayRecords.map(r => r.employeeId));
-
-    for (const emp of allActive) {
-      if (!emp.email || presentIds.has(emp.id)) continue;
-      await dispatchNotification({
-        eventType: "no_sign_in", module: "attendance",
-        recipientEmail: emp.email, recipientName: emp.name ?? "",
-        recipientEmployeeDbId: emp.id,
-        variables: { recipientName: emp.name ?? "" },
-      }).catch(() => {});
-    }
-  } catch (e) {
-    logger.error({ err: e }, "[scheduler] alertAttendanceAnomalies error");
-  }
-}
+// alertAttendanceAnomalies removed — superseded by alertShiftAwareNoSignIn below
 
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 export function startScheduler(_port: number) {
@@ -899,13 +996,13 @@ export function startScheduler(_port: number) {
   cron.schedule("45 */2 * * *", () => {
     void processConfiguredEscalations();
   });
-  // At 18:30 daily — alert employees with no attendance record today
-  cron.schedule("30 18 * * *", () => {
-    void alertAttendanceAnomalies();
+  // Every 30 minutes — shift-aware no-sign-in alert (30 min after each employee's personal shift start)
+  cron.schedule("*/30 * * * *", () => {
+    void alertShiftAwareNoSignIn();
   });
-  // At 19:00 daily — alert employees who signed in but didn't sign out
-  cron.schedule("0 19 * * *", () => {
-    void alertNoSignOut();
+  // Every 30 minutes — shift-aware no-sign-out alert (30 min after each employee's personal shift end)
+  cron.schedule("*/30 * * * *", () => {
+    void alertShiftAwareNoSignOut();
   });
   // At 19:30 daily — alert employees who exceeded overtime threshold
   cron.schedule("30 19 * * *", () => {
