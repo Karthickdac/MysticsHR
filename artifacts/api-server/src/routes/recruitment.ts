@@ -637,7 +637,7 @@ router.get("/interviews/:id/feedback", requireHrmsUser, requireRole(...HR_WRITE_
   }
 });
 
-router.post("/interviews/:id/feedback", requireHrmsUser, async (req, res) => {
+router.post("/interviews/:id/feedback", requireHrmsUser, requireRole(...HR_WRITE_ROLES, "hod"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const b = req.body ?? {};
