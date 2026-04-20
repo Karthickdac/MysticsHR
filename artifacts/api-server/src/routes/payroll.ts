@@ -8,8 +8,8 @@ import {
   salaryStructuresTable, salaryComponentsTable, payrollRunsTable, payrollRecordsTable,
   payslipsTable, taxRegimeDeclarationsTable, salaryRevisionsTable, payrollLocksTable,
   payrollLockExceptionsTable, loanRepaymentsTable, employeesTable, hrmsUsersTable,
-  departmentsTable, designationsTable, attendanceRecordsTable, payrollSettingsTable,
-  employeeProfilesTable,
+  departmentsTable, designationsTable, attendanceRecordsTable, overtimeRecordsTable,
+  payrollSettingsTable, employeeProfilesTable,
   salaryComponentTypeEnum, lockExceptionTypeEnum, salaryRevisionStatusEnum,
 } from "@workspace/db/schema";
 import { eq, and, desc, asc, or, gte, lte, sql } from "drizzle-orm";
@@ -730,7 +730,6 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
       const workingDays = lastDay;
       const attendanceRows = await db.select({
         status: attendanceRecordsTable.status,
-        overtimeMinutes: attendanceRecordsTable.overtimeMinutes,
       }).from(attendanceRecordsTable).where(
         and(eq(attendanceRecordsTable.employeeId, emp.id), gte(attendanceRecordsTable.attendanceDate, periodStart), lte(attendanceRecordsTable.attendanceDate, periodEnd))
       );
@@ -743,8 +742,27 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
       const absences = attendanceRows.filter(a => a.status === "Absent").length;
       const lopDays = absences;
       const leaveDays = attendanceRows.filter(a => a.status === "On Leave").length;
-      const totalOvertimeMins = attendanceRows.reduce((s, a) => s + (a.overtimeMinutes ?? 0), 0);
+
+      // Source overtime from the dedicated overtime_records table (populated by the
+      // attendance module on sign-out). Use the recorded totalAmount when present;
+      // otherwise fall back to deriving it from the basic-derived hourly rate below.
+      const overtimeRows = await db.select({
+        overtimeMinutes: overtimeRecordsTable.overtimeMinutes,
+        totalAmount: overtimeRecordsTable.totalAmount,
+      }).from(overtimeRecordsTable).where(
+        and(
+          eq(overtimeRecordsTable.employeeId, emp.id),
+          gte(overtimeRecordsTable.attendanceDate, periodStart),
+          lte(overtimeRecordsTable.attendanceDate, periodEnd),
+        )
+      );
+      const totalOvertimeMins = overtimeRows.reduce((s, r) => s + (r.overtimeMinutes ?? 0), 0);
       const overtimeHours = totalOvertimeMins / 60;
+      const hasRecordedOvertimeAmount = overtimeRows.some(r => r.totalAmount != null);
+      const recordedOvertimeAmount = overtimeRows.reduce(
+        (s, r) => s + (r.totalAmount != null ? Number(r.totalAmount) : 0),
+        0,
+      );
 
       const factor = workingDays > 0 ? presentDays / workingDays : 0;
 
@@ -766,10 +784,14 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
         }
       }
 
-      // Monetise overtime: daily rate = (monthly basic / working days), overtime factor = 2×
+      // Monetise overtime: prefer the totalAmount already stored on overtime_records
+      // (computed at the time of approval using the employee's contracted ratePerHour).
+      // Fall back to a 2× hourly-rate derivation from gross CTC when no amount was recorded.
       const dailyRate = workingDays > 0 ? Number(structure.grossCtc) / 12 / workingDays : 0;
       const hourlyRate = dailyRate / 8;
-      const overtimePay = Math.round(overtimeHours * hourlyRate * 2);
+      const overtimePay = hasRecordedOvertimeAmount
+        ? Math.round(recordedOvertimeAmount)
+        : Math.round(overtimeHours * hourlyRate * 2);
       otherEarnings += overtimePay;
 
       const grossEarnings = basic + hra + specialAllowance + travelAllowance + medicalAllowance +
