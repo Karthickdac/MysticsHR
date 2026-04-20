@@ -5,9 +5,11 @@ import {
   useHrActionLeave,
   useCancelActionLeaveApplication,
   useInitializeLeaveBalances,
+  useCarryForwardLeaveBalances,
   getListLeaveApplicationsQueryKey,
   getListLeaveBalancesQueryKey,
   type InitializeLeaveBalances200,
+  type CarryForwardLeaveBalances200,
   type LeaveApplication,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -53,12 +55,15 @@ export default function LeaveApprovalsPage() {
   const hrMutation = useHrActionLeave();
   const cancelActionMutation = useCancelActionLeaveApplication();
   const initMutation = useInitializeLeaveBalances();
+  const carryForwardMutation = useCarryForwardLeaveBalances();
 
   const [actionState, setActionState] = useState<ActionState | null>(null);
   const [remarks, setRemarks] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showInit, setShowInit] = useState(false);
   const [initYear, setInitYear] = useState(String(new Date().getFullYear()));
+  const [showCarryForward, setShowCarryForward] = useState(false);
+  const [cfYear, setCfYear] = useState(String(new Date().getFullYear() - 1));
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: getListLeaveApplicationsQueryKey({}) });
@@ -89,6 +94,17 @@ export default function LeaveApprovalsPage() {
       alert(`Initialized ${result.count} leave balance records for ${initYear}.`);
       setShowInit(false);
     } catch { alert("Failed to initialize balances"); }
+  }
+
+  async function handleCarryForward() {
+    try {
+      const result: CarryForwardLeaveBalances200 = await carryForwardMutation.mutateAsync({ data: { year: Number(cfYear) } });
+      invalidate();
+      alert(result.message);
+      setShowCarryForward(false);
+    } catch (err: any) {
+      alert(err?.response?.data?.error ?? "Failed to carry forward balances");
+    }
   }
 
   const filtered = (applications ?? []).filter(a => {
@@ -123,9 +139,14 @@ export default function LeaveApprovalsPage() {
         </div>
         <div className="flex gap-2">
           {isHr && (
-            <Button size="sm" variant="outline" onClick={() => setShowInit(true)}>
-              <RefreshCw className="w-4 h-4 mr-1" />Initialize Balances
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={() => setShowInit(true)}>
+                <RefreshCw className="w-4 h-4 mr-1" />Initialize Balances
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowCarryForward(true)}>
+                <RefreshCw className="w-4 h-4 mr-1" />Carry Forward
+              </Button>
+            </>
           )}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-44 h-8 text-xs">
@@ -239,6 +260,31 @@ export default function LeaveApprovalsPage() {
               onClick={handleAction}
               disabled={isMutating}>
               {isMutating ? "Processing..." : actionState?.action === "Approved" ? "Confirm" : "Confirm Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Carry-forward dialog */}
+      <Dialog open={showCarryForward} onOpenChange={setShowCarryForward}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Year-End Carry Forward</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-500">
+              For each active employee and leave type, this caps remaining balance by the leave type's carry-forward limit, moves it to the next year as carry-forward, and resets used/pending while allocating the new year's annual quota. Already-processed records are skipped.
+            </p>
+            <div>
+              <Label>Source Year</Label>
+              <Input type="number" value={cfYear} onChange={e => setCfYear(e.target.value)} min="2020" max="2030" />
+              <p className="text-xs text-gray-400 mt-1">Carry-forward target year: {Number(cfYear) + 1}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCarryForward(false)}>Close</Button>
+            <Button onClick={handleCarryForward} disabled={carryForwardMutation.isPending}>
+              {carryForwardMutation.isPending ? "Processing..." : "Run Carry Forward"}
             </Button>
           </DialogFooter>
         </DialogContent>

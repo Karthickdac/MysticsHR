@@ -3410,6 +3410,24 @@ export const InitializeLeaveBalancesResponse = zod.object({
 });
 
 /**
+ * For each active employee × leave type, applies carryForwardMax cap to remaining balance, moves it to next year's carryForward, resets used/pending to 0, and allocates annualQuota for the new year.
+ * @summary Year-end carry-forward and balance reset
+ */
+export const CarryForwardLeaveBalancesBody = zod.object({
+  year: zod.number().describe("Source year (carry-forward target is year+1)"),
+  employeeId: zod.number().nullish(),
+});
+
+export const CarryForwardLeaveBalancesResponse = zod.object({
+  processed: zod.number(),
+  carriedForwardCount: zod.number(),
+  totalDaysCarried: zod.string(),
+  fromYear: zod.number(),
+  toYear: zod.number(),
+  message: zod.string(),
+});
+
+/**
  * @summary Run periodic (monthly) leave accrual for all or one employee
  */
 export const accrueLeaveBalancesBodyMonthMax = 12;

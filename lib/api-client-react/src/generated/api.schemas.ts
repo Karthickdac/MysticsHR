@@ -3256,6 +3256,22 @@ export type InitializeLeaveBalances200 = {
   count: number;
 };
 
+export type CarryForwardLeaveBalancesBody = {
+  /** Source year (carry-forward target is year+1) */
+  year: number;
+  /** @nullable */
+  employeeId?: number | null;
+};
+
+export type CarryForwardLeaveBalances200 = {
+  processed: number;
+  carriedForwardCount: number;
+  totalDaysCarried: string;
+  fromYear: number;
+  toYear: number;
+  message: string;
+};
+
 export type AccrueLeaveBalancesBody = {
   year: number;
   /**

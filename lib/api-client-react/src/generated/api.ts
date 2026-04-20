@@ -39,6 +39,8 @@ import type {
   CancelActionLeaveApplicationBody,
   CancelLeaveBody,
   Candidate,
+  CarryForwardLeaveBalances200,
+  CarryForwardLeaveBalancesBody,
   ClearanceTask,
   ComputeAppraisalOutcomesBody,
   ComputeFnfBody,
@@ -12475,6 +12477,97 @@ export const useInitializeLeaveBalances = <
   TContext
 > => {
   return useMutation(getInitializeLeaveBalancesMutationOptions(options));
+};
+
+/**
+ * For each active employee × leave type, applies carryForwardMax cap to remaining balance, moves it to next year's carryForward, resets used/pending to 0, and allocates annualQuota for the new year.
+ * @summary Year-end carry-forward and balance reset
+ */
+export const getCarryForwardLeaveBalancesUrl = () => {
+  return `/api/leave/balances/carry-forward`;
+};
+
+export const carryForwardLeaveBalances = async (
+  carryForwardLeaveBalancesBody: CarryForwardLeaveBalancesBody,
+  options?: RequestInit,
+): Promise<CarryForwardLeaveBalances200> => {
+  return customFetch<CarryForwardLeaveBalances200>(
+    getCarryForwardLeaveBalancesUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(carryForwardLeaveBalancesBody),
+    },
+  );
+};
+
+export const getCarryForwardLeaveBalancesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof carryForwardLeaveBalances>>,
+    TError,
+    { data: BodyType<CarryForwardLeaveBalancesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof carryForwardLeaveBalances>>,
+  TError,
+  { data: BodyType<CarryForwardLeaveBalancesBody> },
+  TContext
+> => {
+  const mutationKey = ["carryForwardLeaveBalances"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof carryForwardLeaveBalances>>,
+    { data: BodyType<CarryForwardLeaveBalancesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return carryForwardLeaveBalances(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CarryForwardLeaveBalancesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof carryForwardLeaveBalances>>
+>;
+export type CarryForwardLeaveBalancesMutationBody =
+  BodyType<CarryForwardLeaveBalancesBody>;
+export type CarryForwardLeaveBalancesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Year-end carry-forward and balance reset
+ */
+export const useCarryForwardLeaveBalances = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof carryForwardLeaveBalances>>,
+    TError,
+    { data: BodyType<CarryForwardLeaveBalancesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof carryForwardLeaveBalances>>,
+  TError,
+  { data: BodyType<CarryForwardLeaveBalancesBody> },
+  TContext
+> => {
+  return useMutation(getCarryForwardLeaveBalancesMutationOptions(options));
 };
 
 /**

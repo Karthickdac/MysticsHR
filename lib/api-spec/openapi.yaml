@@ -2672,6 +2672,38 @@ paths:
                   count: { type: integer }
                 required: [count]
 
+  /leave/balances/carry-forward:
+    post:
+      operationId: carryForwardLeaveBalances
+      tags: [Leave]
+      summary: Year-end carry-forward and balance reset
+      description: For each active employee × leave type, applies carryForwardMax cap to remaining balance, moves it to next year's carryForward, resets used/pending to 0, and allocates annualQuota for the new year.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year: { type: integer, description: "Source year (carry-forward target is year+1)" }
+                employeeId: { type: ["integer", "null"] }
+      responses:
+        "200":
+          description: Carry-forward result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [processed, carriedForwardCount, totalDaysCarried, fromYear, toYear, message]
+                properties:
+                  processed: { type: integer }
+                  carriedForwardCount: { type: integer }
+                  totalDaysCarried: { type: string }
+                  fromYear: { type: integer }
+                  toYear: { type: integer }
+                  message: { type: string }
+
   /leave/balances/accrue:
     post:
       operationId: accrueLeaveBalances
