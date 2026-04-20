@@ -464,6 +464,10 @@ router.post("/shift-swaps/:id/hr-action", requireHrmsUser, requireRole(...HR_ROL
       res.status(422).json({ error: "HR action is not permitted until HOD has approved this swap request" });
       return;
     }
+    if (swap.hrStatus !== "Pending") {
+      res.status(422).json({ error: "This swap request has already been processed by HR and cannot be re-processed" });
+      return;
+    }
 
     // For approved swaps, resolve active templates BEFORE the transaction
     // Both must exist — if either is missing, reject with 422 rather than silently skipping

@@ -46,6 +46,18 @@ function fmtMins(mins: number | null | undefined): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
+/**
+ * Build an ISO timestamp for attendance. For overnight night shifts, if signOutTime
+ * (HH:MM) is earlier than signInTime (HH:MM), we advance the date by one day.
+ */
+function buildTS(date: string, time: string, signInTime?: string): string {
+  const d = new Date(`${date}T${time}`);
+  if (signInTime && time < signInTime) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d.toISOString();
+}
+
 // HR view: uses GET /attendance (includes employee name/code from join)
 function HrAttendanceView() {
   const qc = useQueryClient();
@@ -80,8 +92,8 @@ function HrAttendanceView() {
         employeeId: form.employeeId,
         attendanceDate: form.attendanceDate,
         status: form.status,
-        signInTime: form.signInTime ? new Date(`${form.attendanceDate}T${form.signInTime}`).toISOString() : null,
-        signOutTime: form.signOutTime ? new Date(`${form.attendanceDate}T${form.signOutTime}`).toISOString() : null,
+        signInTime: form.signInTime ? buildTS(form.attendanceDate, form.signInTime) : null,
+        signOutTime: form.signOutTime ? buildTS(form.attendanceDate, form.signOutTime, form.signInTime) : null,
         breakDurationMinutes: form.breakDurationMinutes,
         notes: form.notes || null,
       };
@@ -100,8 +112,8 @@ function HrAttendanceView() {
     try {
       const payload: AttendanceOverrideBody = {
         overrideReason: overrideForm.overrideReason,
-        signInTime: overrideForm.signInTime ? new Date(`${editingRecord.attendanceDate}T${overrideForm.signInTime}`).toISOString() : null,
-        signOutTime: overrideForm.signOutTime ? new Date(`${editingRecord.attendanceDate}T${overrideForm.signOutTime}`).toISOString() : null,
+        signInTime: overrideForm.signInTime ? buildTS(editingRecord.attendanceDate, overrideForm.signInTime) : null,
+        signOutTime: overrideForm.signOutTime ? buildTS(editingRecord.attendanceDate, overrideForm.signOutTime, overrideForm.signInTime) : null,
         breakDurationMinutes: overrideForm.breakDurationMinutes || null,
         status: overrideForm.status || null,
         notes: overrideForm.notes || null,

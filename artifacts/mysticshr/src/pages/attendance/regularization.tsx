@@ -30,6 +30,15 @@ function fmt(dt: string | null | undefined): string {
   return new Date(dt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Build ISO timestamp; if signOutTime < signInTime, advance date by 1 day (overnight shift). */
+function buildTS(date: string, time: string, signInTime?: string): string {
+  const d = new Date(`${date}T${time}`);
+  if (signInTime && time < signInTime) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d.toISOString();
+}
+
 export default function RegularizationPage() {
   const qc = useQueryClient();
   const { role } = useCurrentUser();
@@ -56,8 +65,8 @@ export default function RegularizationPage() {
       await createReg.mutateAsync({
         data: {
           attendanceDate: form.attendanceDate,
-          requestedSignIn: form.requestedSignIn ? new Date(`${form.attendanceDate}T${form.requestedSignIn}`).toISOString() : undefined,
-          requestedSignOut: form.requestedSignOut ? new Date(`${form.attendanceDate}T${form.requestedSignOut}`).toISOString() : undefined,
+          requestedSignIn: form.requestedSignIn ? buildTS(form.attendanceDate, form.requestedSignIn) : undefined,
+          requestedSignOut: form.requestedSignOut ? buildTS(form.attendanceDate, form.requestedSignOut, form.requestedSignIn) : undefined,
           reason: form.reason,
         }
       });
