@@ -29,6 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
   Approved: "bg-green-100 text-green-700",
   Rejected: "bg-red-100 text-red-700",
   Cancelled: "bg-gray-100 text-gray-500",
+  "Cancel Requested": "bg-orange-100 text-orange-700",
 };
 
 function fmtDate(d: string | null | undefined) {

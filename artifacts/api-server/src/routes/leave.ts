@@ -14,7 +14,7 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, isNull, or, sql, desc, SQL, inArray } from "drizzle-orm";
 
-const LEAVE_STATUSES = ["Pending", "HOD Approved", "Approved", "Rejected", "Cancelled"] as const;
+const LEAVE_STATUSES = ["Pending", "HOD Approved", "HR Approved", "Approved", "Rejected", "Cancelled", "Cancel Requested"] as const;
 type LeaveStatusValue = (typeof LEAVE_STATUSES)[number];
 
 const router = Router();
@@ -297,11 +297,10 @@ router.post("/leave/applications", requireHrmsUser, requireRole(...ALL_ROLES), a
       halfDaySession?: string; reason?: string; documentUrl?: string; lopConfirmed?: boolean;
     };
 
-    // Resolve employee
+    // Resolve employee — must have a linked employee profile; no fallback allowed
     const emp = await getEmployeeForUser(req.hrmsUser.id);
-    if (!emp && req.hrmsUser.role === "employee") { res.status(422).json({ error: "No employee profile linked to your account" }); return; }
-    const employeeId = emp?.id ?? (req.hrmsUser.role !== "employee" ? (await db.select({ id: employeesTable.id }).from(employeesTable).where(isNull(employeesTable.deletedAt)).limit(1))[0]?.id : null);
-    if (!employeeId) { res.status(422).json({ error: "Employee not found" }); return; }
+    if (!emp) { res.status(422).json({ error: "No employee profile linked to your account. Cannot submit leave." }); return; }
+    const employeeId = emp.id;
 
     const [leaveType] = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.id, leaveTypeId));
     if (!leaveType || !leaveType.isActive) { res.status(422).json({ error: "Invalid or inactive leave type" }); return; }
@@ -401,6 +400,12 @@ router.post("/leave/applications/:id/hod-action", requireHrmsUser, requireRole("
     if (!app) { res.status(404).json({ error: "Not found" }); return; }
     if (app.status !== "Pending") { res.status(422).json({ error: "Application is not in Pending state" }); return; }
 
+    // Check leave type requires HOD approval
+    const [leaveType] = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.id, app.leaveTypeId));
+    if (!leaveType?.requiresHodApproval && req.hrmsUser.role === "hod") {
+      res.status(403).json({ error: "This leave type does not require HOD approval" }); return;
+    }
+
     // HOD scope check
     if (req.hrmsUser.role === "hod" && req.hrmsUser.employeeId) {
       const [hodEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, req.hrmsUser.employeeId));
@@ -410,8 +415,6 @@ router.post("/leave/applications/:id/hod-action", requireHrmsUser, requireRole("
         return;
       }
     }
-
-    const [leaveType] = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.id, app.leaveTypeId));
     const year = new Date(app.fromDate as string).getFullYear();
     const totalDays = parseFloat(app.totalDays as string);
 
@@ -464,16 +467,18 @@ router.post("/leave/applications/:id/hr-action", requireHrmsUser, requireRole(..
     const [app] = await db.select().from(leaveApplicationsTable).where(eq(leaveApplicationsTable.id, appId));
     if (!app) { res.status(404).json({ error: "Not found" }); return; }
 
-    // Enforce HOD approval sequence: if leave type requires HOD approval, status must be "HOD Approved"
+    // Enforce HOD approval sequence:
+    // - "HOD Approved" is always valid (handles both required and skip-HOD cases)
+    // - "Pending" is valid only if the leave type does NOT require HOD approval
     const [leaveTypeForCheck] = await db.select({ requiresHodApproval: leaveTypesTable.requiresHodApproval })
       .from(leaveTypesTable).where(eq(leaveTypesTable.id, app.leaveTypeId));
     const requiresHod = leaveTypeForCheck?.requiresHodApproval ?? true;
-    const validPrecondition = requiresHod ? app.status === "HOD Approved" : app.status === "Pending";
+    const validPrecondition = app.status === "HOD Approved" || (!requiresHod && app.status === "Pending");
     if (!validPrecondition) {
       res.status(422).json({
         error: requiresHod
           ? "Application must be HOD Approved before HR can action it"
-          : "Application must be in Pending state"
+          : "Application must be in Pending or HOD Approved state"
       });
       return;
     }
@@ -517,12 +522,14 @@ router.post("/leave/applications/:id/cancel", requireHrmsUser, requireRole(...AL
 
     const [app] = await db.select().from(leaveApplicationsTable).where(eq(leaveApplicationsTable.id, appId));
     if (!app) { res.status(404).json({ error: "Not found" }); return; }
-    if (["Rejected", "Cancelled"].includes(app.status)) {
-      res.status(422).json({ error: "Cannot cancel an already rejected or cancelled application" });
+    if (["Rejected", "Cancelled", "Cancel Requested"].includes(app.status)) {
+      res.status(422).json({ error: "Application is already cancelled, rejected, or has a pending cancel request" });
       return;
     }
 
-    // Ownership / scope check
+    const isHrRole = ["super_admin", "hr_manager", "hr_executive"].includes(req.hrmsUser.role);
+
+    // Ownership / scope check for non-HR roles
     if (req.hrmsUser.role === "employee") {
       const emp = await getEmployeeForUser(req.hrmsUser.id);
       if (!emp || emp.id !== app.employeeId) { res.status(403).json({ error: "You can only cancel your own leave applications" }); return; }
@@ -532,42 +539,128 @@ router.post("/leave/applications/:id/cancel", requireHrmsUser, requireRole(...AL
       if (!hodEmp?.departmentId || hodEmp.departmentId !== reqEmp?.departmentId) {
         res.status(403).json({ error: "You can only cancel leave applications from employees in your department" }); return;
       }
-    }
-    // payroll_admin cannot cancel others' leave (read-only role)
-    if (req.hrmsUser.role === "payroll_admin") {
+    } else if (req.hrmsUser.role === "payroll_admin") {
       const emp = await getEmployeeForUser(req.hrmsUser.id);
       if (!emp || emp.id !== app.employeeId) { res.status(403).json({ error: "Payroll admin can only cancel their own leave" }); return; }
+    }
+    // hr_manager, hr_executive, super_admin: unrestricted
+
+    const totalDays = parseFloat(app.totalDays as string);
+    const year = new Date(app.fromDate as string).getFullYear();
+
+    // HR: direct immediate cancel. Non-HR: pending leave can be cancelled immediately;
+    // approved/HOD-approved leave needs HOD/HR approval ("Cancel Requested")
+    const needsApproval = !isHrRole && ["Approved", "HOD Approved"].includes(app.status);
+
+    const updated = await db.transaction(async (tx) => {
+      if (needsApproval) {
+        // Move to "Cancel Requested" — balance stays as-is until approval
+        const [row] = await tx.update(leaveApplicationsTable)
+          .set({
+            status: "Cancel Requested",
+            cancelledById: req.hrmsUser!.id,
+            cancellationReason: reason ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(leaveApplicationsTable.id, appId))
+          .returning();
+        return row;
+      } else {
+        // Immediate cancel (HR or Pending status)
+        const [row] = await tx.update(leaveApplicationsTable)
+          .set({ status: "Cancelled", cancelledById: req.hrmsUser!.id, cancellationReason: reason ?? null, cancelledAt: new Date(), updatedAt: new Date() })
+          .where(eq(leaveApplicationsTable.id, appId))
+          .returning();
+
+        const [bal] = await tx.select().from(leaveBalancesTable).where(
+          and(eq(leaveBalancesTable.employeeId, app.employeeId), eq(leaveBalancesTable.leaveTypeId, app.leaveTypeId), eq(leaveBalancesTable.year, year))
+        );
+        if (bal) {
+          if (app.status === "Approved") {
+            await tx.update(leaveBalancesTable)
+              .set({ used: sql`GREATEST(0, ${leaveBalancesTable.used} - ${totalDays})`, updatedAt: new Date() })
+              .where(eq(leaveBalancesTable.id, bal.id));
+          } else {
+            await tx.update(leaveBalancesTable)
+              .set({ pending: sql`GREATEST(0, ${leaveBalancesTable.pending} - ${totalDays})`, updatedAt: new Date() })
+              .where(eq(leaveBalancesTable.id, bal.id));
+          }
+        }
+        return row;
+      }
+    });
+
+    const auditAction = needsApproval ? "REQUEST_CANCEL_LEAVE" : "CANCEL_LEAVE";
+    await logAudit({ user: req.hrmsUser, action: auditAction, module: "Leave", recordId: appId, newValue: updated.status, ipAddress: req.ip });
+    res.json(updated);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// HOD/HR approves or rejects a "Cancel Requested" leave application
+router.post("/leave/applications/:id/cancel-action", requireHrmsUser, requireRole("super_admin", "hr_manager", "hr_executive", "hod"), async (req, res) => {
+  try {
+    const { action, remarks } = req.body as { action: "Approved" | "Rejected"; remarks?: string };
+    const appId = Number(req.params.id);
+
+    const [app] = await db.select().from(leaveApplicationsTable).where(eq(leaveApplicationsTable.id, appId));
+    if (!app) { res.status(404).json({ error: "Not found" }); return; }
+    if (app.status !== "Cancel Requested") { res.status(422).json({ error: "Application is not in Cancel Requested state" }); return; }
+
+    // HOD scope check
+    if (req.hrmsUser.role === "hod" && req.hrmsUser.employeeId) {
+      const [hodEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, req.hrmsUser.employeeId));
+      const [reqEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, app.employeeId));
+      if (hodEmp?.departmentId == null || hodEmp.departmentId !== reqEmp?.departmentId) {
+        res.status(403).json({ error: "You can only action cancel requests from employees in your department" }); return;
+      }
     }
 
     const totalDays = parseFloat(app.totalDays as string);
     const year = new Date(app.fromDate as string).getFullYear();
 
     const updated = await db.transaction(async (tx) => {
-      const [row] = await tx.update(leaveApplicationsTable)
-        .set({ status: "Cancelled", cancelledById: req.hrmsUser!.id, cancellationReason: reason ?? null, cancelledAt: new Date(), updatedAt: new Date() })
-        .where(eq(leaveApplicationsTable.id, appId))
-        .returning();
-
-      const [bal] = await tx.select().from(leaveBalancesTable).where(
-        and(eq(leaveBalancesTable.employeeId, app.employeeId), eq(leaveBalancesTable.leaveTypeId, app.leaveTypeId), eq(leaveBalancesTable.year, year))
-      );
-      if (bal) {
-        if (app.status === "Approved") {
-          // Restore used balance
-          await tx.update(leaveBalancesTable)
-            .set({ used: sql`GREATEST(0, ${leaveBalancesTable.used} - ${totalDays})`, updatedAt: new Date() })
-            .where(eq(leaveBalancesTable.id, bal.id));
-        } else {
-          // Restore pending
-          await tx.update(leaveBalancesTable)
-            .set({ pending: sql`GREATEST(0, ${leaveBalancesTable.pending} - ${totalDays})`, updatedAt: new Date() })
-            .where(eq(leaveBalancesTable.id, bal.id));
+      if (action === "Approved") {
+        const [row] = await tx.update(leaveApplicationsTable)
+          .set({ status: "Cancelled", cancelledAt: new Date(), updatedAt: new Date() })
+          .where(eq(leaveApplicationsTable.id, appId))
+          .returning();
+        // Restore balance: infer previous status from approval trail
+        const [bal] = await tx.select().from(leaveBalancesTable).where(
+          and(eq(leaveBalancesTable.employeeId, app.employeeId), eq(leaveBalancesTable.leaveTypeId, app.leaveTypeId), eq(leaveBalancesTable.year, year))
+        );
+        if (bal) {
+          const wasApproved = !!app.hrActionedAt || (!!app.hodActionedAt && !app.hodRemarks?.startsWith("Reject"));
+          if (wasApproved) {
+            await tx.update(leaveBalancesTable)
+              .set({ used: sql`GREATEST(0, ${leaveBalancesTable.used} - ${totalDays})`, updatedAt: new Date() })
+              .where(eq(leaveBalancesTable.id, bal.id));
+          } else {
+            await tx.update(leaveBalancesTable)
+              .set({ pending: sql`GREATEST(0, ${leaveBalancesTable.pending} - ${totalDays})`, updatedAt: new Date() })
+              .where(eq(leaveBalancesTable.id, bal.id));
+          }
         }
+        return row;
+      } else {
+        // Rejected: restore to previous state
+        // Infer previous status from approval timestamps
+        let restoreStatus: LeaveStatusValue;
+        if (app.hrActionedAt) {
+          restoreStatus = "Approved";
+        } else if (app.hodActionedAt) {
+          restoreStatus = "HOD Approved";
+        } else {
+          restoreStatus = "Pending";
+        }
+        const [row] = await tx.update(leaveApplicationsTable)
+          .set({ status: restoreStatus, cancelledById: null, cancellationReason: remarks ? `Cancel rejected: ${remarks}` : "Cancel request rejected", cancelledAt: null, updatedAt: new Date() })
+          .where(eq(leaveApplicationsTable.id, appId))
+          .returning();
+        return row;
       }
-      return row;
     });
 
-    await logAudit({ user: req.hrmsUser, action: "CANCEL_LEAVE", module: "Leave", recordId: appId, newValue: "Cancelled", ipAddress: req.ip });
+    await logAudit({ user: req.hrmsUser, action: `${action.toUpperCase()}_CANCEL_LEAVE`, module: "Leave", recordId: appId, newValue: action, ipAddress: req.ip });
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

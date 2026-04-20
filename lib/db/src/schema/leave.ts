@@ -4,7 +4,7 @@ import { hrmsUsersTable } from "./hrms_users";
 import { departmentsTable } from "./departments";
 
 export const leaveStatusEnum = pgEnum("leave_status", [
-  "Pending", "HOD Approved", "HR Approved", "Approved", "Rejected", "Cancelled",
+  "Pending", "HOD Approved", "HR Approved", "Approved", "Rejected", "Cancelled", "Cancel Requested",
 ]);
 
 export const permissionStatusEnum = pgEnum("permission_status", [

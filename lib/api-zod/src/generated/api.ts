@@ -3165,6 +3165,50 @@ export const CancelLeaveApplicationResponse = zod.object({
 });
 
 /**
+ * @summary HOD or HR approves/rejects a cancel request
+ */
+export const CancelActionLeaveApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CancelActionLeaveApplicationBody = zod.object({
+  action: zod.enum(["Approved", "Rejected"]),
+  remarks: zod.string().optional(),
+});
+
+export const CancelActionLeaveApplicationResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string(),
+  documentUrl: zod.string().nullish(),
+  status: zod.string(),
+  isLop: zod.boolean(),
+  lopConfirmed: zod.boolean(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrActionedById: zod.number().nullish(),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  cancelledById: zod.number().nullish(),
+  cancellationReason: zod.string().nullish(),
+  cancelledAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List leave balances for an employee
  */
 export const ListLeaveBalancesQueryParams = zod.object({

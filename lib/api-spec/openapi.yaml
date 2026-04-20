@@ -2501,6 +2501,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeaveApplication"
 
+  /leave/applications/{id}/cancel-action:
+    post:
+      operationId: cancelActionLeaveApplication
+      tags: [Leave]
+      summary: HOD or HR approves/rejects a cancel request
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string, enum: [Approved, Rejected] }
+                remarks: { type: string }
+              required: [action]
+      responses:
+        "200":
+          description: Cancel actioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
   /leave/balances:
     get:
       operationId: listLeaveBalances

@@ -271,21 +271,26 @@ router.post("/permissions", requireHrmsUser, requireRole(...ALL_ROLES), async (r
     const register = await getOrCreateRegister(employeeId, year, month);
     const remaining = register.limitMinutes - register.usedMinutes;
 
-    // Block if exceeds limit (unless HR override)
-    if (durationMinutes > remaining && !isOverride) {
-      if (!["super_admin", "hr_manager", "hr_executive"].includes(req.hrmsUser.role)) {
-        res.status(422).json({
-          error: `Monthly permission limit exceeded. Used: ${register.usedMinutes} min, Limit: ${register.limitMinutes} min, Remaining: ${remaining} min.`,
-          usedMinutes: register.usedMinutes,
-          limitMinutes: register.limitMinutes,
-          remainingMinutes: remaining,
-        });
-        return;
-      }
+    // Only HR roles may set isOverride=true
+    const isHrRole = ["super_admin", "hr_manager", "hr_executive"].includes(req.hrmsUser.role);
+    if (isOverride && !isHrRole) {
+      res.status(403).json({ error: "Only HR can submit override permissions" }); return;
     }
 
-    if (isOverride && !["super_admin", "hr_manager", "hr_executive"].includes(req.hrmsUser.role)) {
-      res.status(403).json({ error: "Only HR can submit override permissions" }); return;
+    // If override is claimed, justification is mandatory
+    if (isOverride && !overrideJustification?.trim()) {
+      res.status(400).json({ error: "Override justification is required when isOverride is true" }); return;
+    }
+
+    // Block if exceeds limit — applies to ALL roles including HR; override flag + justification required to bypass
+    if (durationMinutes > remaining && !isOverride) {
+      res.status(422).json({
+        error: `Monthly permission limit exceeded. Used: ${register.usedMinutes} min, Limit: ${register.limitMinutes} min, Remaining: ${remaining} min. HR can re-submit with isOverride=true and a justification.`,
+        usedMinutes: register.usedMinutes,
+        limitMinutes: register.limitMinutes,
+        remainingMinutes: remaining,
+      });
+      return;
     }
 
     const [created] = await db.insert(permissionApplicationsTable).values({

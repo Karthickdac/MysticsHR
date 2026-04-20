@@ -3,6 +3,7 @@ import {
   useListLeaveApplications,
   useHodActionLeave,
   useHrActionLeave,
+  useCancelActionLeaveApplication,
   useInitializeLeaveBalances,
   getListLeaveApplicationsQueryKey,
   getListLeaveBalancesQueryKey,
@@ -28,12 +29,17 @@ const STATUS_COLORS: Record<string, string> = {
   Approved: "bg-green-100 text-green-700",
   Rejected: "bg-red-100 text-red-700",
   Cancelled: "bg-gray-100 text-gray-500",
+  "Cancel Requested": "bg-orange-100 text-orange-700",
 };
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
+
+type ActionState =
+  | { kind: "approval"; id: number; type: "hod" | "hr"; action: "Approved" | "Rejected" }
+  | { kind: "cancel-action"; id: number; action: "Approved" | "Rejected" };
 
 export default function LeaveApprovalsPage() {
   const { role: hrmsRole } = useCurrentHrmsUser();
@@ -45,9 +51,10 @@ export default function LeaveApprovalsPage() {
   const { data: applications, isLoading } = useListLeaveApplications({});
   const hodMutation = useHodActionLeave();
   const hrMutation = useHrActionLeave();
+  const cancelActionMutation = useCancelActionLeaveApplication();
   const initMutation = useInitializeLeaveBalances();
 
-  const [actionState, setActionState] = useState<{ id: number; type: "hod" | "hr"; action: "Approved" | "Rejected" } | null>(null);
+  const [actionState, setActionState] = useState<ActionState | null>(null);
   const [remarks, setRemarks] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showInit, setShowInit] = useState(false);
@@ -61,7 +68,9 @@ export default function LeaveApprovalsPage() {
   async function handleAction() {
     if (!actionState) return;
     try {
-      if (actionState.type === "hod") {
+      if (actionState.kind === "cancel-action") {
+        await cancelActionMutation.mutateAsync({ id: actionState.id, data: { action: actionState.action, remarks: remarks || undefined } });
+      } else if (actionState.type === "hod") {
         await hodMutation.mutateAsync({ id: actionState.id, data: { action: actionState.action, remarks: remarks || undefined } });
       } else {
         await hrMutation.mutateAsync({ id: actionState.id, data: { action: actionState.action, remarks: remarks || undefined } });
@@ -87,8 +96,7 @@ export default function LeaveApprovalsPage() {
     return true;
   });
 
-  // Determine what actions are available per application for current role
-  function getActions(app: LeaveApplication): Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> {
+  function getApprovalActions(app: LeaveApplication): Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> {
     const actions: Array<{ type: "hod" | "hr"; action: "Approved" | "Rejected" }> = [];
     if ((isHod || isHr) && app.status === "Pending") {
       actions.push({ type: "hod", action: "Approved" }, { type: "hod", action: "Rejected" });
@@ -98,6 +106,8 @@ export default function LeaveApprovalsPage() {
     }
     return actions;
   }
+
+  const isMutating = hodMutation.isPending || hrMutation.isPending || cancelActionMutation.isPending;
 
   return (
     <div className="p-6 space-y-6">
@@ -113,7 +123,7 @@ export default function LeaveApprovalsPage() {
             </Button>
           )}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40 h-8 text-xs">
+            <SelectTrigger className="w-44 h-8 text-xs">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -121,6 +131,7 @@ export default function LeaveApprovalsPage() {
               <SelectItem value="Pending">Pending</SelectItem>
               <SelectItem value="HOD Approved">HOD Approved</SelectItem>
               <SelectItem value="Approved">Approved</SelectItem>
+              <SelectItem value="Cancel Requested">Cancel Requested</SelectItem>
               <SelectItem value="Rejected">Rejected</SelectItem>
               <SelectItem value="Cancelled">Cancelled</SelectItem>
             </SelectContent>
@@ -135,7 +146,8 @@ export default function LeaveApprovalsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((app) => {
-            const actions = getActions(app);
+            const approvalActions = getApprovalActions(app);
+            const canActionCancel = (isHod || isHr) && app.status === "Cancel Requested";
             return (
               <Card key={app.id} className="border shadow-none">
                 <CardContent className="p-4">
@@ -156,25 +168,40 @@ export default function LeaveApprovalsPage() {
                         {app.isHalfDay && ` • ${app.halfDaySession}`}
                       </div>
                       {app.reason && <div className="text-xs text-gray-400 italic">{app.reason}</div>}
+                      {app.cancellationReason && app.status === "Cancel Requested" && (
+                        <div className="text-xs text-orange-600">Cancel reason: {app.cancellationReason}</div>
+                      )}
                       {app.hodRemarks && <div className="text-xs text-blue-500">HOD: {app.hodRemarks}</div>}
                       {app.hrRemarks && <div className="text-xs text-indigo-500">HR: {app.hrRemarks}</div>}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <Badge className={STATUS_COLORS[app.status] ?? ""}>{app.status}</Badge>
-                      {actions.length > 0 && (
+                      {approvalActions.length > 0 && (
                         <div className="flex gap-1">
-                          {actions.filter(a => a.action === "Approved").length > 0 && (
+                          {approvalActions.filter(a => a.action === "Approved").length > 0 && (
                             <Button size="sm" variant="outline" className="text-green-600 border-green-200 h-7 text-xs gap-1"
-                              onClick={() => { setActionState({ id: app.id, type: actions.find(a => a.action === "Approved")!.type, action: "Approved" }); setRemarks(""); }}>
+                              onClick={() => { setActionState({ kind: "approval", id: app.id, type: approvalActions.find(a => a.action === "Approved")!.type, action: "Approved" }); setRemarks(""); }}>
                               <CheckCircle className="w-3 h-3" />Approve
                             </Button>
                           )}
-                          {actions.filter(a => a.action === "Rejected").length > 0 && (
+                          {approvalActions.filter(a => a.action === "Rejected").length > 0 && (
                             <Button size="sm" variant="outline" className="text-red-500 border-red-200 h-7 text-xs gap-1"
-                              onClick={() => { setActionState({ id: app.id, type: actions.find(a => a.action === "Rejected")!.type, action: "Rejected" }); setRemarks(""); }}>
+                              onClick={() => { setActionState({ kind: "approval", id: app.id, type: approvalActions.find(a => a.action === "Rejected")!.type, action: "Rejected" }); setRemarks(""); }}>
                               <XCircle className="w-3 h-3" />Reject
                             </Button>
                           )}
+                        </div>
+                      )}
+                      {canActionCancel && (
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" className="text-green-600 border-green-200 h-7 text-xs gap-1"
+                            onClick={() => { setActionState({ kind: "cancel-action", id: app.id, action: "Approved" }); setRemarks(""); }}>
+                            <CheckCircle className="w-3 h-3" />Allow Cancel
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-red-500 border-red-200 h-7 text-xs gap-1"
+                            onClick={() => { setActionState({ kind: "cancel-action", id: app.id, action: "Rejected" }); setRemarks(""); }}>
+                            <XCircle className="w-3 h-3" />Deny Cancel
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -186,23 +213,27 @@ export default function LeaveApprovalsPage() {
         </div>
       )}
 
-      {/* Action confirmation dialog */}
+      {/* Action dialog */}
       <Dialog open={!!actionState} onOpenChange={(o) => { if (!o) { setActionState(null); setRemarks(""); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{actionState?.action} Leave Application</DialogTitle>
+            <DialogTitle>
+              {actionState?.kind === "cancel-action"
+                ? `${actionState.action === "Approved" ? "Allow" : "Deny"} Cancellation Request`
+                : `${actionState?.action} Leave Application`}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <Label>Remarks (optional)</Label>
+            <Label>Remarks {actionState?.action === "Rejected" ? "(recommended)" : "(optional)"}</Label>
             <Textarea value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Add remarks..." rows={3} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setActionState(null); setRemarks(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setActionState(null); setRemarks(""); }}>Close</Button>
             <Button
               className={actionState?.action === "Approved" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}
               onClick={handleAction}
-              disabled={hodMutation.isPending || hrMutation.isPending}>
-              {hodMutation.isPending || hrMutation.isPending ? "Processing..." : actionState?.action}
+              disabled={isMutating}>
+              {isMutating ? "Processing..." : actionState?.action === "Approved" ? "Confirm" : "Confirm Reject"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -222,7 +253,7 @@ export default function LeaveApprovalsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInit(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowInit(false)}>Close</Button>
             <Button onClick={handleInitBalances} disabled={initMutation.isPending}>
               {initMutation.isPending ? "Initializing..." : "Initialize"}
             </Button>

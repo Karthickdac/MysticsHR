@@ -1860,6 +1860,19 @@ export type ListLeaveApplicationsParams = {
   leaveTypeId?: number;
 };
 
+export type CancelActionLeaveApplicationBodyAction =
+  (typeof CancelActionLeaveApplicationBodyAction)[keyof typeof CancelActionLeaveApplicationBodyAction];
+
+export const CancelActionLeaveApplicationBodyAction = {
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export type CancelActionLeaveApplicationBody = {
+  action: CancelActionLeaveApplicationBodyAction;
+  remarks?: string;
+};
+
 export type ListLeaveBalancesParams = {
   employeeId?: number;
   year?: number;

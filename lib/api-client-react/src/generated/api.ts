@@ -27,6 +27,7 @@ import type {
   AuditLogListResponse,
   BlackoutDate,
   BulkImportResult,
+  CancelActionLeaveApplicationBody,
   CancelLeaveBody,
   Candidate,
   CreateAttendanceBody,
@@ -11572,6 +11573,94 @@ export const useCancelLeaveApplication = <
   TContext
 > => {
   return useMutation(getCancelLeaveApplicationMutationOptions(options));
+};
+
+/**
+ * @summary HOD or HR approves/rejects a cancel request
+ */
+export const getCancelActionLeaveApplicationUrl = (id: number) => {
+  return `/api/leave/applications/${id}/cancel-action`;
+};
+
+export const cancelActionLeaveApplication = async (
+  id: number,
+  cancelActionLeaveApplicationBody: CancelActionLeaveApplicationBody,
+  options?: RequestInit,
+): Promise<LeaveApplication> => {
+  return customFetch<LeaveApplication>(getCancelActionLeaveApplicationUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(cancelActionLeaveApplicationBody),
+  });
+};
+
+export const getCancelActionLeaveApplicationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelActionLeaveApplication>>,
+    TError,
+    { id: number; data: BodyType<CancelActionLeaveApplicationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelActionLeaveApplication>>,
+  TError,
+  { id: number; data: BodyType<CancelActionLeaveApplicationBody> },
+  TContext
+> => {
+  const mutationKey = ["cancelActionLeaveApplication"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelActionLeaveApplication>>,
+    { id: number; data: BodyType<CancelActionLeaveApplicationBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return cancelActionLeaveApplication(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelActionLeaveApplicationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelActionLeaveApplication>>
+>;
+export type CancelActionLeaveApplicationMutationBody =
+  BodyType<CancelActionLeaveApplicationBody>;
+export type CancelActionLeaveApplicationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HOD or HR approves/rejects a cancel request
+ */
+export const useCancelActionLeaveApplication = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelActionLeaveApplication>>,
+    TError,
+    { id: number; data: BodyType<CancelActionLeaveApplicationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelActionLeaveApplication>>,
+  TError,
+  { id: number; data: BodyType<CancelActionLeaveApplicationBody> },
+  TContext
+> => {
+  return useMutation(getCancelActionLeaveApplicationMutationOptions(options));
 };
 
 /**
