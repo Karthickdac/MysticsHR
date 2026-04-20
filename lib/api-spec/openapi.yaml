@@ -2384,6 +2384,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeaveType"
 
+  /leave/policies:
+    get:
+      operationId: listLeavePolicies
+      tags: [Leave]
+      summary: List leave policies (policy fields for all leave types)
+      responses:
+        "200":
+          description: Leave policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeavePolicy"
+
+  /leave/policies/{typeId}:
+    get:
+      operationId: getLeavePolicy
+      tags: [Leave]
+      summary: Get leave policy for a specific leave type
+      parameters:
+        - { name: typeId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Leave policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeavePolicy"
+        "404":
+          description: Not found
+    put:
+      operationId: updateLeavePolicy
+      tags: [Leave]
+      summary: Update leave policy for a specific leave type (HR only)
+      parameters:
+        - { name: typeId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeavePolicyBody"
+      responses:
+        "200":
+          description: Updated leave type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveType"
+        "404":
+          description: Not found
+
   /leave/applications:
     get:
       operationId: listLeaveApplications
@@ -4458,6 +4511,41 @@ components:
         allowHalfDay: { type: boolean }
         lopByDefault: { type: boolean }
         isActive: { type: boolean }
+
+    LeavePolicy:
+      type: object
+      properties:
+        id: { type: integer }
+        leaveTypeName: { type: string }
+        leaveTypeCode: { type: string }
+        isActive: { type: boolean }
+        requiresHodApproval: { type: boolean }
+        requiresHrApproval: { type: boolean }
+        advanceNoticeDays: { type: integer }
+        minConsecutiveDays: { type: ["string", "null"] }
+        maxConsecutiveDays: { type: ["string", "null"] }
+        allowHalfDay: { type: boolean }
+        lopByDefault: { type: boolean }
+        carryForwardEnabled: { type: boolean }
+        carryForwardMax: { type: ["string", "null"] }
+        encashmentEnabled: { type: boolean }
+        applicableEmploymentTypes: { type: ["array", "null"], items: { type: string } }
+      required: [id, leaveTypeName, leaveTypeCode, isActive, requiresHodApproval, requiresHrApproval, advanceNoticeDays, allowHalfDay, lopByDefault, carryForwardEnabled, encashmentEnabled]
+
+    UpdateLeavePolicyBody:
+      type: object
+      properties:
+        requiresHodApproval: { type: boolean }
+        requiresHrApproval: { type: boolean }
+        advanceNoticeDays: { type: integer }
+        minConsecutiveDays: { type: ["string", "null"] }
+        maxConsecutiveDays: { type: ["string", "null"] }
+        allowHalfDay: { type: boolean }
+        lopByDefault: { type: boolean }
+        carryForwardEnabled: { type: boolean }
+        carryForwardMax: { type: ["string", "null"] }
+        encashmentEnabled: { type: boolean }
+        applicableEmploymentTypes: { type: ["array", "null"], items: { type: string } }
 
     LeaveApplication:
       type: object

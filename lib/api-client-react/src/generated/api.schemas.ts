@@ -1392,6 +1392,46 @@ export interface CreateLeaveTypeBody {
   isActive?: boolean;
 }
 
+export interface LeavePolicy {
+  id: number;
+  leaveTypeName: string;
+  leaveTypeCode: string;
+  isActive: boolean;
+  requiresHodApproval: boolean;
+  requiresHrApproval: boolean;
+  advanceNoticeDays: number;
+  /** @nullable */
+  minConsecutiveDays?: string | null;
+  /** @nullable */
+  maxConsecutiveDays?: string | null;
+  allowHalfDay: boolean;
+  lopByDefault: boolean;
+  carryForwardEnabled: boolean;
+  /** @nullable */
+  carryForwardMax?: string | null;
+  encashmentEnabled: boolean;
+  /** @nullable */
+  applicableEmploymentTypes?: string[] | null;
+}
+
+export interface UpdateLeavePolicyBody {
+  requiresHodApproval?: boolean;
+  requiresHrApproval?: boolean;
+  advanceNoticeDays?: number;
+  /** @nullable */
+  minConsecutiveDays?: string | null;
+  /** @nullable */
+  maxConsecutiveDays?: string | null;
+  allowHalfDay?: boolean;
+  lopByDefault?: boolean;
+  carryForwardEnabled?: boolean;
+  /** @nullable */
+  carryForwardMax?: string | null;
+  encashmentEnabled?: boolean;
+  /** @nullable */
+  applicableEmploymentTypes?: string[] | null;
+}
+
 export interface LeaveApplication {
   id: number;
   employeeId: number;

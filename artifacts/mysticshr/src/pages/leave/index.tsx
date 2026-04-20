@@ -123,9 +123,14 @@ export default function LeavePage() {
         </div>
         <div className="flex gap-2">
           {isHr && (
-            <Link href="/leave/types">
-              <Button variant="outline" size="sm">Leave Types</Button>
-            </Link>
+            <>
+              <Link href="/leave/types">
+                <Button variant="outline" size="sm">Leave Types</Button>
+              </Link>
+              <Link href="/leave/policies">
+                <Button variant="outline" size="sm">Policies</Button>
+              </Link>
+            </>
           )}
           <Link href="/leave/calendar">
             <Button variant="outline" size="sm"><Calendar className="w-4 h-4 mr-1" />Calendar</Button>

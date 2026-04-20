@@ -154,6 +154,70 @@ router.delete("/leave/types/:id", requireHrmsUser, requireRole(...HR_ROLES), asy
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── LEAVE POLICIES ──────────────────────────────────────────────────────────
+// Policy is the configurable behaviour layer of each leave type.
+// These endpoints expose CRUD for policy-specific fields independently of
+// the leave type's base attributes (name, code, quota, active flag).
+
+const POLICY_FIELDS = {
+  requiresHodApproval: leaveTypesTable.requiresHodApproval,
+  requiresHrApproval: leaveTypesTable.requiresHrApproval,
+  advanceNoticeDays: leaveTypesTable.advanceNoticeDays,
+  minConsecutiveDays: leaveTypesTable.minConsecutiveDays,
+  maxConsecutiveDays: leaveTypesTable.maxConsecutiveDays,
+  allowHalfDay: leaveTypesTable.allowHalfDay,
+  lopByDefault: leaveTypesTable.lopByDefault,
+  carryForwardEnabled: leaveTypesTable.carryForwardEnabled,
+  carryForwardMax: leaveTypesTable.carryForwardMax,
+  encashmentEnabled: leaveTypesTable.encashmentEnabled,
+  applicableEmploymentTypes: leaveTypesTable.applicableEmploymentTypes,
+};
+
+router.get("/leave/policies", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const policies = await db.select({
+      id: leaveTypesTable.id,
+      leaveTypeName: leaveTypesTable.name,
+      leaveTypeCode: leaveTypesTable.code,
+      isActive: leaveTypesTable.isActive,
+      ...POLICY_FIELDS,
+    }).from(leaveTypesTable).orderBy(leaveTypesTable.name);
+    res.json(policies);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.get("/leave/policies/:typeId", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const [policy] = await db.select({
+      id: leaveTypesTable.id,
+      leaveTypeName: leaveTypesTable.name,
+      leaveTypeCode: leaveTypesTable.code,
+      isActive: leaveTypesTable.isActive,
+      ...POLICY_FIELDS,
+    }).from(leaveTypesTable).where(eq(leaveTypesTable.id, Number(req.params.typeId)));
+    if (!policy) { res.status(404).json({ error: "Leave type not found" }); return; }
+    res.json(policy);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.put("/leave/policies/:typeId", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const body = req.body as {
+      requiresHodApproval?: boolean; requiresHrApproval?: boolean; advanceNoticeDays?: number;
+      minConsecutiveDays?: string; maxConsecutiveDays?: string | null; allowHalfDay?: boolean;
+      lopByDefault?: boolean; carryForwardEnabled?: boolean; carryForwardMax?: string | null;
+      encashmentEnabled?: boolean; applicableEmploymentTypes?: string[] | null;
+    };
+    const [updated] = await db.update(leaveTypesTable)
+      .set({ ...body, updatedAt: new Date() })
+      .where(eq(leaveTypesTable.id, Number(req.params.typeId)))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Leave type not found" }); return; }
+    await logAudit({ user: req.hrmsUser, action: "UPDATE_LEAVE_POLICY", module: "Leave", recordId: updated.id, newValue: updated.name, ipAddress: req.ip });
+    res.json(updated);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 // ─── LEAVE APPLICATIONS ───────────────────────────────────────────────────────
 
 router.get("/leave/applications", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
@@ -662,13 +726,21 @@ router.post("/leave/applications/:id/cancel-action", requireHrmsUser, requireRol
           .set({ status: "Cancelled", cancelledAt: new Date(), updatedAt: new Date() })
           .where(eq(leaveApplicationsTable.id, appId))
           .returning();
-        // Restore balance: infer previous status from approval trail
+        // Restore balance: determine which bucket holds the days
+        // - balance moves to `used` only when HR fully approves, OR when HOD approves
+        //   directly to "Approved" (requiresHrApproval=false).
+        // - "HOD Approved" (waiting for HR) still has balance in `pending`.
+        const [lt] = await tx.select({ requiresHrApproval: leaveTypesTable.requiresHrApproval })
+          .from(leaveTypesTable).where(eq(leaveTypesTable.id, app.leaveTypeId));
+        const balanceInUsed =
+          !!app.hrActionedAt ||                                    // HR granted final approval
+          (!!app.hodActionedAt && lt?.requiresHrApproval === false); // HOD-only path → "Approved"
+
         const [bal] = await tx.select().from(leaveBalancesTable).where(
           and(eq(leaveBalancesTable.employeeId, app.employeeId), eq(leaveBalancesTable.leaveTypeId, app.leaveTypeId), eq(leaveBalancesTable.year, year))
         );
         if (bal) {
-          const wasApproved = !!app.hrActionedAt || (!!app.hodActionedAt && !app.hodRemarks?.startsWith("Reject"));
-          if (wasApproved) {
+          if (balanceInUsed) {
             await tx.update(leaveBalancesTable)
               .set({ used: sql`GREATEST(0, ${leaveBalancesTable.used} - ${totalDays})`, updatedAt: new Date() })
               .where(eq(leaveBalancesTable.id, bal.id));

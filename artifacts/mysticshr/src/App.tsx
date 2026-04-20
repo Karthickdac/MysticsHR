@@ -29,6 +29,7 @@ import LeavePage from "@/pages/leave/index";
 import LeaveTypesPage from "@/pages/leave/types";
 import LeaveCalendarPage from "@/pages/leave/calendar";
 import LeaveApprovalsPage from "@/pages/leave/approvals";
+import LeavePoliciesPage from "@/pages/leave/policies";
 import PermissionsPage from "@/pages/permissions/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
@@ -403,6 +404,14 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
                 <LeaveApprovalsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/leave/policies">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <LeavePoliciesPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

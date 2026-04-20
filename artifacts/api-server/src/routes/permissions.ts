@@ -5,6 +5,7 @@ import { db } from "../lib/db";
 import {
   permissionApplicationsTable,
   permissionRegistersTable,
+  attendanceRecordsTable,
   employeesTable,
   hrmsUsersTable,
   departmentsTable,
@@ -342,6 +343,29 @@ router.post("/permissions/:id/action", requireHrmsUser, requireRole("super_admin
         await tx.update(permissionRegistersTable)
           .set({ usedMinutes: register.usedMinutes + perm.durationMinutes, updatedAt: new Date() })
           .where(eq(permissionRegistersTable.id, register.id));
+
+        // Reflect approved permission in attendance record for that day
+        const permDateStr = perm.permissionDate as string;
+        const [existingAtt] = await tx.select().from(attendanceRecordsTable).where(
+          and(eq(attendanceRecordsTable.employeeId, perm.employeeId), eq(attendanceRecordsTable.attendanceDate, permDateStr))
+        );
+        const permNote = `Permission: ${perm.startTime}–${perm.endTime} (${perm.durationMinutes} min) — Ref #${perm.id}`;
+        if (existingAtt) {
+          await tx.update(attendanceRecordsTable)
+            .set({
+              status: "On Permission",
+              notes: existingAtt.notes ? `${existingAtt.notes}; ${permNote}` : permNote,
+              updatedAt: new Date(),
+            })
+            .where(eq(attendanceRecordsTable.id, existingAtt.id));
+        } else {
+          await tx.insert(attendanceRecordsTable).values({
+            employeeId: perm.employeeId,
+            attendanceDate: permDateStr,
+            status: "On Permission",
+            notes: permNote,
+          });
+        }
       }
       return row;
     });

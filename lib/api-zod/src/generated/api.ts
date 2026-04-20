@@ -2934,6 +2934,98 @@ export const DeleteLeaveTypeResponse = zod.object({
 });
 
 /**
+ * @summary List leave policies (policy fields for all leave types)
+ */
+export const ListLeavePoliciesResponseItem = zod.object({
+  id: zod.number(),
+  leaveTypeName: zod.string(),
+  leaveTypeCode: zod.string(),
+  isActive: zod.boolean(),
+  requiresHodApproval: zod.boolean(),
+  requiresHrApproval: zod.boolean(),
+  advanceNoticeDays: zod.number(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  allowHalfDay: zod.boolean(),
+  lopByDefault: zod.boolean(),
+  carryForwardEnabled: zod.boolean(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+});
+export const ListLeavePoliciesResponse = zod.array(
+  ListLeavePoliciesResponseItem,
+);
+
+/**
+ * @summary Get leave policy for a specific leave type
+ */
+export const GetLeavePolicyParams = zod.object({
+  typeId: zod.coerce.number(),
+});
+
+export const GetLeavePolicyResponse = zod.object({
+  id: zod.number(),
+  leaveTypeName: zod.string(),
+  leaveTypeCode: zod.string(),
+  isActive: zod.boolean(),
+  requiresHodApproval: zod.boolean(),
+  requiresHrApproval: zod.boolean(),
+  advanceNoticeDays: zod.number(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  allowHalfDay: zod.boolean(),
+  lopByDefault: zod.boolean(),
+  carryForwardEnabled: zod.boolean(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+});
+
+/**
+ * @summary Update leave policy for a specific leave type (HR only)
+ */
+export const UpdateLeavePolicyParams = zod.object({
+  typeId: zod.coerce.number(),
+});
+
+export const UpdateLeavePolicyBody = zod.object({
+  requiresHodApproval: zod.boolean().optional(),
+  requiresHrApproval: zod.boolean().optional(),
+  advanceNoticeDays: zod.number().optional(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  allowHalfDay: zod.boolean().optional(),
+  lopByDefault: zod.boolean().optional(),
+  carryForwardEnabled: zod.boolean().optional(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean().optional(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+});
+
+export const UpdateLeavePolicyResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().nullish(),
+  annualQuota: zod.string(),
+  carryForwardEnabled: zod.boolean(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  advanceNoticeDays: zod.number(),
+  requiresHrApproval: zod.boolean(),
+  requiresHodApproval: zod.boolean(),
+  allowHalfDay: zod.boolean(),
+  lopByDefault: zod.boolean(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List leave applications (filtered by role/employee)
  */
 export const ListLeaveApplicationsQueryParams = zod.object({
