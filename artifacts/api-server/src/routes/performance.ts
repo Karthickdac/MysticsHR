@@ -106,22 +106,31 @@ router.get("/performance/goals", requireHrmsUser, requireRole(...ALL_ROLES), asy
   try {
     const { cycleId, employeeId } = req.query as { cycleId?: string; employeeId?: string };
     const u = req.hrmsUser!;
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
 
     const conds = [];
     if (cycleId) conds.push(eq(performanceGoalsTable.cycleId, Number(cycleId)));
     if (employeeId) conds.push(eq(performanceGoalsTable.employeeId, Number(employeeId)));
 
-    // Employees can only see their own goals — fail closed if no linked employee
     if (u.role === "employee") {
+      // Employees can only see their own goals — fail closed if no linked employee
       const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
-      if (!emp) {
-        res.json([]); // No linked employee record: return empty, not all goals
-        return;
-      }
+      if (!emp) { res.json([]); return; }
       conds.push(eq(performanceGoalsTable.employeeId, emp.id));
+    } else if (!isHrRole) {
+      // HOD/non-HR manager: scope to direct reports only
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp) { res.json([]); return; }
+      const directReports = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(eq(employeesTable.managerId, hodEmp.id));
+      if (directReports.length === 0) { res.json([]); return; }
+      conds.push(inArray(performanceGoalsTable.employeeId, directReports.map(r => r.id)));
     }
+    // HR roles and super_admin: unrestricted
 
     const goals = await db.select({
       id: performanceGoalsTable.id,
@@ -169,9 +178,26 @@ router.post("/performance/goals", requireHrmsUser, requireRole(...MANAGER_ROLES)
       res.status(400).json({ error: "cycleId, employeeId, title, and weightage are required" });
       return;
     }
+
+    const targetEmployeeId = Number(employeeId);
+    // HOD scope: can only assign goals to direct reports
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
+    if (!isHrRole) {
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp) { res.status(403).json({ error: "No employee record linked to your account" }); return; }
+      const [targetEmp] = await db.select({ managerId: employeesTable.managerId }).from(employeesTable)
+        .where(eq(employeesTable.id, targetEmployeeId));
+      if (!targetEmp || targetEmp.managerId !== hodEmp.id) {
+        res.status(403).json({ error: "You can only assign goals to your direct reports" });
+        return;
+      }
+    }
+
     const [goal] = await db.insert(performanceGoalsTable).values({
       cycleId: Number(cycleId),
-      employeeId: Number(employeeId),
+      employeeId: targetEmployeeId,
       title, description: description ?? null,
       weightage: String(weightage),
       targetValue: targetValue ?? null,
@@ -185,10 +211,33 @@ router.post("/performance/goals", requireHrmsUser, requireRole(...MANAGER_ROLES)
 
 router.put("/performance/goals/:id", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
+    const u = req.hrmsUser!;
+    const goalId = Number(req.params.id);
     const { title, description, weightage, targetValue, measurementMethod, status } = req.body;
+
+    // Fetch goal to verify scope
+    const [existingGoal] = await db.select({ id: performanceGoalsTable.id, employeeId: performanceGoalsTable.employeeId })
+      .from(performanceGoalsTable).where(eq(performanceGoalsTable.id, goalId));
+    if (!existingGoal) { res.status(404).json({ error: "Not found" }); return; }
+
+    // HOD scope: can only update goals belonging to direct reports
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
+    if (!isHrRole) {
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp) { res.status(403).json({ error: "No employee record linked to your account" }); return; }
+      const [targetEmp] = await db.select({ managerId: employeesTable.managerId }).from(employeesTable)
+        .where(eq(employeesTable.id, existingGoal.employeeId));
+      if (!targetEmp || targetEmp.managerId !== hodEmp.id) {
+        res.status(403).json({ error: "You can only update goals for your direct reports" });
+        return;
+      }
+    }
+
     const [updated] = await db.update(performanceGoalsTable)
       .set({ title, description: description ?? null, weightage: String(weightage), targetValue: targetValue ?? null, measurementMethod: measurementMethod ?? null, status: status ?? "Active", updatedAt: new Date() })
-      .where(eq(performanceGoalsTable.id, Number(req.params.id)))
+      .where(eq(performanceGoalsTable.id, goalId))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     res.json(updated);
