@@ -4,6 +4,7 @@ import { dispatchNotification } from "../lib/notification-service";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { checkPayrollLock } from "../lib/payroll-lock";
+import { applyLeaveToAttendance, revertLeaveFromAttendance } from "../lib/leave-attendance-sync";
 import {
   leaveTypesTable,
   leavePoliciesTable,
@@ -616,6 +617,7 @@ router.post("/leave/applications/:id/hod-action", requireHrmsUser, requireRole("
             .set({ used: sql`${leaveBalancesTable.used} + ${totalDays}`, pending: sql`${leaveBalancesTable.pending} - ${totalDays}`, updatedAt: new Date() })
             .where(eq(leaveBalancesTable.id, bal.id));
         }
+        await applyLeaveToAttendance(tx, app.id, app.employeeId, app.fromDate as string, app.toDate as string);
       } else if (action === "Rejected") {
         // Restore pending balance
         const [bal] = await tx.select().from(leaveBalancesTable).where(
@@ -682,6 +684,9 @@ router.post("/leave/applications/:id/hr-action", requireHrmsUser, requireRole(..
             .set({ pending: sql`${leaveBalancesTable.pending} - ${totalDays}`, updatedAt: new Date() })
             .where(eq(leaveBalancesTable.id, bal.id));
         }
+      }
+      if (action === "Approved") {
+        await applyLeaveToAttendance(tx, app.id, app.employeeId, app.fromDate as string, app.toDate as string);
       }
       return row;
     });
@@ -780,6 +785,9 @@ router.post("/leave/applications/:id/cancel", requireHrmsUser, requireRole(...AL
               .where(eq(leaveBalancesTable.id, bal.id));
           }
         }
+        if (app.status === "Approved") {
+          await revertLeaveFromAttendance(tx, app.id, app.employeeId, app.fromDate as string, app.toDate as string);
+        }
         return row;
       }
     });
@@ -841,6 +849,11 @@ router.post("/leave/applications/:id/cancel-action", requireHrmsUser, requireRol
               .set({ pending: sql`GREATEST(0, ${leaveBalancesTable.pending} - ${totalDays})`, updatedAt: new Date() })
               .where(eq(leaveBalancesTable.id, bal.id));
           }
+        }
+        // If the leave was previously fully approved, the auto-attendance entries
+        // have already been written — revert them now that the cancel is approved.
+        if (balanceInUsed) {
+          await revertLeaveFromAttendance(tx, app.id, app.employeeId, app.fromDate as string, app.toDate as string);
         }
         return row;
       } else {
