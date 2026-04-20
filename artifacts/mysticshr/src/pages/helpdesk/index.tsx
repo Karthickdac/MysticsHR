@@ -50,6 +50,7 @@ function CreateTicketModal({ open, onClose }: { open: boolean; onClose: () => vo
     description: "",
     category: "IT",
     priority: "Medium",
+    attachmentUrl: null,
   });
 
   function handleSubmit(e: React.FormEvent) {
@@ -57,7 +58,7 @@ function CreateTicketModal({ open, onClose }: { open: boolean; onClose: () => vo
     create.mutate({ data: form }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getListHelpdeskTicketsQueryKey() });
-        setForm({ subject: "", description: "", category: "IT", priority: "Medium" });
+        setForm({ subject: "", description: "", category: "IT", priority: "Medium", attachmentUrl: null });
         onClose();
       },
     });
@@ -100,6 +101,15 @@ function CreateTicketModal({ open, onClose }: { open: boolean; onClose: () => vo
             <Textarea rows={4} value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               placeholder="Describe the issue in detail..." required />
+          </div>
+          <div>
+            <Label>Attachment URL (optional)</Label>
+            <Input
+              value={form.attachmentUrl ?? ""}
+              onChange={e => setForm(f => ({ ...f, attachmentUrl: e.target.value || null }))}
+              placeholder="https://... (link to screenshot, document, etc.)"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Provide a URL to any relevant file or screenshot</p>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
@@ -175,16 +185,16 @@ function TicketRow({ ticket }: { ticket: HelpdeskTicket }) {
 export default function HelpdeskPage() {
   const { role } = useCurrentHrmsUser();
   const [showCreate, setShowCreate] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
-  const [filterPriority, setFilterPriority] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterPriority, setFilterPriority] = useState("all");
 
   const isManager = ["super_admin", "hr_manager", "hr_executive", "hod"].includes(role ?? "");
 
   const { data: tickets = [], isLoading } = useListHelpdeskTickets({
-    status: filterStatus || undefined,
-    category: filterCategory || undefined,
-    priority: filterPriority || undefined,
+    status: filterStatus !== "all" ? filterStatus : undefined,
+    category: filterCategory !== "all" ? filterCategory : undefined,
+    priority: filterPriority !== "all" ? filterPriority : undefined,
   });
 
   return (
@@ -222,25 +232,25 @@ export default function HelpdeskPage() {
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={filterCategory} onValueChange={setFilterCategory}>
                 <SelectTrigger><SelectValue placeholder="All Categories" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={filterPriority} onValueChange={setFilterPriority}>
                 <SelectTrigger><SelectValue placeholder="All Priorities" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Priorities</SelectItem>
+                  <SelectItem value="all">All Priorities</SelectItem>
                   {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={() => { setFilterStatus(""); setFilterCategory(""); setFilterPriority(""); }}>
+              <Button variant="outline" onClick={() => { setFilterStatus("all"); setFilterCategory("all"); setFilterPriority("all"); }}>
                 Clear
               </Button>
             </div>

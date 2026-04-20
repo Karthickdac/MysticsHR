@@ -360,4 +360,84 @@ router.get("/documents/issued/:id/download", requireHrmsUser, requireRole(...ALL
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── FNF APPROVAL: AUTO-ISSUE RELIEVING LETTER ────────────────────────────────
+router.post("/employees/:id/fnf-approve", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const employeeId = Number(req.params.id);
+    const { lastWorkingDay, remarks } = req.body;
+    if (!lastWorkingDay) {
+      res.status(400).json({ error: "lastWorkingDay is required" }); return;
+    }
+
+    const [emp] = await db.select({
+      id: employeesTable.id,
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      employeeCode: employeesTable.employeeId,
+      dateOfJoining: employeesTable.dateOfJoining,
+    }).from(employeesTable).where(eq(employeesTable.id, employeeId));
+    if (!emp) { res.status(404).json({ error: "Employee not found" }); return; }
+
+    // Find an active relieving_letter template; fall back to any available template
+    const [template] = await db.select().from(documentTemplatesTable)
+      .where(
+        and(
+          eq(documentTemplatesTable.documentType, "relieving_letter"),
+          eq(documentTemplatesTable.isActive, true),
+        )
+      ).limit(1);
+
+    const documentType = "relieving_letter";
+    const autoFields: Record<string, string> = {
+      employeeName: `${emp.firstName} ${emp.lastName}`,
+      employeeCode: emp.employeeCode ?? "",
+      dateOfJoining: emp.dateOfJoining ?? "",
+      lastWorkingDay,
+      currentDate: new Date().toLocaleDateString("en-IN"),
+      ...(remarks ? { remarks } : {}),
+    };
+
+    const bodyTemplate = template?.bodyTemplate ?? `This is to certify that {{employeeName}} (Employee Code: {{employeeCode}}) was employed with Automystics Technologies from {{dateOfJoining}} to {{lastWorkingDay}}. We wish {{employeeName}} all the best in their future endeavors.`;
+    const bodyText = substituteTemplate(bodyTemplate, autoFields);
+
+    const pdfBuffer = await generatePdf({
+      companyName: template?.companyName ?? "Automystics Technologies",
+      companyAddress: template?.companyAddress ?? "",
+      headerText: template?.headerText ?? "Relieving Letter",
+      footerText: template?.footerText ?? "This is a system-generated document.",
+      bodyText,
+      title: "Relieving Letter",
+    });
+
+    const filename = `Relieving_Letter_${emp.employeeCode ?? emp.id}_${Date.now()}.pdf`;
+    const fileContent = pdfBuffer.toString("base64");
+
+    const [issued] = await db.insert(issuedDocumentsTable).values({
+      employeeId,
+      templateId: template?.id ?? null,
+      documentType,
+      filename,
+      generatedBy: u.id,
+      fieldValues: autoFields,
+      fileContent,
+    }).returning();
+
+    await logAudit({
+      userId: u.id,
+      action: "fnf_approve",
+      entityType: "issued_document",
+      entityId: issued.id,
+      changes: { documentType, employeeId, lastWorkingDay },
+    });
+
+    res.json({
+      message: `FnF approved. Relieving Letter issued for ${emp.firstName} ${emp.lastName}.`,
+      issuedDocumentId: issued.id,
+      employeeId,
+      lastWorkingDay,
+    });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 export default router;

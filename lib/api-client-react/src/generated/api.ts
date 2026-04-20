@@ -83,6 +83,8 @@ import type {
   EssDashboard,
   EssProfile,
   FinalizePayrollRun200,
+  FnfApproveBody,
+  FnfApproveResult,
   GenerateDocumentBody,
   GetAttendanceParams,
   GetAttendanceRegularizationsParams,
@@ -182,6 +184,7 @@ import type {
   RejectPreOnboardingDocumentBody,
   RejectRequisitionBody,
   Role,
+  RunHelpdeskSlaCheck200,
   SalaryRevision,
   SalaryStructure,
   SalaryStructureDetail,
@@ -18865,6 +18868,174 @@ export function useGetHelpdeskSlaReport<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Process SLA breaches for all open tickets and write escalation logs
+ */
+export const getRunHelpdeskSlaCheckUrl = () => {
+  return `/api/helpdesk/sla-check`;
+};
+
+export const runHelpdeskSlaCheck = async (
+  options?: RequestInit,
+): Promise<RunHelpdeskSlaCheck200> => {
+  return customFetch<RunHelpdeskSlaCheck200>(getRunHelpdeskSlaCheckUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRunHelpdeskSlaCheckMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runHelpdeskSlaCheck>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runHelpdeskSlaCheck>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["runHelpdeskSlaCheck"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runHelpdeskSlaCheck>>,
+    void
+  > = () => {
+    return runHelpdeskSlaCheck(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunHelpdeskSlaCheckMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runHelpdeskSlaCheck>>
+>;
+
+export type RunHelpdeskSlaCheckMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Process SLA breaches for all open tickets and write escalation logs
+ */
+export const useRunHelpdeskSlaCheck = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runHelpdeskSlaCheck>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runHelpdeskSlaCheck>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRunHelpdeskSlaCheckMutationOptions(options));
+};
+
+/**
+ * @summary Approve Full and Final settlement — auto-issues a Relieving Letter
+ */
+export const getApproveEmployeeFnfUrl = (id: number) => {
+  return `/api/employees/${id}/fnf-approve`;
+};
+
+export const approveEmployeeFnf = async (
+  id: number,
+  fnfApproveBody: FnfApproveBody,
+  options?: RequestInit,
+): Promise<FnfApproveResult> => {
+  return customFetch<FnfApproveResult>(getApproveEmployeeFnfUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fnfApproveBody),
+  });
+};
+
+export const getApproveEmployeeFnfMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveEmployeeFnf>>,
+    TError,
+    { id: number; data: BodyType<FnfApproveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveEmployeeFnf>>,
+  TError,
+  { id: number; data: BodyType<FnfApproveBody> },
+  TContext
+> => {
+  const mutationKey = ["approveEmployeeFnf"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveEmployeeFnf>>,
+    { id: number; data: BodyType<FnfApproveBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return approveEmployeeFnf(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveEmployeeFnfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveEmployeeFnf>>
+>;
+export type ApproveEmployeeFnfMutationBody = BodyType<FnfApproveBody>;
+export type ApproveEmployeeFnfMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Approve Full and Final settlement — auto-issues a Relieving Letter
+ */
+export const useApproveEmployeeFnf = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveEmployeeFnf>>,
+    TError,
+    { id: number; data: BodyType<FnfApproveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveEmployeeFnf>>,
+  TError,
+  { id: number; data: BodyType<FnfApproveBody> },
+  TContext
+> => {
+  return useMutation(getApproveEmployeeFnfMutationOptions(options));
+};
 
 /**
  * @summary List document templates

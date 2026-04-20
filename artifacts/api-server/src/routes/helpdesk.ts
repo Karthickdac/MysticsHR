@@ -340,6 +340,41 @@ router.post("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...AL
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── SLA CHECK (DETERMINISTIC ESCALATION) ────────────────────────────────────
+router.post("/helpdesk/sla-check", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const now = new Date();
+    // Find all open tickets past their SLA deadline that haven't been escalated yet
+    const overdueTickets = await db.select().from(helpdeskTicketsTable)
+      .where(
+        and(
+          eq(helpdeskTicketsTable.slaBreached, false),
+        )
+      );
+
+    const breachTargets = overdueTickets.filter(t =>
+      t.slaDeadline &&
+      new Date(t.slaDeadline) < now &&
+      !["Resolved", "Closed"].includes(t.status) &&
+      !t.slaEscalatedAt
+    );
+
+    let escalated = 0;
+    for (const ticket of breachTargets) {
+      await db.update(helpdeskTicketsTable)
+        .set({ slaBreached: true, slaEscalatedAt: now })
+        .where(eq(helpdeskTicketsTable.id, ticket.id));
+      await db.insert(ticketSlaLogsTable).values({
+        ticketId: ticket.id,
+        event: `SLA BREACH ESCALATION: Ticket "${ticket.subject}" is overdue. Assigned to user ${ticket.assignedToUserId ?? "unassigned"}. Manager and HR Head must take action.`,
+      });
+      escalated++;
+    }
+
+    res.json({ escalated });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 // ─── SLA REPORT ───────────────────────────────────────────────────────────────
 router.get("/helpdesk/sla-report", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {

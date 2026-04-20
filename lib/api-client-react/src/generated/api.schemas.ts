@@ -2295,6 +2295,10 @@ export interface HelpdeskTicket {
   slaDeadline?: string | null;
   slaBreached: boolean;
   /** @nullable */
+  slaEscalatedAt?: string | null;
+  /** @nullable */
+  attachmentUrl?: string | null;
+  /** @nullable */
   resolvedAt?: string | null;
   /** @nullable */
   closedAt?: string | null;
@@ -2343,6 +2347,7 @@ export interface CreateHelpdeskTicketBody {
   description: string;
   category: CreateHelpdeskTicketBodyCategory;
   priority: CreateHelpdeskTicketBodyPriority;
+  attachmentUrl?: string | null;
 }
 
 export type UpdateHelpdeskTicketBodyStatus =
@@ -2398,6 +2403,18 @@ export interface HelpdeskSlaReport {
   avgResolutionHours?: number | null;
   byPriority: HelpdeskSlaReportByPriorityItem[];
   byCategory: HelpdeskSlaReportByCategoryItem[];
+}
+
+export interface FnfApproveBody {
+  lastWorkingDay: string;
+  remarks?: string | null;
+}
+
+export interface FnfApproveResult {
+  message: string;
+  issuedDocumentId: number;
+  employeeId: number;
+  lastWorkingDay: string;
 }
 
 export interface DocumentTemplate {
@@ -2931,6 +2948,10 @@ export type ListHelpdeskTicketsParams = {
   category?: string;
   priority?: string;
   assignedTo?: number;
+};
+
+export type RunHelpdeskSlaCheck200 = {
+  escalated: number;
 };
 
 export type ListIssuedDocumentsParams = {

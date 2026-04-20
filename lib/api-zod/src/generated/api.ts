@@ -4790,6 +4790,8 @@ export const ListHelpdeskTicketsResponseItem = zod.object({
   assignedToName: zod.string().nullish(),
   slaDeadline: zod.coerce.date().nullish(),
   slaBreached: zod.boolean(),
+  slaEscalatedAt: zod.coerce.date().nullish(),
+  attachmentUrl: zod.string().nullish(),
   resolvedAt: zod.coerce.date().nullish(),
   closedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -4807,6 +4809,7 @@ export const CreateHelpdeskTicketBody = zod.object({
   description: zod.string(),
   category: zod.enum(["IT", "HR", "Finance", "Admin", "Other"]),
   priority: zod.enum(["Low", "Medium", "High", "Urgent"]),
+  attachmentUrl: zod.string().nullish(),
 });
 
 /**
@@ -4830,6 +4833,8 @@ export const GetHelpdeskTicketResponse = zod
     assignedToName: zod.string().nullish(),
     slaDeadline: zod.coerce.date().nullish(),
     slaBreached: zod.boolean(),
+    slaEscalatedAt: zod.coerce.date().nullish(),
+    attachmentUrl: zod.string().nullish(),
     resolvedAt: zod.coerce.date().nullish(),
     closedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
@@ -4885,6 +4890,8 @@ export const UpdateHelpdeskTicketResponse = zod.object({
   assignedToName: zod.string().nullish(),
   slaDeadline: zod.coerce.date().nullish(),
   slaBreached: zod.boolean(),
+  slaEscalatedAt: zod.coerce.date().nullish(),
+  attachmentUrl: zod.string().nullish(),
   resolvedAt: zod.coerce.date().nullish(),
   closedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
@@ -4945,6 +4952,32 @@ export const GetHelpdeskSlaReportResponse = zod.object({
       count: zod.number(),
     }),
   ),
+});
+
+/**
+ * @summary Process SLA breaches for all open tickets and write escalation logs
+ */
+export const RunHelpdeskSlaCheckResponse = zod.object({
+  escalated: zod.number(),
+});
+
+/**
+ * @summary Approve Full and Final settlement — auto-issues a Relieving Letter
+ */
+export const ApproveEmployeeFnfParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveEmployeeFnfBody = zod.object({
+  lastWorkingDay: zod.coerce.date(),
+  remarks: zod.string().nullish(),
+});
+
+export const ApproveEmployeeFnfResponse = zod.object({
+  message: zod.string(),
+  issuedDocumentId: zod.number(),
+  employeeId: zod.number(),
+  lastWorkingDay: zod.string(),
 });
 
 /**
