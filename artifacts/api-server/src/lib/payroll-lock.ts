@@ -2,7 +2,7 @@ import { db } from "./db";
 import { payrollLocksTable, payrollLockExceptionsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
-export type LockExceptionType = "edit_salary" | "edit_attendance" | "edit_bank";
+export type LockExceptionType = "edit_salary" | "edit_attendance" | "edit_leave_balance" | "edit_bank_account";
 
 /**
  * Check whether the current payroll period is locked for writes.

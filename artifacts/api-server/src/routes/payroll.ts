@@ -406,7 +406,7 @@ router.get("/payroll/lock-exceptions", requireHrmsUser, requireRole(...HR_ROLES)
       approvalRemarks: payrollLockExceptionsTable.approvalRemarks,
       approvedAt: payrollLockExceptionsTable.approvedAt,
       createdAt: payrollLockExceptionsTable.createdAt,
-      requesterName: sql<string>`${hrmsUsersTable.firstName} || ' ' || ${hrmsUsersTable.lastName}`,
+      requesterName: hrmsUsersTable.name,
       lockYear: payrollLocksTable.year,
       lockMonth: payrollLocksTable.month,
     }).from(payrollLockExceptionsTable)
@@ -793,7 +793,7 @@ router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole("super_adm
     for (const record of records) {
       const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, record.employeeId));
       const [dept] = emp?.departmentId ? await db.select({ name: departmentsTable.name }).from(departmentsTable).where(eq(departmentsTable.id, emp.departmentId)) : [null];
-      const [desig] = await db.select({ name: designationsTable.name }).from(designationsTable).where(eq(designationsTable.id, emp?.designationId ?? 0));
+      const [desig] = await db.select({ name: designationsTable.title }).from(designationsTable).where(eq(designationsTable.id, emp?.designationId ?? 0));
 
       const payslipData = {
         employee: { name: `${emp?.firstName ?? ""} ${emp?.lastName ?? ""}`, code: emp?.employeeId, department: dept?.name ?? "", designation: desig?.name ?? "" },

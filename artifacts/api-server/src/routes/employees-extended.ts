@@ -110,7 +110,7 @@ router.put(
       const hasBankUpdate = ["bankAccountName", "bankAccountNumber", "ifscCode", "bankName", "bankBranch"]
         .some(f => Object.prototype.hasOwnProperty.call(b, f));
       if (hasBankUpdate) {
-        const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_bank");
+        const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_bank_account");
         if (lockError) { res.status(422).json({ error: lockError }); return; }
       }
 

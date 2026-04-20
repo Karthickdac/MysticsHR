@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
+import { checkPayrollLock } from "../lib/payroll-lock";
 import {
   leaveTypesTable,
   leavePoliciesTable,
@@ -888,6 +889,9 @@ router.get("/leave/balances", requireHrmsUser, requireRole(...HR_READ_ROLES, "em
 
 router.post("/leave/balances/initialize", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance");
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
+
     const { year, employeeId } = req.body as { year: number; employeeId?: number };
     const leaveTypes = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.isActive, true));
     const emps = await db.select({ id: employeesTable.id }).from(employeesTable)
@@ -928,6 +932,9 @@ router.post("/leave/balances/initialize", requireHrmsUser, requireRole(...HR_ROL
 
 router.post("/leave/balances/accrue", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance");
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
+
     const { year, month, employeeId } = req.body as { year: number; month: number; employeeId?: number };
 
     if (!year || !month || month < 1 || month > 12) {
