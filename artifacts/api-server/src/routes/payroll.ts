@@ -17,6 +17,13 @@ import { eq, and, desc, asc, or, gte, lte, sql } from "drizzle-orm";
 const router = Router();
 
 const PAYROLL_ADMIN_ROLES = ["super_admin", "payroll_admin"] as const;
+
+function buildAppUrl(path: string): string {
+  const base = process.env.APP_URL
+    ?? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "");
+  if (!base) return path;
+  return `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+}
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive", "payroll_admin"] as const;
 const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
 const ALL_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] as const;
@@ -885,6 +892,36 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
     }).where(eq(payrollRunsTable.id, runId));
 
     await logAudit({ user: req.hrmsUser, action: "PAYROLL_COMPUTE", module: "Payroll", recordId: runId, newValue: `${year}-${month}: ${records.length} records`, ipAddress: req.ip });
+
+    // Notify all payroll admins (super_admin + payroll_admin) that this run is awaiting approval
+    const monthNameComputed = new Date(year, month - 1).toLocaleString("en-IN", { month: "long" });
+    const periodComputed = `${monthNameComputed} ${year}`;
+    const runUrlComputed = buildAppUrl(`/payroll/runs/${runId}`);
+    const initiatorName = req.hrmsUser?.name ?? "Payroll Team";
+    const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    void import("../lib/notification-service").then(async ({ dispatchNotification }) => {
+      const approvers = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, id: hrmsUsersTable.id })
+        .from(hrmsUsersTable)
+        .where(and(or(eq(hrmsUsersTable.role, "super_admin"), eq(hrmsUsersTable.role, "payroll_admin")), eq(hrmsUsersTable.isActive, true)));
+      await Promise.allSettled(approvers.map(a => {
+        if (!a.email) return Promise.resolve();
+        return dispatchNotification({
+          eventType: "payroll_run_pending_approval", module: "payroll",
+          recipientEmail: a.email, recipientName: a.name,
+          variables: {
+            recipientName: a.name ?? "",
+            period: periodComputed,
+            initiatorName,
+            totalEmployees: String(records.length),
+            totalGross: fmtINR(totalGross),
+            totalNet: fmtINR(totalNet),
+            runUrl: runUrlComputed,
+          },
+          entityType: "payroll_run", entityId: runId,
+        });
+      }));
+    }).catch(() => {});
+
     res.json({ message: "Payroll computed", totalEmployees: records.length, totalGross, totalNet });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -950,16 +987,19 @@ router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole(...PAYROLL
     // Notify each employee that their payslip is available
     const monthName = new Date(run.periodYear, run.periodMonth - 1).toLocaleString("en-IN", { month: "long" });
     const period = `${monthName} ${run.periodYear}`;
-    import("../lib/notification-service").then(async ({ dispatchNotification }) => {
+    void import("../lib/notification-service").then(async ({ dispatchNotification }) => {
       await Promise.allSettled(records.map(async record => {
         const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
           .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, record.employeeId)).limit(1);
         if (!empUser?.email) return;
+        const [slip] = await db.select({ id: payslipsTable.id }).from(payslipsTable)
+          .where(eq(payslipsTable.payrollRecordId, record.id)).limit(1);
+        const payslipUrl = buildAppUrl(slip ? `/payroll/payslips?view=${slip.id}` : `/payroll/payslips`);
         return dispatchNotification({
           eventType: "payslip_published", module: "payroll",
           recipientEmail: empUser.email, recipientName: empUser.name,
           recipientEmployeeDbId: record.employeeId,
-          variables: { period, recipientName: empUser.name },
+          variables: { period, recipientName: empUser.name ?? "", payslipUrl },
           entityType: "payroll_run", entityId: runId,
         });
       }));

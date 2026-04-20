@@ -35,6 +35,7 @@ const EVENT_TYPES = [
   { value: "leave_rejected", label: "Leave Rejected" },
   { value: "payslip_published", label: "Payslip Published" },
   { value: "payroll_locked", label: "Payroll Locked" },
+  { value: "payroll_run_pending_approval", label: "Payroll Run Awaiting Approval" },
   { value: "offer_letter_issued", label: "Offer Letter Issued" },
   { value: "onboarding_access", label: "Pre-Onboarding Portal Access" },
   { value: "document_issued", label: "Document Issued" },

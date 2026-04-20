@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useListPayslips, useGetPayslip } from "@workspace/api-client-react";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,26 @@ export default function PayslipsPage() {
   const [monthFilter, setMonthFilter] = useState("");
   const [empFilter, setEmpFilter] = useState("");
   const [viewId, setViewId] = useState<number | null>(null);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  const consumedDeepLink = useRef(false);
+
+  useEffect(() => {
+    if (consumedDeepLink.current) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("view") ?? params.get("highlight");
+    const id = raw ? Number(raw) : NaN;
+    if (!(Number.isFinite(id) && id > 0)) return;
+    consumedDeepLink.current = true;
+    setHighlightId(id);
+    if (params.get("view")) setViewId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("view");
+    url.searchParams.delete("highlight");
+    window.history.replaceState({}, "", url.toString());
+    const t = setTimeout(() => setHighlightId(null), 4000);
+    return () => clearTimeout(t);
+  }, []);
 
   const { data: payslips, isLoading } = useListPayslips({
     year: yearFilter ? Number(yearFilter) : undefined,
@@ -85,7 +105,11 @@ export default function PayslipsPage() {
       ) : (
         <div className="grid gap-3">
           {filtered.map(p => (
-            <Card key={p.id} className="hover:shadow-sm transition-shadow">
+            <Card
+              key={p.id}
+              ref={(el) => { if (el && highlightId === p.id) el.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+              className={`hover:shadow-sm transition-shadow ${highlightId === p.id ? "ring-2 ring-blue-500 bg-blue-50/40" : ""}`}
+            >
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-blue-50 rounded-lg">
