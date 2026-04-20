@@ -55,12 +55,14 @@ function TaskCard({
 }) {
   const isDone = !!task.completedAt;
   const canComplete = canManage || (isEmployee && task.assigneeRole === "employee");
+  const canUncomplete = canManage;
+  const canToggle = isDone ? canUncomplete : canComplete;
   return (
     <div className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${isDone ? "border-green-200 bg-green-50" : "border-border bg-background"}`}>
       <button
         onClick={() => isDone ? onUncomplete(task.id) : onComplete(task.id)}
         className="mt-0.5 flex-shrink-0"
-        disabled={!canComplete}
+        disabled={!canToggle}
       >
         {isDone
           ? <CheckCircle2 className="w-5 h-5 text-green-500" />
