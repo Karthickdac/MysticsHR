@@ -392,9 +392,30 @@ router.post("/shift-swaps", requireHrmsUser, requireRole(...ALL_ROLES), async (r
 router.post("/shift-swaps/:id/hod-action", requireHrmsUser, requireRole("super_admin", "hr_manager", "hr_executive", "hod"), async (req, res) => {
   try {
     const { action, remarks } = req.body as { action: "Approved" | "Rejected"; remarks?: string };
+    const swapId = Number(req.params.id);
+
+    const [swap] = await db.select().from(shiftSwapsTable).where(eq(shiftSwapsTable.id, swapId));
+    if (!swap) { res.status(404).json({ error: "Not found" }); return; }
+
+    // State machine: only Pending HOD status can be actioned
+    if (swap.hodStatus !== "Pending") {
+      res.status(422).json({ error: "This swap request has already received a HOD decision and cannot be re-processed" });
+      return;
+    }
+
+    // HOD scope: a HOD can only action swaps where the requester is in their department
+    if (req.hrmsUser.role === "hod" && req.hrmsUser.employeeId) {
+      const [hodEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, req.hrmsUser.employeeId));
+      const [reqEmp] = await db.select({ departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, swap.requesterEmployeeId as number));
+      if (hodEmp?.departmentId == null || hodEmp.departmentId !== reqEmp?.departmentId) {
+        res.status(403).json({ error: "You can only action shift swap requests from employees in your department" });
+        return;
+      }
+    }
+
     const [updated] = await db.update(shiftSwapsTable)
-      .set({ hodStatus: action, hodRemarks: remarks ?? null, hodActionedById: req.hrmsUser.id, hodActionedAt: new Date(), updatedAt: new Date() })
-      .where(eq(shiftSwapsTable.id, Number(req.params.id)))
+      .set({ hodStatus: action, hodRemarks: remarks ?? null, hodActionedById: req.hrmsUser!.id, hodActionedAt: new Date(), updatedAt: new Date() })
+      .where(eq(shiftSwapsTable.id, swapId))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     await logAudit({ user: req.hrmsUser, action: `HOD_${action.toUpperCase()}`, module: "ShiftSwaps", recordId: updated.id, newValue: action, ipAddress: req.ip });
