@@ -20,6 +20,8 @@ import {
   Banknote,
   Target,
   Home,
+  Ticket,
+  FileBadge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -44,8 +46,10 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
     { name: "Leave", href: "/leave", icon: Umbrella, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Permissions", href: "/permissions", icon: Timer, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Payroll", href: "/payroll", icon: Banknote, roles: ["super_admin", "hr_manager", "hr_executive", "payroll_admin", "employee"] },
-    { name: "Performance", href: "/performance", icon: Target, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Performance", href: "/performance", icon: Target, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "employee"] },
     { name: "ESS Portal", href: "/ess", icon: Home, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Helpdesk", href: "/helpdesk", icon: Ticket, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Documents", href: "/documents", icon: FileBadge, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Departments", href: "/departments", icon: Building2, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Designations", href: "/designations", icon: Briefcase, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Users", href: "/users", icon: ShieldCheck, roles: ["super_admin", "hr_manager"] },

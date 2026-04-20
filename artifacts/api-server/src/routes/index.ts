@@ -18,6 +18,8 @@ import leaveRouter from "./leave";
 import permissionsRouter from "./permissions";
 import payrollRouter from "./payroll";
 import performanceRouter from "./performance";
+import helpdeskRouter from "./helpdesk";
+import documentsRouter from "./documents";
 
 const router: IRouter = Router();
 
@@ -39,6 +41,8 @@ router.use(leaveRouter);
 router.use(permissionsRouter);
 router.use(payrollRouter);
 router.use(performanceRouter);
+router.use(helpdeskRouter);
+router.use(documentsRouter);
 router.use(auditLogsRouter);
 
 export default router;

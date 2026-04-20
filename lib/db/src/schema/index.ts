@@ -21,3 +21,5 @@ export * from "./attendance";
 export * from "./leave";
 export * from "./payroll";
 export * from "./performance";
+export * from "./helpdesk";
+export * from "./documents";

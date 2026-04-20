@@ -45,6 +45,9 @@ import EvaluationsPage from "@/pages/performance/evaluations";
 import CalibrationPage from "@/pages/performance/calibration";
 import CycleDetailPage from "@/pages/performance/cycle-detail";
 import EssPortalPage from "@/pages/ess/index";
+import HelpdeskPage from "@/pages/helpdesk/index";
+import TicketDetailPage from "@/pages/helpdesk/ticket-detail";
+import DocumentsPage from "@/pages/documents/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -554,6 +557,30 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
                 <EssPortalPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/helpdesk/:id">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <TicketDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/helpdesk">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <HelpdeskPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/documents">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <DocumentsPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

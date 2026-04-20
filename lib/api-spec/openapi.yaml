@@ -12,6 +12,10 @@ tags:
     description: Performance management — cycles, goals, appraisals, calibration, outcomes
   - name: ess
     description: Employee Self-Service portal — profile, dashboard, and self-service actions
+  - name: helpdesk
+    description: Internal helpdesk ticketing — raise, track, and resolve tickets
+  - name: documents
+    description: HR document generation — templates and issued letterhead documents
   - name: health
     description: Health operations
   - name: departments
@@ -3986,6 +3990,270 @@ paths:
                 $ref: "#/components/schemas/EssDashboard"
 
   # ──────────────────────────────────────────────
+  # HELPDESK
+  # ──────────────────────────────────────────────
+
+  /helpdesk/tickets:
+    get:
+      operationId: listHelpdeskTickets
+      tags: [helpdesk]
+      summary: List helpdesk tickets (scoped by role)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: priority
+          schema: { type: string }
+        - in: query
+          name: assignedTo
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HelpdeskTicket"
+    post:
+      operationId: createHelpdeskTicket
+      tags: [helpdesk]
+      summary: Create a helpdesk ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateHelpdeskTicketBody"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskTicket"
+
+  /helpdesk/tickets/{id}:
+    get:
+      operationId: getHelpdeskTicket
+      tags: [helpdesk]
+      summary: Get a helpdesk ticket by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskTicketDetail"
+    put:
+      operationId: updateHelpdeskTicket
+      tags: [helpdesk]
+      summary: Update ticket status, priority, or assignment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateHelpdeskTicketBody"
+      responses:
+        "200":
+          description: Updated ticket
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskTicket"
+
+  /helpdesk/tickets/{id}/comments:
+    get:
+      operationId: listTicketComments
+      tags: [helpdesk]
+      summary: Get comments for a ticket
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TicketComment"
+    post:
+      operationId: addTicketComment
+      tags: [helpdesk]
+      summary: Add a comment to a ticket
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTicketCommentBody"
+      responses:
+        "201":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketComment"
+
+  /helpdesk/sla-report:
+    get:
+      operationId: getHelpdeskSlaReport
+      tags: [helpdesk]
+      summary: SLA breach and resolution report
+      responses:
+        "200":
+          description: SLA report data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpdeskSlaReport"
+
+  # ──────────────────────────────────────────────
+  # DOCUMENTS
+  # ──────────────────────────────────────────────
+
+  /documents/templates:
+    get:
+      operationId: listDocumentTemplates
+      tags: [documents]
+      summary: List document templates
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentTemplate"
+    post:
+      operationId: createDocumentTemplate
+      tags: [documents]
+      summary: Create a document template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentTemplateBody"
+      responses:
+        "201":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentTemplate"
+
+  /documents/templates/{id}:
+    put:
+      operationId: updateDocumentTemplate
+      tags: [documents]
+      summary: Update a document template
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentTemplateBody"
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentTemplate"
+
+  /documents/issued:
+    get:
+      operationId: listIssuedDocuments
+      tags: [documents]
+      summary: List issued documents (scoped by role)
+      parameters:
+        - in: query
+          name: employeeId
+          schema: { type: integer }
+        - in: query
+          name: documentType
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of issued documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IssuedDocument"
+
+  /documents/generate:
+    post:
+      operationId: generateDocument
+      tags: [documents]
+      summary: Generate and issue a document for an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateDocumentBody"
+      responses:
+        "201":
+          description: Document generated and issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuedDocument"
+
+  /documents/issued/{id}/download:
+    get:
+      operationId: downloadIssuedDocument
+      tags: [documents]
+      summary: Download an issued document as PDF
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  # ──────────────────────────────────────────────
   # PERFORMANCE + ESS SCHEMA ADDITIONS
   # (appended to components.schemas section via tag in existing file)
   # ──────────────────────────────────────────────
@@ -6406,3 +6674,169 @@ components:
           items:
             type: object
       required: [attendance, leaveBalances, performanceGoals, pendingActions]
+
+    # ─── HELPDESK ────────────────────────────────────────────────────────────────
+
+    HelpdeskTicket:
+      type: object
+      properties:
+        id: { type: integer }
+        subject: { type: string }
+        description: { type: string }
+        category: { type: string }
+        priority: { type: string }
+        status: { type: string }
+        raisedByEmployeeId: { type: ['integer', 'null'] }
+        raisedByName: { type: ['string', 'null'] }
+        assignedToUserId: { type: ['integer', 'null'] }
+        assignedToName: { type: ['string', 'null'] }
+        slaDeadline: { type: ['string', 'null'], format: date-time }
+        slaBreached: { type: boolean }
+        resolvedAt: { type: ['string', 'null'], format: date-time }
+        closedAt: { type: ['string', 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, subject, description, category, priority, status, slaBreached, createdAt, updatedAt]
+
+    HelpdeskTicketDetail:
+      allOf:
+        - $ref: "#/components/schemas/HelpdeskTicket"
+        - type: object
+          properties:
+            comments:
+              type: array
+              items:
+                $ref: "#/components/schemas/TicketComment"
+          required: [comments]
+
+    TicketComment:
+      type: object
+      properties:
+        id: { type: integer }
+        ticketId: { type: integer }
+        authorId: { type: integer }
+        authorName: { type: ['string', 'null'] }
+        message: { type: string }
+        isInternal: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required: [id, ticketId, authorId, message, isInternal, createdAt]
+
+    CreateHelpdeskTicketBody:
+      type: object
+      required: [subject, description, category, priority]
+      properties:
+        subject: { type: string }
+        description: { type: string }
+        category:
+          type: string
+          enum: [IT, HR, Finance, Admin, Other]
+        priority:
+          type: string
+          enum: [Low, Medium, High, Urgent]
+
+    UpdateHelpdeskTicketBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Open, In Progress, Pending Employee Response, Resolved, Closed]
+        priority:
+          type: string
+          enum: [Low, Medium, High, Urgent]
+        assignedToUserId: { type: ['integer', 'null'] }
+
+    AddTicketCommentBody:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        isInternal: { type: boolean }
+
+    HelpdeskSlaReport:
+      type: object
+      properties:
+        totalTickets: { type: integer }
+        openTickets: { type: integer }
+        resolvedTickets: { type: integer }
+        slaBreachedCount: { type: integer }
+        avgResolutionHours: { type: ['number', 'null'] }
+        byPriority:
+          type: array
+          items:
+            type: object
+            properties:
+              priority: { type: string }
+              count: { type: integer }
+              breached: { type: integer }
+            required: [priority, count, breached]
+        byCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              category: { type: string }
+              count: { type: integer }
+            required: [category, count]
+      required: [totalTickets, openTickets, resolvedTickets, slaBreachedCount, byPriority, byCategory]
+
+    # ─── DOCUMENTS ───────────────────────────────────────────────────────────────
+
+    DocumentTemplate:
+      type: object
+      properties:
+        id: { type: integer }
+        documentType: { type: string }
+        name: { type: string }
+        companyName: { type: ['string', 'null'] }
+        companyAddress: { type: ['string', 'null'] }
+        headerText: { type: ['string', 'null'] }
+        footerText: { type: ['string', 'null'] }
+        bodyTemplate: { type: string }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, documentType, name, bodyTemplate, isActive, createdAt, updatedAt]
+
+    CreateDocumentTemplateBody:
+      type: object
+      required: [documentType, name, bodyTemplate]
+      properties:
+        documentType:
+          type: string
+          enum: [Experience Certificate, Appointment Letter, Warning Notice, Offer Letter, NOC, Relieving Letter]
+        name: { type: string }
+        companyName: { type: ['string', 'null'] }
+        companyAddress: { type: ['string', 'null'] }
+        headerText: { type: ['string', 'null'] }
+        footerText: { type: ['string', 'null'] }
+        bodyTemplate: { type: string }
+        isActive: { type: boolean }
+
+    IssuedDocument:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ['string', 'null'] }
+        employeeCode: { type: ['string', 'null'] }
+        templateId: { type: ['integer', 'null'] }
+        documentType: { type: string }
+        filename: { type: string }
+        generatedBy: { type: ['integer', 'null'] }
+        generatedByName: { type: ['string', 'null'] }
+        generatedAt: { type: string, format: date-time }
+        fieldValues: { type: object }
+      required: [id, employeeId, documentType, filename, generatedAt, fieldValues]
+
+    GenerateDocumentBody:
+      type: object
+      required: [employeeId, documentType, templateId]
+      properties:
+        employeeId: { type: integer }
+        documentType:
+          type: string
+          enum: [Experience Certificate, Appointment Letter, Warning Notice, Offer Letter, NOC, Relieving Letter]
+        templateId: { type: integer }
+        fieldValues:
+          type: object
+          additionalProperties: true

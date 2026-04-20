@@ -205,6 +205,15 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Frontend pages: `/performance` (cycles dashboard + quick-nav), `/performance/goals` (KRA/KPI list with progress bars + assign modal), `/performance/appraisals` (self-rating with star UI), `/performance/evaluations` (manager ratings for team), `/performance/calibration` (score matrix + outcome computation), `/ess` (3-tab hub: Dashboard / My Profile / Services)
 - Role gates: HR creates cycles, HOD+ assigns goals, all roles access ESS, HR-only calibration
 
+### Task #8: Helpdesk Ticketing + Document Generation
+- DB tables: `helpdesk_tickets`, `ticket_comments`, `ticket_sla_logs`, `document_templates`, `issued_documents`
+- Enum: `hrDocumentTypeEnum` (pg `hr_document_type`) — offer_letter, appointment_letter, experience_letter, salary_certificate, noc, increment_letter, relieving_letter, custom
+- Backend routes: `/helpdesk` (CRUD + comments + SLA tracking + report) and `/documents` (templates CRUD + PDF generation via pdf-lib + download)
+- SLA hours: Urgent=4, High=8, Medium=24, Low=48. Priority change resets SLA deadline.
+- PDF generation: pdf-lib with `{{fieldName}}` substitution. Auto-fields: employeeName, employeeCode, dateOfJoining, lastWorkingDay, currentDate
+- Frontend pages: `/helpdesk` (dashboard + create ticket + filters), `/helpdesk/ticket/:id` (detail + comments + status/priority controls), `/documents` (templates list + generate modal + issued documents)
+- Role gates: Employees see own tickets; HOD sees team; HR unrestricted. Template management is HR-only. Internal comments restricted to MANAGER_ROLES.
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

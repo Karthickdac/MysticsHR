@@ -2276,6 +2276,217 @@ export interface EssDashboard {
   pendingActions: EssDashboardPendingActionsItem[];
 }
 
+export interface HelpdeskTicket {
+  id: number;
+  subject: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: string;
+  /** @nullable */
+  raisedByEmployeeId?: number | null;
+  /** @nullable */
+  raisedByName?: string | null;
+  /** @nullable */
+  assignedToUserId?: number | null;
+  /** @nullable */
+  assignedToName?: string | null;
+  /** @nullable */
+  slaDeadline?: string | null;
+  slaBreached: boolean;
+  /** @nullable */
+  resolvedAt?: string | null;
+  /** @nullable */
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketComment {
+  id: number;
+  ticketId: number;
+  authorId: number;
+  /** @nullable */
+  authorName?: string | null;
+  message: string;
+  isInternal: boolean;
+  createdAt: string;
+}
+
+export type HelpdeskTicketDetail = HelpdeskTicket & {
+  comments: TicketComment[];
+};
+
+export type CreateHelpdeskTicketBodyCategory =
+  (typeof CreateHelpdeskTicketBodyCategory)[keyof typeof CreateHelpdeskTicketBodyCategory];
+
+export const CreateHelpdeskTicketBodyCategory = {
+  IT: "IT",
+  HR: "HR",
+  Finance: "Finance",
+  Admin: "Admin",
+  Other: "Other",
+} as const;
+
+export type CreateHelpdeskTicketBodyPriority =
+  (typeof CreateHelpdeskTicketBodyPriority)[keyof typeof CreateHelpdeskTicketBodyPriority];
+
+export const CreateHelpdeskTicketBodyPriority = {
+  Low: "Low",
+  Medium: "Medium",
+  High: "High",
+  Urgent: "Urgent",
+} as const;
+
+export interface CreateHelpdeskTicketBody {
+  subject: string;
+  description: string;
+  category: CreateHelpdeskTicketBodyCategory;
+  priority: CreateHelpdeskTicketBodyPriority;
+}
+
+export type UpdateHelpdeskTicketBodyStatus =
+  (typeof UpdateHelpdeskTicketBodyStatus)[keyof typeof UpdateHelpdeskTicketBodyStatus];
+
+export const UpdateHelpdeskTicketBodyStatus = {
+  Open: "Open",
+  In_Progress: "In Progress",
+  Pending_Employee_Response: "Pending Employee Response",
+  Resolved: "Resolved",
+  Closed: "Closed",
+} as const;
+
+export type UpdateHelpdeskTicketBodyPriority =
+  (typeof UpdateHelpdeskTicketBodyPriority)[keyof typeof UpdateHelpdeskTicketBodyPriority];
+
+export const UpdateHelpdeskTicketBodyPriority = {
+  Low: "Low",
+  Medium: "Medium",
+  High: "High",
+  Urgent: "Urgent",
+} as const;
+
+export interface UpdateHelpdeskTicketBody {
+  status?: UpdateHelpdeskTicketBodyStatus;
+  priority?: UpdateHelpdeskTicketBodyPriority;
+  /** @nullable */
+  assignedToUserId?: number | null;
+}
+
+export interface AddTicketCommentBody {
+  message: string;
+  isInternal?: boolean;
+}
+
+export type HelpdeskSlaReportByPriorityItem = {
+  priority: string;
+  count: number;
+  breached: number;
+};
+
+export type HelpdeskSlaReportByCategoryItem = {
+  category: string;
+  count: number;
+};
+
+export interface HelpdeskSlaReport {
+  totalTickets: number;
+  openTickets: number;
+  resolvedTickets: number;
+  slaBreachedCount: number;
+  /** @nullable */
+  avgResolutionHours?: number | null;
+  byPriority: HelpdeskSlaReportByPriorityItem[];
+  byCategory: HelpdeskSlaReportByCategoryItem[];
+}
+
+export interface DocumentTemplate {
+  id: number;
+  documentType: string;
+  name: string;
+  /** @nullable */
+  companyName?: string | null;
+  /** @nullable */
+  companyAddress?: string | null;
+  /** @nullable */
+  headerText?: string | null;
+  /** @nullable */
+  footerText?: string | null;
+  bodyTemplate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateDocumentTemplateBodyDocumentType =
+  (typeof CreateDocumentTemplateBodyDocumentType)[keyof typeof CreateDocumentTemplateBodyDocumentType];
+
+export const CreateDocumentTemplateBodyDocumentType = {
+  Experience_Certificate: "Experience Certificate",
+  Appointment_Letter: "Appointment Letter",
+  Warning_Notice: "Warning Notice",
+  Offer_Letter: "Offer Letter",
+  NOC: "NOC",
+  Relieving_Letter: "Relieving Letter",
+} as const;
+
+export interface CreateDocumentTemplateBody {
+  documentType: CreateDocumentTemplateBodyDocumentType;
+  name: string;
+  /** @nullable */
+  companyName?: string | null;
+  /** @nullable */
+  companyAddress?: string | null;
+  /** @nullable */
+  headerText?: string | null;
+  /** @nullable */
+  footerText?: string | null;
+  bodyTemplate: string;
+  isActive?: boolean;
+}
+
+export type IssuedDocumentFieldValues = { [key: string]: unknown };
+
+export interface IssuedDocument {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  templateId?: number | null;
+  documentType: string;
+  filename: string;
+  /** @nullable */
+  generatedBy?: number | null;
+  /** @nullable */
+  generatedByName?: string | null;
+  generatedAt: string;
+  fieldValues: IssuedDocumentFieldValues;
+}
+
+export type GenerateDocumentBodyDocumentType =
+  (typeof GenerateDocumentBodyDocumentType)[keyof typeof GenerateDocumentBodyDocumentType];
+
+export const GenerateDocumentBodyDocumentType = {
+  Experience_Certificate: "Experience Certificate",
+  Appointment_Letter: "Appointment Letter",
+  Warning_Notice: "Warning Notice",
+  Offer_Letter: "Offer Letter",
+  NOC: "NOC",
+  Relieving_Letter: "Relieving Letter",
+} as const;
+
+export type GenerateDocumentBodyFieldValues = { [key: string]: unknown };
+
+export interface GenerateDocumentBody {
+  employeeId: number;
+  documentType: GenerateDocumentBodyDocumentType;
+  templateId: number;
+  fieldValues?: GenerateDocumentBodyFieldValues;
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -2713,4 +2924,16 @@ export type ComputeAppraisalOutcomesBodyCalibrationNotes = {
 export type ComputeAppraisalOutcomesBody = {
   cycleId: number;
   calibrationNotes?: ComputeAppraisalOutcomesBodyCalibrationNotes;
+};
+
+export type ListHelpdeskTicketsParams = {
+  status?: string;
+  category?: string;
+  priority?: string;
+  assignedTo?: number;
+};
+
+export type ListIssuedDocumentsParams = {
+  employeeId?: number;
+  documentType?: string;
 };

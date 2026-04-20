@@ -22,6 +22,7 @@ import type {
   AccrueLeaveBalancesBody,
   ActionBody,
   ActivityItem,
+  AddTicketCommentBody,
   AppraisalOutcome,
   ApprovePayrollRun200,
   ApproveRequisitionBody,
@@ -44,10 +45,12 @@ import type {
   CreateDepartmentBody,
   CreateDesignationBody,
   CreateDocumentBody,
+  CreateDocumentTemplateBody,
   CreateEmployeeBody,
   CreateEmployeeDocumentBody,
   CreateEmployeeEducationBody,
   CreateEmployeeWorkExperienceBody,
+  CreateHelpdeskTicketBody,
   CreateInductionSessionBody,
   CreateLeaveTypeBody,
   CreateLoanBody,
@@ -69,6 +72,7 @@ import type {
   DashboardKpis,
   Department,
   Designation,
+  DocumentTemplate,
   Employee,
   EmployeeDocument,
   EmployeeEducation,
@@ -79,6 +83,7 @@ import type {
   EssDashboard,
   EssProfile,
   FinalizePayrollRun200,
+  GenerateDocumentBody,
   GetAttendanceParams,
   GetAttendanceRegularizationsParams,
   GetAttendanceSummaryParams,
@@ -101,12 +106,16 @@ import type {
   GoalProgressBody,
   HeadcountByDepartment,
   HealthStatus,
+  HelpdeskSlaReport,
+  HelpdeskTicket,
+  HelpdeskTicketDetail,
   HrmsUser,
   InductionSession,
   InitLeaveBalancesBody,
   InitializeLeaveBalances200,
   InterviewFeedback,
   InterviewRound,
+  IssuedDocument,
   JobRequisition,
   LeaveActionBody,
   LeaveApplication,
@@ -120,6 +129,8 @@ import type {
   ListCandidatesParams,
   ListDesignationsParams,
   ListEmployeesParams,
+  ListHelpdeskTicketsParams,
+  ListIssuedDocumentsParams,
   ListLeaveApplicationsParams,
   ListLeaveBalancesParams,
   ListLeaveTypesParams,
@@ -189,12 +200,14 @@ import type {
   SubmitPermissionBody,
   SubmitSelfAppraisalBody,
   TaxDeclaration,
+  TicketComment,
   UpdateCandidateBody,
   UpdateDepartmentBody,
   UpdateDesignationBody,
   UpdateEmployeeBody,
   UpdateEmployeeStatusBody,
   UpdateEssProfileBody,
+  UpdateHelpdeskTicketBody,
   UpdateInterviewBody,
   UpdateLeavePolicyBody,
   UpdateLoanBody,
@@ -18234,6 +18247,1141 @@ export function useGetEssDashboard<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetEssDashboardQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List helpdesk tickets (scoped by role)
+ */
+export const getListHelpdeskTicketsUrl = (
+  params?: ListHelpdeskTicketsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/helpdesk/tickets?${stringifiedParams}`
+    : `/api/helpdesk/tickets`;
+};
+
+export const listHelpdeskTickets = async (
+  params?: ListHelpdeskTicketsParams,
+  options?: RequestInit,
+): Promise<HelpdeskTicket[]> => {
+  return customFetch<HelpdeskTicket[]>(getListHelpdeskTicketsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListHelpdeskTicketsQueryKey = (
+  params?: ListHelpdeskTicketsParams,
+) => {
+  return [`/api/helpdesk/tickets`, ...(params ? [params] : [])] as const;
+};
+
+export const getListHelpdeskTicketsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listHelpdeskTickets>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListHelpdeskTicketsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listHelpdeskTickets>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListHelpdeskTicketsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listHelpdeskTickets>>
+  > = ({ signal }) =>
+    listHelpdeskTickets(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listHelpdeskTickets>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListHelpdeskTicketsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listHelpdeskTickets>>
+>;
+export type ListHelpdeskTicketsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List helpdesk tickets (scoped by role)
+ */
+
+export function useListHelpdeskTickets<
+  TData = Awaited<ReturnType<typeof listHelpdeskTickets>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListHelpdeskTicketsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listHelpdeskTickets>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListHelpdeskTicketsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a helpdesk ticket
+ */
+export const getCreateHelpdeskTicketUrl = () => {
+  return `/api/helpdesk/tickets`;
+};
+
+export const createHelpdeskTicket = async (
+  createHelpdeskTicketBody: CreateHelpdeskTicketBody,
+  options?: RequestInit,
+): Promise<HelpdeskTicket> => {
+  return customFetch<HelpdeskTicket>(getCreateHelpdeskTicketUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createHelpdeskTicketBody),
+  });
+};
+
+export const getCreateHelpdeskTicketMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createHelpdeskTicket>>,
+    TError,
+    { data: BodyType<CreateHelpdeskTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createHelpdeskTicket>>,
+  TError,
+  { data: BodyType<CreateHelpdeskTicketBody> },
+  TContext
+> => {
+  const mutationKey = ["createHelpdeskTicket"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createHelpdeskTicket>>,
+    { data: BodyType<CreateHelpdeskTicketBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createHelpdeskTicket(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateHelpdeskTicketMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createHelpdeskTicket>>
+>;
+export type CreateHelpdeskTicketMutationBody =
+  BodyType<CreateHelpdeskTicketBody>;
+export type CreateHelpdeskTicketMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a helpdesk ticket
+ */
+export const useCreateHelpdeskTicket = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createHelpdeskTicket>>,
+    TError,
+    { data: BodyType<CreateHelpdeskTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createHelpdeskTicket>>,
+  TError,
+  { data: BodyType<CreateHelpdeskTicketBody> },
+  TContext
+> => {
+  return useMutation(getCreateHelpdeskTicketMutationOptions(options));
+};
+
+/**
+ * @summary Get a helpdesk ticket by ID
+ */
+export const getGetHelpdeskTicketUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}`;
+};
+
+export const getHelpdeskTicket = async (
+  id: number,
+  options?: RequestInit,
+): Promise<HelpdeskTicketDetail> => {
+  return customFetch<HelpdeskTicketDetail>(getGetHelpdeskTicketUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetHelpdeskTicketQueryKey = (id: number) => {
+  return [`/api/helpdesk/tickets/${id}`] as const;
+};
+
+export const getGetHelpdeskTicketQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHelpdeskTicket>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHelpdeskTicket>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetHelpdeskTicketQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getHelpdeskTicket>>
+  > = ({ signal }) => getHelpdeskTicket(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHelpdeskTicket>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHelpdeskTicketQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getHelpdeskTicket>>
+>;
+export type GetHelpdeskTicketQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a helpdesk ticket by ID
+ */
+
+export function useGetHelpdeskTicket<
+  TData = Awaited<ReturnType<typeof getHelpdeskTicket>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHelpdeskTicket>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHelpdeskTicketQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update ticket status, priority, or assignment
+ */
+export const getUpdateHelpdeskTicketUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}`;
+};
+
+export const updateHelpdeskTicket = async (
+  id: number,
+  updateHelpdeskTicketBody: UpdateHelpdeskTicketBody,
+  options?: RequestInit,
+): Promise<HelpdeskTicket> => {
+  return customFetch<HelpdeskTicket>(getUpdateHelpdeskTicketUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateHelpdeskTicketBody),
+  });
+};
+
+export const getUpdateHelpdeskTicketMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateHelpdeskTicket>>,
+    TError,
+    { id: number; data: BodyType<UpdateHelpdeskTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateHelpdeskTicket>>,
+  TError,
+  { id: number; data: BodyType<UpdateHelpdeskTicketBody> },
+  TContext
+> => {
+  const mutationKey = ["updateHelpdeskTicket"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateHelpdeskTicket>>,
+    { id: number; data: BodyType<UpdateHelpdeskTicketBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateHelpdeskTicket(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateHelpdeskTicketMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateHelpdeskTicket>>
+>;
+export type UpdateHelpdeskTicketMutationBody =
+  BodyType<UpdateHelpdeskTicketBody>;
+export type UpdateHelpdeskTicketMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update ticket status, priority, or assignment
+ */
+export const useUpdateHelpdeskTicket = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateHelpdeskTicket>>,
+    TError,
+    { id: number; data: BodyType<UpdateHelpdeskTicketBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateHelpdeskTicket>>,
+  TError,
+  { id: number; data: BodyType<UpdateHelpdeskTicketBody> },
+  TContext
+> => {
+  return useMutation(getUpdateHelpdeskTicketMutationOptions(options));
+};
+
+/**
+ * @summary Get comments for a ticket
+ */
+export const getListTicketCommentsUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}/comments`;
+};
+
+export const listTicketComments = async (
+  id: number,
+  options?: RequestInit,
+): Promise<TicketComment[]> => {
+  return customFetch<TicketComment[]>(getListTicketCommentsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTicketCommentsQueryKey = (id: number) => {
+  return [`/api/helpdesk/tickets/${id}/comments`] as const;
+};
+
+export const getListTicketCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTicketComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTicketComments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTicketCommentsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTicketComments>>
+  > = ({ signal }) => listTicketComments(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTicketComments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTicketCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTicketComments>>
+>;
+export type ListTicketCommentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get comments for a ticket
+ */
+
+export function useListTicketComments<
+  TData = Awaited<ReturnType<typeof listTicketComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTicketComments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTicketCommentsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add a comment to a ticket
+ */
+export const getAddTicketCommentUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}/comments`;
+};
+
+export const addTicketComment = async (
+  id: number,
+  addTicketCommentBody: AddTicketCommentBody,
+  options?: RequestInit,
+): Promise<TicketComment> => {
+  return customFetch<TicketComment>(getAddTicketCommentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addTicketCommentBody),
+  });
+};
+
+export const getAddTicketCommentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addTicketComment>>,
+    TError,
+    { id: number; data: BodyType<AddTicketCommentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addTicketComment>>,
+  TError,
+  { id: number; data: BodyType<AddTicketCommentBody> },
+  TContext
+> => {
+  const mutationKey = ["addTicketComment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addTicketComment>>,
+    { id: number; data: BodyType<AddTicketCommentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addTicketComment(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddTicketCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addTicketComment>>
+>;
+export type AddTicketCommentMutationBody = BodyType<AddTicketCommentBody>;
+export type AddTicketCommentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add a comment to a ticket
+ */
+export const useAddTicketComment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addTicketComment>>,
+    TError,
+    { id: number; data: BodyType<AddTicketCommentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addTicketComment>>,
+  TError,
+  { id: number; data: BodyType<AddTicketCommentBody> },
+  TContext
+> => {
+  return useMutation(getAddTicketCommentMutationOptions(options));
+};
+
+/**
+ * @summary SLA breach and resolution report
+ */
+export const getGetHelpdeskSlaReportUrl = () => {
+  return `/api/helpdesk/sla-report`;
+};
+
+export const getHelpdeskSlaReport = async (
+  options?: RequestInit,
+): Promise<HelpdeskSlaReport> => {
+  return customFetch<HelpdeskSlaReport>(getGetHelpdeskSlaReportUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetHelpdeskSlaReportQueryKey = () => {
+  return [`/api/helpdesk/sla-report`] as const;
+};
+
+export const getGetHelpdeskSlaReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetHelpdeskSlaReportQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getHelpdeskSlaReport>>
+  > = ({ signal }) => getHelpdeskSlaReport({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHelpdeskSlaReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getHelpdeskSlaReport>>
+>;
+export type GetHelpdeskSlaReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary SLA breach and resolution report
+ */
+
+export function useGetHelpdeskSlaReport<
+  TData = Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getHelpdeskSlaReport>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHelpdeskSlaReportQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List document templates
+ */
+export const getListDocumentTemplatesUrl = () => {
+  return `/api/documents/templates`;
+};
+
+export const listDocumentTemplates = async (
+  options?: RequestInit,
+): Promise<DocumentTemplate[]> => {
+  return customFetch<DocumentTemplate[]>(getListDocumentTemplatesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDocumentTemplatesQueryKey = () => {
+  return [`/api/documents/templates`] as const;
+};
+
+export const getListDocumentTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDocumentTemplates>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDocumentTemplates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListDocumentTemplatesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDocumentTemplates>>
+  > = ({ signal }) => listDocumentTemplates({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDocumentTemplates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDocumentTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDocumentTemplates>>
+>;
+export type ListDocumentTemplatesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List document templates
+ */
+
+export function useListDocumentTemplates<
+  TData = Awaited<ReturnType<typeof listDocumentTemplates>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDocumentTemplates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDocumentTemplatesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a document template
+ */
+export const getCreateDocumentTemplateUrl = () => {
+  return `/api/documents/templates`;
+};
+
+export const createDocumentTemplate = async (
+  createDocumentTemplateBody: CreateDocumentTemplateBody,
+  options?: RequestInit,
+): Promise<DocumentTemplate> => {
+  return customFetch<DocumentTemplate>(getCreateDocumentTemplateUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createDocumentTemplateBody),
+  });
+};
+
+export const getCreateDocumentTemplateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDocumentTemplate>>,
+    TError,
+    { data: BodyType<CreateDocumentTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createDocumentTemplate>>,
+  TError,
+  { data: BodyType<CreateDocumentTemplateBody> },
+  TContext
+> => {
+  const mutationKey = ["createDocumentTemplate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createDocumentTemplate>>,
+    { data: BodyType<CreateDocumentTemplateBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createDocumentTemplate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateDocumentTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createDocumentTemplate>>
+>;
+export type CreateDocumentTemplateMutationBody =
+  BodyType<CreateDocumentTemplateBody>;
+export type CreateDocumentTemplateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a document template
+ */
+export const useCreateDocumentTemplate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDocumentTemplate>>,
+    TError,
+    { data: BodyType<CreateDocumentTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createDocumentTemplate>>,
+  TError,
+  { data: BodyType<CreateDocumentTemplateBody> },
+  TContext
+> => {
+  return useMutation(getCreateDocumentTemplateMutationOptions(options));
+};
+
+/**
+ * @summary Update a document template
+ */
+export const getUpdateDocumentTemplateUrl = (id: number) => {
+  return `/api/documents/templates/${id}`;
+};
+
+export const updateDocumentTemplate = async (
+  id: number,
+  createDocumentTemplateBody: CreateDocumentTemplateBody,
+  options?: RequestInit,
+): Promise<DocumentTemplate> => {
+  return customFetch<DocumentTemplate>(getUpdateDocumentTemplateUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createDocumentTemplateBody),
+  });
+};
+
+export const getUpdateDocumentTemplateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDocumentTemplate>>,
+    TError,
+    { id: number; data: BodyType<CreateDocumentTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateDocumentTemplate>>,
+  TError,
+  { id: number; data: BodyType<CreateDocumentTemplateBody> },
+  TContext
+> => {
+  const mutationKey = ["updateDocumentTemplate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateDocumentTemplate>>,
+    { id: number; data: BodyType<CreateDocumentTemplateBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateDocumentTemplate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateDocumentTemplateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateDocumentTemplate>>
+>;
+export type UpdateDocumentTemplateMutationBody =
+  BodyType<CreateDocumentTemplateBody>;
+export type UpdateDocumentTemplateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a document template
+ */
+export const useUpdateDocumentTemplate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDocumentTemplate>>,
+    TError,
+    { id: number; data: BodyType<CreateDocumentTemplateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateDocumentTemplate>>,
+  TError,
+  { id: number; data: BodyType<CreateDocumentTemplateBody> },
+  TContext
+> => {
+  return useMutation(getUpdateDocumentTemplateMutationOptions(options));
+};
+
+/**
+ * @summary List issued documents (scoped by role)
+ */
+export const getListIssuedDocumentsUrl = (
+  params?: ListIssuedDocumentsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/documents/issued?${stringifiedParams}`
+    : `/api/documents/issued`;
+};
+
+export const listIssuedDocuments = async (
+  params?: ListIssuedDocumentsParams,
+  options?: RequestInit,
+): Promise<IssuedDocument[]> => {
+  return customFetch<IssuedDocument[]>(getListIssuedDocumentsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListIssuedDocumentsQueryKey = (
+  params?: ListIssuedDocumentsParams,
+) => {
+  return [`/api/documents/issued`, ...(params ? [params] : [])] as const;
+};
+
+export const getListIssuedDocumentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listIssuedDocuments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListIssuedDocumentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIssuedDocuments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListIssuedDocumentsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listIssuedDocuments>>
+  > = ({ signal }) =>
+    listIssuedDocuments(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listIssuedDocuments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListIssuedDocumentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listIssuedDocuments>>
+>;
+export type ListIssuedDocumentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List issued documents (scoped by role)
+ */
+
+export function useListIssuedDocuments<
+  TData = Awaited<ReturnType<typeof listIssuedDocuments>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListIssuedDocumentsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listIssuedDocuments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListIssuedDocumentsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Generate and issue a document for an employee
+ */
+export const getGenerateDocumentUrl = () => {
+  return `/api/documents/generate`;
+};
+
+export const generateDocument = async (
+  generateDocumentBody: GenerateDocumentBody,
+  options?: RequestInit,
+): Promise<IssuedDocument> => {
+  return customFetch<IssuedDocument>(getGenerateDocumentUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateDocumentBody),
+  });
+};
+
+export const getGenerateDocumentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateDocument>>,
+    TError,
+    { data: BodyType<GenerateDocumentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateDocument>>,
+  TError,
+  { data: BodyType<GenerateDocumentBody> },
+  TContext
+> => {
+  const mutationKey = ["generateDocument"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateDocument>>,
+    { data: BodyType<GenerateDocumentBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return generateDocument(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateDocumentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateDocument>>
+>;
+export type GenerateDocumentMutationBody = BodyType<GenerateDocumentBody>;
+export type GenerateDocumentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Generate and issue a document for an employee
+ */
+export const useGenerateDocument = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateDocument>>,
+    TError,
+    { data: BodyType<GenerateDocumentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateDocument>>,
+  TError,
+  { data: BodyType<GenerateDocumentBody> },
+  TContext
+> => {
+  return useMutation(getGenerateDocumentMutationOptions(options));
+};
+
+/**
+ * @summary Download an issued document as PDF
+ */
+export const getDownloadIssuedDocumentUrl = (id: number) => {
+  return `/api/documents/issued/${id}/download`;
+};
+
+export const downloadIssuedDocument = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadIssuedDocumentUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getDownloadIssuedDocumentQueryKey = (id: number) => {
+  return [`/api/documents/issued/${id}/download`] as const;
+};
+
+export const getDownloadIssuedDocumentQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadIssuedDocument>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadIssuedDocument>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getDownloadIssuedDocumentQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof downloadIssuedDocument>>
+  > = ({ signal }) => downloadIssuedDocument(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadIssuedDocument>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadIssuedDocumentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadIssuedDocument>>
+>;
+export type DownloadIssuedDocumentQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download an issued document as PDF
+ */
+
+export function useDownloadIssuedDocument<
+  TData = Awaited<ReturnType<typeof downloadIssuedDocument>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadIssuedDocument>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadIssuedDocumentQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

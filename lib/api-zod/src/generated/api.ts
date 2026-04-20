@@ -4766,3 +4766,312 @@ export const GetEssDashboardResponse = zod.object({
   performanceGoals: zod.array(zod.object({}).passthrough()),
   pendingActions: zod.array(zod.object({}).passthrough()),
 });
+
+/**
+ * @summary List helpdesk tickets (scoped by role)
+ */
+export const ListHelpdeskTicketsQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+  category: zod.coerce.string().optional(),
+  priority: zod.coerce.string().optional(),
+  assignedTo: zod.coerce.number().optional(),
+});
+
+export const ListHelpdeskTicketsResponseItem = zod.object({
+  id: zod.number(),
+  subject: zod.string(),
+  description: zod.string(),
+  category: zod.string(),
+  priority: zod.string(),
+  status: zod.string(),
+  raisedByEmployeeId: zod.number().nullish(),
+  raisedByName: zod.string().nullish(),
+  assignedToUserId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  slaDeadline: zod.coerce.date().nullish(),
+  slaBreached: zod.boolean(),
+  resolvedAt: zod.coerce.date().nullish(),
+  closedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListHelpdeskTicketsResponse = zod.array(
+  ListHelpdeskTicketsResponseItem,
+);
+
+/**
+ * @summary Create a helpdesk ticket
+ */
+export const CreateHelpdeskTicketBody = zod.object({
+  subject: zod.string(),
+  description: zod.string(),
+  category: zod.enum(["IT", "HR", "Finance", "Admin", "Other"]),
+  priority: zod.enum(["Low", "Medium", "High", "Urgent"]),
+});
+
+/**
+ * @summary Get a helpdesk ticket by ID
+ */
+export const GetHelpdeskTicketParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetHelpdeskTicketResponse = zod
+  .object({
+    id: zod.number(),
+    subject: zod.string(),
+    description: zod.string(),
+    category: zod.string(),
+    priority: zod.string(),
+    status: zod.string(),
+    raisedByEmployeeId: zod.number().nullish(),
+    raisedByName: zod.string().nullish(),
+    assignedToUserId: zod.number().nullish(),
+    assignedToName: zod.string().nullish(),
+    slaDeadline: zod.coerce.date().nullish(),
+    slaBreached: zod.boolean(),
+    resolvedAt: zod.coerce.date().nullish(),
+    closedAt: zod.coerce.date().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      comments: zod.array(
+        zod.object({
+          id: zod.number(),
+          ticketId: zod.number(),
+          authorId: zod.number(),
+          authorName: zod.string().nullish(),
+          message: zod.string(),
+          isInternal: zod.boolean(),
+          createdAt: zod.coerce.date(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary Update ticket status, priority, or assignment
+ */
+export const UpdateHelpdeskTicketParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateHelpdeskTicketBody = zod.object({
+  status: zod
+    .enum([
+      "Open",
+      "In Progress",
+      "Pending Employee Response",
+      "Resolved",
+      "Closed",
+    ])
+    .optional(),
+  priority: zod.enum(["Low", "Medium", "High", "Urgent"]).optional(),
+  assignedToUserId: zod.number().nullish(),
+});
+
+export const UpdateHelpdeskTicketResponse = zod.object({
+  id: zod.number(),
+  subject: zod.string(),
+  description: zod.string(),
+  category: zod.string(),
+  priority: zod.string(),
+  status: zod.string(),
+  raisedByEmployeeId: zod.number().nullish(),
+  raisedByName: zod.string().nullish(),
+  assignedToUserId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  slaDeadline: zod.coerce.date().nullish(),
+  slaBreached: zod.boolean(),
+  resolvedAt: zod.coerce.date().nullish(),
+  closedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get comments for a ticket
+ */
+export const ListTicketCommentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListTicketCommentsResponseItem = zod.object({
+  id: zod.number(),
+  ticketId: zod.number(),
+  authorId: zod.number(),
+  authorName: zod.string().nullish(),
+  message: zod.string(),
+  isInternal: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+export const ListTicketCommentsResponse = zod.array(
+  ListTicketCommentsResponseItem,
+);
+
+/**
+ * @summary Add a comment to a ticket
+ */
+export const AddTicketCommentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddTicketCommentBody = zod.object({
+  message: zod.string(),
+  isInternal: zod.boolean().optional(),
+});
+
+/**
+ * @summary SLA breach and resolution report
+ */
+export const GetHelpdeskSlaReportResponse = zod.object({
+  totalTickets: zod.number(),
+  openTickets: zod.number(),
+  resolvedTickets: zod.number(),
+  slaBreachedCount: zod.number(),
+  avgResolutionHours: zod.number().nullish(),
+  byPriority: zod.array(
+    zod.object({
+      priority: zod.string(),
+      count: zod.number(),
+      breached: zod.number(),
+    }),
+  ),
+  byCategory: zod.array(
+    zod.object({
+      category: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary List document templates
+ */
+export const ListDocumentTemplatesResponseItem = zod.object({
+  id: zod.number(),
+  documentType: zod.string(),
+  name: zod.string(),
+  companyName: zod.string().nullish(),
+  companyAddress: zod.string().nullish(),
+  headerText: zod.string().nullish(),
+  footerText: zod.string().nullish(),
+  bodyTemplate: zod.string(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListDocumentTemplatesResponse = zod.array(
+  ListDocumentTemplatesResponseItem,
+);
+
+/**
+ * @summary Create a document template
+ */
+export const CreateDocumentTemplateBody = zod.object({
+  documentType: zod.enum([
+    "Experience Certificate",
+    "Appointment Letter",
+    "Warning Notice",
+    "Offer Letter",
+    "NOC",
+    "Relieving Letter",
+  ]),
+  name: zod.string(),
+  companyName: zod.string().nullish(),
+  companyAddress: zod.string().nullish(),
+  headerText: zod.string().nullish(),
+  footerText: zod.string().nullish(),
+  bodyTemplate: zod.string(),
+  isActive: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update a document template
+ */
+export const UpdateDocumentTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateDocumentTemplateBody = zod.object({
+  documentType: zod.enum([
+    "Experience Certificate",
+    "Appointment Letter",
+    "Warning Notice",
+    "Offer Letter",
+    "NOC",
+    "Relieving Letter",
+  ]),
+  name: zod.string(),
+  companyName: zod.string().nullish(),
+  companyAddress: zod.string().nullish(),
+  headerText: zod.string().nullish(),
+  footerText: zod.string().nullish(),
+  bodyTemplate: zod.string(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateDocumentTemplateResponse = zod.object({
+  id: zod.number(),
+  documentType: zod.string(),
+  name: zod.string(),
+  companyName: zod.string().nullish(),
+  companyAddress: zod.string().nullish(),
+  headerText: zod.string().nullish(),
+  footerText: zod.string().nullish(),
+  bodyTemplate: zod.string(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List issued documents (scoped by role)
+ */
+export const ListIssuedDocumentsQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  documentType: zod.coerce.string().optional(),
+});
+
+export const ListIssuedDocumentsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  templateId: zod.number().nullish(),
+  documentType: zod.string(),
+  filename: zod.string(),
+  generatedBy: zod.number().nullish(),
+  generatedByName: zod.string().nullish(),
+  generatedAt: zod.coerce.date(),
+  fieldValues: zod.object({}).passthrough(),
+});
+export const ListIssuedDocumentsResponse = zod.array(
+  ListIssuedDocumentsResponseItem,
+);
+
+/**
+ * @summary Generate and issue a document for an employee
+ */
+export const GenerateDocumentBody = zod.object({
+  employeeId: zod.number(),
+  documentType: zod.enum([
+    "Experience Certificate",
+    "Appointment Letter",
+    "Warning Notice",
+    "Offer Letter",
+    "NOC",
+    "Relieving Letter",
+  ]),
+  templateId: zod.number(),
+  fieldValues: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+/**
+ * @summary Download an issued document as PDF
+ */
+export const DownloadIssuedDocumentParams = zod.object({
+  id: zod.coerce.number(),
+});
