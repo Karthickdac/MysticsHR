@@ -323,10 +323,13 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
       lwdPlus1.setDate(lwdPlus1.getDate() + 1);
       const now = new Date();
       if (now >= lwdPlus1) {
-        // LWD+1 has passed — revoke system access immediately
+        // LWD+1 has passed — revoke system access immediately on both tables
         await db.update(employeesTable)
           .set({ status: "Separated", isActive: false, updatedAt: new Date() })
           .where(eq(employeesTable.id, existing.employeeId));
+        await db.update(hrmsUsersTable)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(hrmsUsersTable.employeeId, existing.employeeId));
       } else {
         // LWD+1 is in the future — mark as Separated but keep access until LWD+1
         await db.update(employeesTable)
@@ -886,6 +889,10 @@ router.post("/exit/process-access-revocations", requireHrmsUser, requireRole(...
       await db.update(employeesTable)
         .set({ isActive: false, updatedAt: new Date() })
         .where(eq(employeesTable.id, r.employeeId));
+      // Also deactivate linked HRMS user account to block system login
+      await db.update(hrmsUsersTable)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(hrmsUsersTable.employeeId, r.employeeId));
       revokedIds.push(r.employeeId);
     }
 

@@ -258,15 +258,17 @@ async function revokeAccessForPastLwd() {
   const today = new Date().toISOString().slice(0, 10);
   try {
     // Find FnF-Approved or Separated exit requests where LWD < today (meaning LWD+1 has passed)
-    // and the employee still has isActive=true
+    // Key off hrmsUsersTable.isActive=true — catches users whose employees.isActive was already set
+    // to false by exit.ts but whose HRMS login account was not yet deactivated.
     const pending = await db.select({
       employeeId: exitRequestsTable.employeeId,
       actualLwd: exitRequestsTable.actualLwd,
       requestedLwd: exitRequestsTable.requestedLwd,
     }).from(exitRequestsTable)
-      .innerJoin(employeesTable, and(
-        eq(exitRequestsTable.employeeId, employeesTable.id),
-        eq(employeesTable.isActive, true),
+      .innerJoin(employeesTable, eq(exitRequestsTable.employeeId, employeesTable.id))
+      .innerJoin(hrmsUsersTable, and(
+        eq(hrmsUsersTable.employeeId, employeesTable.id),
+        eq(hrmsUsersTable.isActive, true),
       ))
       .where(and(
         sql`${exitRequestsTable.status} IN ('FnF Approved', 'Separated')`,
