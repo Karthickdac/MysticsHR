@@ -25,9 +25,12 @@ import type {
   AttendanceRecord,
   AttendanceRegularization,
   AuditLogListResponse,
+  BlackoutDate,
   BulkImportResult,
+  CancelLeaveBody,
   Candidate,
   CreateAttendanceBody,
+  CreateBlackoutDateBody,
   CreateCandidateBody,
   CreateDepartmentBody,
   CreateDesignationBody,
@@ -37,6 +40,7 @@ import type {
   CreateEmployeeEducationBody,
   CreateEmployeeWorkExperienceBody,
   CreateInductionSessionBody,
+  CreateLeaveTypeBody,
   CreateOfferBody,
   CreateOnboardingTaskBody,
   CreateRegularizationBody,
@@ -61,7 +65,9 @@ import type {
   GetDashboardRecentActivityParams,
   GetEmployeesIdAttendanceParams,
   GetEmployeesIdOvertimeParams,
+  GetLeaveCalendarParams,
   GetOnboardingChecklistsParams,
+  GetPermissionRegisterParams,
   GetShiftSwapsParams,
   GetShiftsCalendarParams,
   GetShiftsTemplatesParams,
@@ -69,14 +75,26 @@ import type {
   HealthStatus,
   HrmsUser,
   InductionSession,
+  InitLeaveBalancesBody,
+  InitializeLeaveBalances200,
   InterviewFeedback,
   InterviewRound,
   JobRequisition,
+  LeaveActionBody,
+  LeaveApplication,
+  LeaveBalance,
+  LeaveCalendarEntry,
+  LeaveType,
   ListAuditLogsParams,
+  ListBlackoutDatesParams,
   ListCandidatesParams,
   ListDesignationsParams,
   ListEmployeesParams,
+  ListLeaveApplicationsParams,
+  ListLeaveBalancesParams,
+  ListLeaveTypesParams,
   ListOffersParams,
+  ListPermissionsParams,
   ListPreOnboardingRecordsParams,
   ListRequisitionsParams,
   MoveCandidateStageBody,
@@ -86,6 +104,10 @@ import type {
   OnboardingTask,
   OvertimeRecord,
   PatchOnboardingChecklistsIdBody,
+  PermissionActionBody,
+  PermissionApplication,
+  PermissionOverrideBody,
+  PermissionRegister,
   PostDepartmentsIdShiftAssignments201,
   PostEmployeesBulkImportBody,
   PostEmployeesIdOnboardingChecklistBody,
@@ -106,6 +128,8 @@ import type {
   ShiftTemplate,
   StatusCount,
   SubmitFeedbackBody,
+  SubmitLeaveApplicationBody,
+  SubmitPermissionBody,
   UpdateCandidateBody,
   UpdateDepartmentBody,
   UpdateDesignationBody,
@@ -10576,3 +10600,2152 @@ export function useGetEmployeesIdOvertime<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List all leave types
+ */
+export const getListLeaveTypesUrl = (params?: ListLeaveTypesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/leave/types?${stringifiedParams}`
+    : `/api/leave/types`;
+};
+
+export const listLeaveTypes = async (
+  params?: ListLeaveTypesParams,
+  options?: RequestInit,
+): Promise<LeaveType[]> => {
+  return customFetch<LeaveType[]>(getListLeaveTypesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLeaveTypesQueryKey = (params?: ListLeaveTypesParams) => {
+  return [`/api/leave/types`, ...(params ? [params] : [])] as const;
+};
+
+export const getListLeaveTypesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLeaveTypes>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveTypesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveTypes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListLeaveTypesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listLeaveTypes>>> = ({
+    signal,
+  }) => listLeaveTypes(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLeaveTypes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLeaveTypesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLeaveTypes>>
+>;
+export type ListLeaveTypesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all leave types
+ */
+
+export function useListLeaveTypes<
+  TData = Awaited<ReturnType<typeof listLeaveTypes>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveTypesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveTypes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLeaveTypesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new leave type
+ */
+export const getCreateLeaveTypeUrl = () => {
+  return `/api/leave/types`;
+};
+
+export const createLeaveType = async (
+  createLeaveTypeBody: CreateLeaveTypeBody,
+  options?: RequestInit,
+): Promise<LeaveType> => {
+  return customFetch<LeaveType>(getCreateLeaveTypeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLeaveTypeBody),
+  });
+};
+
+export const getCreateLeaveTypeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLeaveType>>,
+    TError,
+    { data: BodyType<CreateLeaveTypeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLeaveType>>,
+  TError,
+  { data: BodyType<CreateLeaveTypeBody> },
+  TContext
+> => {
+  const mutationKey = ["createLeaveType"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLeaveType>>,
+    { data: BodyType<CreateLeaveTypeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createLeaveType(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateLeaveTypeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createLeaveType>>
+>;
+export type CreateLeaveTypeMutationBody = BodyType<CreateLeaveTypeBody>;
+export type CreateLeaveTypeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new leave type
+ */
+export const useCreateLeaveType = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLeaveType>>,
+    TError,
+    { data: BodyType<CreateLeaveTypeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createLeaveType>>,
+  TError,
+  { data: BodyType<CreateLeaveTypeBody> },
+  TContext
+> => {
+  return useMutation(getCreateLeaveTypeMutationOptions(options));
+};
+
+/**
+ * @summary Get a leave type
+ */
+export const getGetLeaveTypeUrl = (id: number) => {
+  return `/api/leave/types/${id}`;
+};
+
+export const getLeaveType = async (
+  id: number,
+  options?: RequestInit,
+): Promise<LeaveType> => {
+  return customFetch<LeaveType>(getGetLeaveTypeUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLeaveTypeQueryKey = (id: number) => {
+  return [`/api/leave/types/${id}`] as const;
+};
+
+export const getGetLeaveTypeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLeaveType>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveType>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLeaveTypeQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeaveType>>> = ({
+    signal,
+  }) => getLeaveType(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLeaveType>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLeaveTypeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLeaveType>>
+>;
+export type GetLeaveTypeQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a leave type
+ */
+
+export function useGetLeaveType<
+  TData = Awaited<ReturnType<typeof getLeaveType>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveType>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLeaveTypeQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update a leave type
+ */
+export const getUpdateLeaveTypeUrl = (id: number) => {
+  return `/api/leave/types/${id}`;
+};
+
+export const updateLeaveType = async (
+  id: number,
+  createLeaveTypeBody: CreateLeaveTypeBody,
+  options?: RequestInit,
+): Promise<LeaveType> => {
+  return customFetch<LeaveType>(getUpdateLeaveTypeUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLeaveTypeBody),
+  });
+};
+
+export const getUpdateLeaveTypeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLeaveType>>,
+    TError,
+    { id: number; data: BodyType<CreateLeaveTypeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateLeaveType>>,
+  TError,
+  { id: number; data: BodyType<CreateLeaveTypeBody> },
+  TContext
+> => {
+  const mutationKey = ["updateLeaveType"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateLeaveType>>,
+    { id: number; data: BodyType<CreateLeaveTypeBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateLeaveType(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateLeaveTypeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateLeaveType>>
+>;
+export type UpdateLeaveTypeMutationBody = BodyType<CreateLeaveTypeBody>;
+export type UpdateLeaveTypeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a leave type
+ */
+export const useUpdateLeaveType = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLeaveType>>,
+    TError,
+    { id: number; data: BodyType<CreateLeaveTypeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateLeaveType>>,
+  TError,
+  { id: number; data: BodyType<CreateLeaveTypeBody> },
+  TContext
+> => {
+  return useMutation(getUpdateLeaveTypeMutationOptions(options));
+};
+
+/**
+ * @summary Deactivate a leave type
+ */
+export const getDeleteLeaveTypeUrl = (id: number) => {
+  return `/api/leave/types/${id}`;
+};
+
+export const deleteLeaveType = async (
+  id: number,
+  options?: RequestInit,
+): Promise<LeaveType> => {
+  return customFetch<LeaveType>(getDeleteLeaveTypeUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteLeaveTypeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLeaveType>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLeaveType>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteLeaveType"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLeaveType>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteLeaveType(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLeaveTypeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteLeaveType>>
+>;
+
+export type DeleteLeaveTypeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Deactivate a leave type
+ */
+export const useDeleteLeaveType = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLeaveType>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteLeaveType>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteLeaveTypeMutationOptions(options));
+};
+
+/**
+ * @summary List leave applications (filtered by role/employee)
+ */
+export const getListLeaveApplicationsUrl = (
+  params?: ListLeaveApplicationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/leave/applications?${stringifiedParams}`
+    : `/api/leave/applications`;
+};
+
+export const listLeaveApplications = async (
+  params?: ListLeaveApplicationsParams,
+  options?: RequestInit,
+): Promise<LeaveApplication[]> => {
+  return customFetch<LeaveApplication[]>(getListLeaveApplicationsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLeaveApplicationsQueryKey = (
+  params?: ListLeaveApplicationsParams,
+) => {
+  return [`/api/leave/applications`, ...(params ? [params] : [])] as const;
+};
+
+export const getListLeaveApplicationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLeaveApplications>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveApplicationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveApplications>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListLeaveApplicationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLeaveApplications>>
+  > = ({ signal }) =>
+    listLeaveApplications(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLeaveApplications>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLeaveApplicationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLeaveApplications>>
+>;
+export type ListLeaveApplicationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List leave applications (filtered by role/employee)
+ */
+
+export function useListLeaveApplications<
+  TData = Awaited<ReturnType<typeof listLeaveApplications>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveApplicationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveApplications>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLeaveApplicationsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit a leave application
+ */
+export const getSubmitLeaveApplicationUrl = () => {
+  return `/api/leave/applications`;
+};
+
+export const submitLeaveApplication = async (
+  submitLeaveApplicationBody: SubmitLeaveApplicationBody,
+  options?: RequestInit,
+): Promise<LeaveApplication> => {
+  return customFetch<LeaveApplication>(getSubmitLeaveApplicationUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitLeaveApplicationBody),
+  });
+};
+
+export const getSubmitLeaveApplicationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitLeaveApplication>>,
+    TError,
+    { data: BodyType<SubmitLeaveApplicationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitLeaveApplication>>,
+  TError,
+  { data: BodyType<SubmitLeaveApplicationBody> },
+  TContext
+> => {
+  const mutationKey = ["submitLeaveApplication"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitLeaveApplication>>,
+    { data: BodyType<SubmitLeaveApplicationBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitLeaveApplication(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitLeaveApplicationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitLeaveApplication>>
+>;
+export type SubmitLeaveApplicationMutationBody =
+  BodyType<SubmitLeaveApplicationBody>;
+export type SubmitLeaveApplicationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit a leave application
+ */
+export const useSubmitLeaveApplication = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitLeaveApplication>>,
+    TError,
+    { data: BodyType<SubmitLeaveApplicationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitLeaveApplication>>,
+  TError,
+  { data: BodyType<SubmitLeaveApplicationBody> },
+  TContext
+> => {
+  return useMutation(getSubmitLeaveApplicationMutationOptions(options));
+};
+
+/**
+ * @summary Get a leave application
+ */
+export const getGetLeaveApplicationUrl = (id: number) => {
+  return `/api/leave/applications/${id}`;
+};
+
+export const getLeaveApplication = async (
+  id: number,
+  options?: RequestInit,
+): Promise<LeaveApplication> => {
+  return customFetch<LeaveApplication>(getGetLeaveApplicationUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLeaveApplicationQueryKey = (id: number) => {
+  return [`/api/leave/applications/${id}`] as const;
+};
+
+export const getGetLeaveApplicationQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLeaveApplication>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveApplication>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLeaveApplicationQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLeaveApplication>>
+  > = ({ signal }) => getLeaveApplication(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLeaveApplication>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLeaveApplicationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLeaveApplication>>
+>;
+export type GetLeaveApplicationQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a leave application
+ */
+
+export function useGetLeaveApplication<
+  TData = Awaited<ReturnType<typeof getLeaveApplication>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveApplication>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLeaveApplicationQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary HOD approves or rejects leave application
+ */
+export const getHodActionLeaveUrl = (id: number) => {
+  return `/api/leave/applications/${id}/hod-action`;
+};
+
+export const hodActionLeave = async (
+  id: number,
+  leaveActionBody: LeaveActionBody,
+  options?: RequestInit,
+): Promise<LeaveApplication> => {
+  return customFetch<LeaveApplication>(getHodActionLeaveUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(leaveActionBody),
+  });
+};
+
+export const getHodActionLeaveMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof hodActionLeave>>,
+    TError,
+    { id: number; data: BodyType<LeaveActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof hodActionLeave>>,
+  TError,
+  { id: number; data: BodyType<LeaveActionBody> },
+  TContext
+> => {
+  const mutationKey = ["hodActionLeave"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof hodActionLeave>>,
+    { id: number; data: BodyType<LeaveActionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return hodActionLeave(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type HodActionLeaveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof hodActionLeave>>
+>;
+export type HodActionLeaveMutationBody = BodyType<LeaveActionBody>;
+export type HodActionLeaveMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HOD approves or rejects leave application
+ */
+export const useHodActionLeave = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof hodActionLeave>>,
+    TError,
+    { id: number; data: BodyType<LeaveActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof hodActionLeave>>,
+  TError,
+  { id: number; data: BodyType<LeaveActionBody> },
+  TContext
+> => {
+  return useMutation(getHodActionLeaveMutationOptions(options));
+};
+
+/**
+ * @summary HR approves or rejects leave application
+ */
+export const getHrActionLeaveUrl = (id: number) => {
+  return `/api/leave/applications/${id}/hr-action`;
+};
+
+export const hrActionLeave = async (
+  id: number,
+  leaveActionBody: LeaveActionBody,
+  options?: RequestInit,
+): Promise<LeaveApplication> => {
+  return customFetch<LeaveApplication>(getHrActionLeaveUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(leaveActionBody),
+  });
+};
+
+export const getHrActionLeaveMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof hrActionLeave>>,
+    TError,
+    { id: number; data: BodyType<LeaveActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof hrActionLeave>>,
+  TError,
+  { id: number; data: BodyType<LeaveActionBody> },
+  TContext
+> => {
+  const mutationKey = ["hrActionLeave"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof hrActionLeave>>,
+    { id: number; data: BodyType<LeaveActionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return hrActionLeave(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type HrActionLeaveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof hrActionLeave>>
+>;
+export type HrActionLeaveMutationBody = BodyType<LeaveActionBody>;
+export type HrActionLeaveMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HR approves or rejects leave application
+ */
+export const useHrActionLeave = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof hrActionLeave>>,
+    TError,
+    { id: number; data: BodyType<LeaveActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof hrActionLeave>>,
+  TError,
+  { id: number; data: BodyType<LeaveActionBody> },
+  TContext
+> => {
+  return useMutation(getHrActionLeaveMutationOptions(options));
+};
+
+/**
+ * @summary Cancel a leave application
+ */
+export const getCancelLeaveApplicationUrl = (id: number) => {
+  return `/api/leave/applications/${id}/cancel`;
+};
+
+export const cancelLeaveApplication = async (
+  id: number,
+  cancelLeaveBody: CancelLeaveBody,
+  options?: RequestInit,
+): Promise<LeaveApplication> => {
+  return customFetch<LeaveApplication>(getCancelLeaveApplicationUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(cancelLeaveBody),
+  });
+};
+
+export const getCancelLeaveApplicationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelLeaveApplication>>,
+    TError,
+    { id: number; data: BodyType<CancelLeaveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelLeaveApplication>>,
+  TError,
+  { id: number; data: BodyType<CancelLeaveBody> },
+  TContext
+> => {
+  const mutationKey = ["cancelLeaveApplication"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelLeaveApplication>>,
+    { id: number; data: BodyType<CancelLeaveBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return cancelLeaveApplication(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelLeaveApplicationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelLeaveApplication>>
+>;
+export type CancelLeaveApplicationMutationBody = BodyType<CancelLeaveBody>;
+export type CancelLeaveApplicationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Cancel a leave application
+ */
+export const useCancelLeaveApplication = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelLeaveApplication>>,
+    TError,
+    { id: number; data: BodyType<CancelLeaveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelLeaveApplication>>,
+  TError,
+  { id: number; data: BodyType<CancelLeaveBody> },
+  TContext
+> => {
+  return useMutation(getCancelLeaveApplicationMutationOptions(options));
+};
+
+/**
+ * @summary List leave balances for an employee
+ */
+export const getListLeaveBalancesUrl = (params?: ListLeaveBalancesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/leave/balances?${stringifiedParams}`
+    : `/api/leave/balances`;
+};
+
+export const listLeaveBalances = async (
+  params?: ListLeaveBalancesParams,
+  options?: RequestInit,
+): Promise<LeaveBalance[]> => {
+  return customFetch<LeaveBalance[]>(getListLeaveBalancesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLeaveBalancesQueryKey = (
+  params?: ListLeaveBalancesParams,
+) => {
+  return [`/api/leave/balances`, ...(params ? [params] : [])] as const;
+};
+
+export const getListLeaveBalancesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLeaveBalances>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveBalancesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveBalances>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListLeaveBalancesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLeaveBalances>>
+  > = ({ signal }) => listLeaveBalances(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLeaveBalances>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLeaveBalancesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLeaveBalances>>
+>;
+export type ListLeaveBalancesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List leave balances for an employee
+ */
+
+export function useListLeaveBalances<
+  TData = Awaited<ReturnType<typeof listLeaveBalances>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveBalancesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveBalances>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLeaveBalancesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Initialize/reset leave balances for a year
+ */
+export const getInitializeLeaveBalancesUrl = () => {
+  return `/api/leave/balances/initialize`;
+};
+
+export const initializeLeaveBalances = async (
+  initLeaveBalancesBody: InitLeaveBalancesBody,
+  options?: RequestInit,
+): Promise<InitializeLeaveBalances200> => {
+  return customFetch<InitializeLeaveBalances200>(
+    getInitializeLeaveBalancesUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(initLeaveBalancesBody),
+    },
+  );
+};
+
+export const getInitializeLeaveBalancesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof initializeLeaveBalances>>,
+    TError,
+    { data: BodyType<InitLeaveBalancesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof initializeLeaveBalances>>,
+  TError,
+  { data: BodyType<InitLeaveBalancesBody> },
+  TContext
+> => {
+  const mutationKey = ["initializeLeaveBalances"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof initializeLeaveBalances>>,
+    { data: BodyType<InitLeaveBalancesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return initializeLeaveBalances(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type InitializeLeaveBalancesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof initializeLeaveBalances>>
+>;
+export type InitializeLeaveBalancesMutationBody =
+  BodyType<InitLeaveBalancesBody>;
+export type InitializeLeaveBalancesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Initialize/reset leave balances for a year
+ */
+export const useInitializeLeaveBalances = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof initializeLeaveBalances>>,
+    TError,
+    { data: BodyType<InitLeaveBalancesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof initializeLeaveBalances>>,
+  TError,
+  { data: BodyType<InitLeaveBalancesBody> },
+  TContext
+> => {
+  return useMutation(getInitializeLeaveBalancesMutationOptions(options));
+};
+
+/**
+ * @summary Get team leave calendar
+ */
+export const getGetLeaveCalendarUrl = (params?: GetLeaveCalendarParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/leave/calendar?${stringifiedParams}`
+    : `/api/leave/calendar`;
+};
+
+export const getLeaveCalendar = async (
+  params?: GetLeaveCalendarParams,
+  options?: RequestInit,
+): Promise<LeaveCalendarEntry[]> => {
+  return customFetch<LeaveCalendarEntry[]>(getGetLeaveCalendarUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLeaveCalendarQueryKey = (
+  params?: GetLeaveCalendarParams,
+) => {
+  return [`/api/leave/calendar`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetLeaveCalendarQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLeaveCalendar>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetLeaveCalendarParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveCalendar>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetLeaveCalendarQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLeaveCalendar>>
+  > = ({ signal }) => getLeaveCalendar(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLeaveCalendar>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLeaveCalendarQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLeaveCalendar>>
+>;
+export type GetLeaveCalendarQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get team leave calendar
+ */
+
+export function useGetLeaveCalendar<
+  TData = Awaited<ReturnType<typeof getLeaveCalendar>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetLeaveCalendarParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveCalendar>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLeaveCalendarQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List blackout dates
+ */
+export const getListBlackoutDatesUrl = (params?: ListBlackoutDatesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/leave/blackout-dates?${stringifiedParams}`
+    : `/api/leave/blackout-dates`;
+};
+
+export const listBlackoutDates = async (
+  params?: ListBlackoutDatesParams,
+  options?: RequestInit,
+): Promise<BlackoutDate[]> => {
+  return customFetch<BlackoutDate[]>(getListBlackoutDatesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBlackoutDatesQueryKey = (
+  params?: ListBlackoutDatesParams,
+) => {
+  return [`/api/leave/blackout-dates`, ...(params ? [params] : [])] as const;
+};
+
+export const getListBlackoutDatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBlackoutDates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBlackoutDatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBlackoutDates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListBlackoutDatesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBlackoutDates>>
+  > = ({ signal }) => listBlackoutDates(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBlackoutDates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBlackoutDatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBlackoutDates>>
+>;
+export type ListBlackoutDatesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List blackout dates
+ */
+
+export function useListBlackoutDates<
+  TData = Awaited<ReturnType<typeof listBlackoutDates>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListBlackoutDatesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listBlackoutDates>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBlackoutDatesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a blackout date range
+ */
+export const getCreateBlackoutDateUrl = () => {
+  return `/api/leave/blackout-dates`;
+};
+
+export const createBlackoutDate = async (
+  createBlackoutDateBody: CreateBlackoutDateBody,
+  options?: RequestInit,
+): Promise<BlackoutDate> => {
+  return customFetch<BlackoutDate>(getCreateBlackoutDateUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createBlackoutDateBody),
+  });
+};
+
+export const getCreateBlackoutDateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBlackoutDate>>,
+    TError,
+    { data: BodyType<CreateBlackoutDateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBlackoutDate>>,
+  TError,
+  { data: BodyType<CreateBlackoutDateBody> },
+  TContext
+> => {
+  const mutationKey = ["createBlackoutDate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBlackoutDate>>,
+    { data: BodyType<CreateBlackoutDateBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBlackoutDate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBlackoutDateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBlackoutDate>>
+>;
+export type CreateBlackoutDateMutationBody = BodyType<CreateBlackoutDateBody>;
+export type CreateBlackoutDateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a blackout date range
+ */
+export const useCreateBlackoutDate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBlackoutDate>>,
+    TError,
+    { data: BodyType<CreateBlackoutDateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBlackoutDate>>,
+  TError,
+  { data: BodyType<CreateBlackoutDateBody> },
+  TContext
+> => {
+  return useMutation(getCreateBlackoutDateMutationOptions(options));
+};
+
+/**
+ * @summary Delete a blackout date
+ */
+export const getDeleteBlackoutDateUrl = (id: number) => {
+  return `/api/leave/blackout-dates/${id}`;
+};
+
+export const deleteBlackoutDate = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BlackoutDate> => {
+  return customFetch<BlackoutDate>(getDeleteBlackoutDateUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteBlackoutDateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteBlackoutDate>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteBlackoutDate>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteBlackoutDate"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteBlackoutDate>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteBlackoutDate(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteBlackoutDateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteBlackoutDate>>
+>;
+
+export type DeleteBlackoutDateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a blackout date
+ */
+export const useDeleteBlackoutDate = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteBlackoutDate>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteBlackoutDate>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteBlackoutDateMutationOptions(options));
+};
+
+/**
+ * @summary List permission applications
+ */
+export const getListPermissionsUrl = (params?: ListPermissionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/permissions?${stringifiedParams}`
+    : `/api/permissions`;
+};
+
+export const listPermissions = async (
+  params?: ListPermissionsParams,
+  options?: RequestInit,
+): Promise<PermissionApplication[]> => {
+  return customFetch<PermissionApplication[]>(getListPermissionsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPermissionsQueryKey = (params?: ListPermissionsParams) => {
+  return [`/api/permissions`, ...(params ? [params] : [])] as const;
+};
+
+export const getListPermissionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPermissions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPermissionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPermissions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListPermissionsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPermissions>>> = ({
+    signal,
+  }) => listPermissions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPermissions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPermissionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPermissions>>
+>;
+export type ListPermissionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List permission applications
+ */
+
+export function useListPermissions<
+  TData = Awaited<ReturnType<typeof listPermissions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPermissionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPermissions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPermissionsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit a permission application
+ */
+export const getSubmitPermissionUrl = () => {
+  return `/api/permissions`;
+};
+
+export const submitPermission = async (
+  submitPermissionBody: SubmitPermissionBody,
+  options?: RequestInit,
+): Promise<PermissionApplication> => {
+  return customFetch<PermissionApplication>(getSubmitPermissionUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitPermissionBody),
+  });
+};
+
+export const getSubmitPermissionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitPermission>>,
+    TError,
+    { data: BodyType<SubmitPermissionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitPermission>>,
+  TError,
+  { data: BodyType<SubmitPermissionBody> },
+  TContext
+> => {
+  const mutationKey = ["submitPermission"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitPermission>>,
+    { data: BodyType<SubmitPermissionBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitPermission(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitPermissionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitPermission>>
+>;
+export type SubmitPermissionMutationBody = BodyType<SubmitPermissionBody>;
+export type SubmitPermissionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit a permission application
+ */
+export const useSubmitPermission = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitPermission>>,
+    TError,
+    { data: BodyType<SubmitPermissionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitPermission>>,
+  TError,
+  { data: BodyType<SubmitPermissionBody> },
+  TContext
+> => {
+  return useMutation(getSubmitPermissionMutationOptions(options));
+};
+
+/**
+ * @summary Get a permission application
+ */
+export const getGetPermissionUrl = (id: number) => {
+  return `/api/permissions/${id}`;
+};
+
+export const getPermission = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PermissionApplication> => {
+  return customFetch<PermissionApplication>(getGetPermissionUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPermissionQueryKey = (id: number) => {
+  return [`/api/permissions/${id}`] as const;
+};
+
+export const getGetPermissionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPermission>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPermission>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPermissionQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPermission>>> = ({
+    signal,
+  }) => getPermission(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPermission>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPermissionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPermission>>
+>;
+export type GetPermissionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a permission application
+ */
+
+export function useGetPermission<
+  TData = Awaited<ReturnType<typeof getPermission>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPermission>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPermissionQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary HOD approves or rejects permission
+ */
+export const getActionPermissionUrl = (id: number) => {
+  return `/api/permissions/${id}/action`;
+};
+
+export const actionPermission = async (
+  id: number,
+  permissionActionBody: PermissionActionBody,
+  options?: RequestInit,
+): Promise<PermissionApplication> => {
+  return customFetch<PermissionApplication>(getActionPermissionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(permissionActionBody),
+  });
+};
+
+export const getActionPermissionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actionPermission>>,
+    TError,
+    { id: number; data: BodyType<PermissionActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof actionPermission>>,
+  TError,
+  { id: number; data: BodyType<PermissionActionBody> },
+  TContext
+> => {
+  const mutationKey = ["actionPermission"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof actionPermission>>,
+    { id: number; data: BodyType<PermissionActionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return actionPermission(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ActionPermissionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof actionPermission>>
+>;
+export type ActionPermissionMutationBody = BodyType<PermissionActionBody>;
+export type ActionPermissionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HOD approves or rejects permission
+ */
+export const useActionPermission = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof actionPermission>>,
+    TError,
+    { id: number; data: BodyType<PermissionActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof actionPermission>>,
+  TError,
+  { id: number; data: BodyType<PermissionActionBody> },
+  TContext
+> => {
+  return useMutation(getActionPermissionMutationOptions(options));
+};
+
+/**
+ * @summary Cancel a permission application
+ */
+export const getCancelPermissionUrl = (id: number) => {
+  return `/api/permissions/${id}/cancel`;
+};
+
+export const cancelPermission = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PermissionApplication> => {
+  return customFetch<PermissionApplication>(getCancelPermissionUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCancelPermissionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelPermission>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelPermission>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["cancelPermission"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelPermission>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return cancelPermission(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelPermissionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelPermission>>
+>;
+
+export type CancelPermissionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Cancel a permission application
+ */
+export const useCancelPermission = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelPermission>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelPermission>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getCancelPermissionMutationOptions(options));
+};
+
+/**
+ * @summary Get permission register for employee/month
+ */
+export const getGetPermissionRegisterUrl = (
+  params?: GetPermissionRegisterParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/permissions/register?${stringifiedParams}`
+    : `/api/permissions/register`;
+};
+
+export const getPermissionRegister = async (
+  params?: GetPermissionRegisterParams,
+  options?: RequestInit,
+): Promise<PermissionRegister> => {
+  return customFetch<PermissionRegister>(getGetPermissionRegisterUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPermissionRegisterQueryKey = (
+  params?: GetPermissionRegisterParams,
+) => {
+  return [`/api/permissions/register`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetPermissionRegisterQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPermissionRegister>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPermissionRegisterParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPermissionRegister>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPermissionRegisterQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPermissionRegister>>
+  > = ({ signal }) =>
+    getPermissionRegister(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPermissionRegister>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPermissionRegisterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPermissionRegister>>
+>;
+export type GetPermissionRegisterQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get permission register for employee/month
+ */
+
+export function useGetPermissionRegister<
+  TData = Awaited<ReturnType<typeof getPermissionRegister>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetPermissionRegisterParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPermissionRegister>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPermissionRegisterQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary HR overrides monthly permission limit for an employee
+ */
+export const getOverridePermissionLimitUrl = () => {
+  return `/api/permissions/register/override`;
+};
+
+export const overridePermissionLimit = async (
+  permissionOverrideBody: PermissionOverrideBody,
+  options?: RequestInit,
+): Promise<PermissionRegister> => {
+  return customFetch<PermissionRegister>(getOverridePermissionLimitUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(permissionOverrideBody),
+  });
+};
+
+export const getOverridePermissionLimitMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof overridePermissionLimit>>,
+    TError,
+    { data: BodyType<PermissionOverrideBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof overridePermissionLimit>>,
+  TError,
+  { data: BodyType<PermissionOverrideBody> },
+  TContext
+> => {
+  const mutationKey = ["overridePermissionLimit"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof overridePermissionLimit>>,
+    { data: BodyType<PermissionOverrideBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return overridePermissionLimit(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OverridePermissionLimitMutationResult = NonNullable<
+  Awaited<ReturnType<typeof overridePermissionLimit>>
+>;
+export type OverridePermissionLimitMutationBody =
+  BodyType<PermissionOverrideBody>;
+export type OverridePermissionLimitMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HR overrides monthly permission limit for an employee
+ */
+export const useOverridePermissionLimit = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof overridePermissionLimit>>,
+    TError,
+    { data: BodyType<PermissionOverrideBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof overridePermissionLimit>>,
+  TError,
+  { data: BodyType<PermissionOverrideBody> },
+  TContext
+> => {
+  return useMutation(getOverridePermissionLimitMutationOptions(options));
+};

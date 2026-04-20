@@ -2299,6 +2299,442 @@ paths:
                 items:
                   $ref: "#/components/schemas/OvertimeRecord"
 
+  # ──────────────────────────────────────────────
+  # LEAVE MANAGEMENT
+  # ──────────────────────────────────────────────
+
+  /leave/types:
+    get:
+      operationId: listLeaveTypes
+      tags: [Leave]
+      summary: List all leave types
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: Leave types list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaveType"
+    post:
+      operationId: createLeaveType
+      tags: [Leave]
+      summary: Create a new leave type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLeaveTypeBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveType"
+
+  /leave/types/{id}:
+    get:
+      operationId: getLeaveType
+      tags: [Leave]
+      summary: Get a leave type
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Leave type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveType"
+    put:
+      operationId: updateLeaveType
+      tags: [Leave]
+      summary: Update a leave type
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLeaveTypeBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveType"
+    delete:
+      operationId: deleteLeaveType
+      tags: [Leave]
+      summary: Deactivate a leave type
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveType"
+
+  /leave/applications:
+    get:
+      operationId: listLeaveApplications
+      tags: [Leave]
+      summary: List leave applications (filtered by role/employee)
+      parameters:
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: fromDate, in: query, schema: { type: string, format: date } }
+        - { name: toDate, in: query, schema: { type: string, format: date } }
+        - { name: departmentId, in: query, schema: { type: integer } }
+        - { name: leaveTypeId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Leave applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaveApplication"
+    post:
+      operationId: submitLeaveApplication
+      tags: [Leave]
+      summary: Submit a leave application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitLeaveApplicationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
+  /leave/applications/{id}:
+    get:
+      operationId: getLeaveApplication
+      tags: [Leave]
+      summary: Get a leave application
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Leave application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
+  /leave/applications/{id}/hod-action:
+    post:
+      operationId: hodActionLeave
+      tags: [Leave]
+      summary: HOD approves or rejects leave application
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
+  /leave/applications/{id}/hr-action:
+    post:
+      operationId: hrActionLeave
+      tags: [Leave]
+      summary: HR approves or rejects leave application
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
+  /leave/applications/{id}/cancel:
+    post:
+      operationId: cancelLeaveApplication
+      tags: [Leave]
+      summary: Cancel a leave application
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelLeaveBody"
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
+
+  /leave/balances:
+    get:
+      operationId: listLeaveBalances
+      tags: [Leave]
+      summary: List leave balances for an employee
+      parameters:
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: year, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Leave balances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaveBalance"
+
+  /leave/balances/initialize:
+    post:
+      operationId: initializeLeaveBalances
+      tags: [Leave]
+      summary: Initialize/reset leave balances for a year
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitLeaveBalancesBody"
+      responses:
+        "200":
+          description: Balances initialized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                required: [count]
+
+  /leave/calendar:
+    get:
+      operationId: getLeaveCalendar
+      tags: [Leave]
+      summary: Get team leave calendar
+      parameters:
+        - { name: month, in: query, schema: { type: string, description: "YYYY-MM" } }
+        - { name: departmentId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Leave calendar entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaveCalendarEntry"
+
+  /leave/blackout-dates:
+    get:
+      operationId: listBlackoutDates
+      tags: [Leave]
+      summary: List blackout dates
+      parameters:
+        - { name: departmentId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Blackout dates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlackoutDate"
+    post:
+      operationId: createBlackoutDate
+      tags: [Leave]
+      summary: Create a blackout date range
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBlackoutDateBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlackoutDate"
+
+  /leave/blackout-dates/{id}:
+    delete:
+      operationId: deleteBlackoutDate
+      tags: [Leave]
+      summary: Delete a blackout date
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlackoutDate"
+
+  # ──────────────────────────────────────────────
+  # PERMISSION MANAGEMENT
+  # ──────────────────────────────────────────────
+
+  /permissions:
+    get:
+      operationId: listPermissions
+      tags: [Permissions]
+      summary: List permission applications
+      parameters:
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: month, in: query, schema: { type: string, description: "YYYY-MM" } }
+        - { name: departmentId, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Permission applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PermissionApplication"
+    post:
+      operationId: submitPermission
+      tags: [Permissions]
+      summary: Submit a permission application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitPermissionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionApplication"
+
+  /permissions/{id}:
+    get:
+      operationId: getPermission
+      tags: [Permissions]
+      summary: Get a permission application
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Permission application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionApplication"
+
+  /permissions/{id}/action:
+    post:
+      operationId: actionPermission
+      tags: [Permissions]
+      summary: HOD approves or rejects permission
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionActionBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionApplication"
+
+  /permissions/{id}/cancel:
+    post:
+      operationId: cancelPermission
+      tags: [Permissions]
+      summary: Cancel a permission application
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionApplication"
+
+  /permissions/register:
+    get:
+      operationId: getPermissionRegister
+      tags: [Permissions]
+      summary: Get permission register for employee/month
+      parameters:
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: month, in: query, schema: { type: string, description: "YYYY-MM" } }
+      responses:
+        "200":
+          description: Permission register
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionRegister"
+
+  /permissions/register/override:
+    post:
+      operationId: overridePermissionLimit
+      tags: [Permissions]
+      summary: HR overrides monthly permission limit for an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionOverrideBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionRegister"
+
 components:
   schemas:
     ShiftTemplate:
@@ -3923,3 +4359,238 @@ components:
         - total
         - limit
         - offset
+
+    LeaveType:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        code: { type: string }
+        description: { type: ["string", "null"] }
+        annualQuota: { type: string }
+        carryForwardEnabled: { type: boolean }
+        carryForwardMax: { type: ["string", "null"] }
+        encashmentEnabled: { type: boolean }
+        applicableEmploymentTypes: { type: ["array", "null"], items: { type: string } }
+        minConsecutiveDays: { type: ["string", "null"] }
+        maxConsecutiveDays: { type: ["string", "null"] }
+        advanceNoticeDays: { type: integer }
+        requiresHrApproval: { type: boolean }
+        requiresHodApproval: { type: boolean }
+        allowHalfDay: { type: boolean }
+        lopByDefault: { type: boolean }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, code, annualQuota, carryForwardEnabled, encashmentEnabled, advanceNoticeDays, requiresHrApproval, requiresHodApproval, allowHalfDay, lopByDefault, isActive, createdAt, updatedAt]
+
+    CreateLeaveTypeBody:
+      type: object
+      required: [name, code, annualQuota]
+      properties:
+        name: { type: string }
+        code: { type: string }
+        description: { type: ["string", "null"] }
+        annualQuota: { type: string }
+        carryForwardEnabled: { type: boolean }
+        carryForwardMax: { type: ["string", "null"] }
+        encashmentEnabled: { type: boolean }
+        applicableEmploymentTypes: { type: ["array", "null"], items: { type: string } }
+        minConsecutiveDays: { type: ["string", "null"] }
+        maxConsecutiveDays: { type: ["string", "null"] }
+        advanceNoticeDays: { type: integer }
+        requiresHrApproval: { type: boolean }
+        requiresHodApproval: { type: boolean }
+        allowHalfDay: { type: boolean }
+        lopByDefault: { type: boolean }
+        isActive: { type: boolean }
+
+    LeaveApplication:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+        departmentName: { type: ["string", "null"] }
+        leaveTypeId: { type: integer }
+        leaveTypeName: { type: ["string", "null"] }
+        leaveTypeCode: { type: ["string", "null"] }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        totalDays: { type: string }
+        isHalfDay: { type: boolean }
+        halfDaySession: { type: ["string", "null"] }
+        reason: { type: string }
+        documentUrl: { type: ["string", "null"] }
+        status: { type: string }
+        isLop: { type: boolean }
+        lopConfirmed: { type: boolean }
+        hodActionedById: { type: ["integer", "null"] }
+        hodRemarks: { type: ["string", "null"] }
+        hodActionedAt: { type: ["string", "null"], format: date-time }
+        hrActionedById: { type: ["integer", "null"] }
+        hrRemarks: { type: ["string", "null"] }
+        hrActionedAt: { type: ["string", "null"], format: date-time }
+        cancelledById: { type: ["integer", "null"] }
+        cancellationReason: { type: ["string", "null"] }
+        cancelledAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, leaveTypeId, fromDate, toDate, totalDays, isHalfDay, reason, status, isLop, lopConfirmed, createdAt, updatedAt]
+
+    SubmitLeaveApplicationBody:
+      type: object
+      required: [leaveTypeId, fromDate, toDate]
+      properties:
+        leaveTypeId: { type: integer }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        isHalfDay: { type: boolean }
+        halfDaySession: { type: ["string", "null"] }
+        reason: { type: string }
+        documentUrl: { type: ["string", "null"] }
+        lopConfirmed: { type: boolean }
+
+    LeaveActionBody:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [Approved, Rejected] }
+        remarks: { type: ["string", "null"] }
+
+    CancelLeaveBody:
+      type: object
+      properties:
+        reason: { type: ["string", "null"] }
+
+    LeaveBalance:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        leaveTypeId: { type: integer }
+        leaveTypeName: { type: ["string", "null"] }
+        leaveTypeCode: { type: ["string", "null"] }
+        year: { type: integer }
+        allocated: { type: string }
+        used: { type: string }
+        pending: { type: string }
+        carryForward: { type: string }
+        available: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, leaveTypeId, year, allocated, used, pending, carryForward, available, createdAt, updatedAt]
+
+    InitLeaveBalancesBody:
+      type: object
+      required: [year]
+      properties:
+        year: { type: integer }
+        employeeId: { type: ["integer", "null"] }
+
+    LeaveCalendarEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: string }
+        departmentName: { type: ["string", "null"] }
+        leaveTypeName: { type: ["string", "null"] }
+        leaveTypeCode: { type: ["string", "null"] }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        totalDays: { type: string }
+        isHalfDay: { type: boolean }
+        status: { type: string }
+      required: [id, employeeId, employeeName, fromDate, toDate, totalDays, isHalfDay, status]
+
+    BlackoutDate:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        departmentId: { type: ["integer", "null"] }
+        reason: { type: ["string", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, fromDate, toDate, createdAt, updatedAt]
+
+    CreateBlackoutDateBody:
+      type: object
+      required: [name, fromDate, toDate]
+      properties:
+        name: { type: string }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        departmentId: { type: ["integer", "null"] }
+        reason: { type: ["string", "null"] }
+
+    PermissionApplication:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ["string", "null"] }
+        employeeCode: { type: ["string", "null"] }
+        departmentName: { type: ["string", "null"] }
+        permissionDate: { type: string, format: date }
+        startTime: { type: string }
+        endTime: { type: string }
+        durationMinutes: { type: integer }
+        reason: { type: string }
+        status: { type: string }
+        hodActionedById: { type: ["integer", "null"] }
+        hodRemarks: { type: ["string", "null"] }
+        hodActionedAt: { type: ["string", "null"], format: date-time }
+        isOverride: { type: boolean }
+        overrideJustification: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, permissionDate, startTime, endTime, durationMinutes, reason, status, isOverride, createdAt, updatedAt]
+
+    SubmitPermissionBody:
+      type: object
+      required: [permissionDate, startTime, endTime, reason]
+      properties:
+        permissionDate: { type: string, format: date }
+        startTime: { type: string }
+        endTime: { type: string }
+        reason: { type: string }
+        isOverride: { type: boolean }
+        overrideJustification: { type: ["string", "null"] }
+
+    PermissionActionBody:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [Approved, Rejected] }
+        remarks: { type: ["string", "null"] }
+
+    PermissionRegister:
+      type: object
+      properties:
+        employeeId: { type: integer }
+        year: { type: integer }
+        month: { type: integer }
+        usedMinutes: { type: integer }
+        limitMinutes: { type: integer }
+        remainingMinutes: { type: integer }
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/PermissionApplication"
+      required: [employeeId, year, month, usedMinutes, limitMinutes, remainingMinutes, applications]
+
+    PermissionOverrideBody:
+      type: object
+      required: [employeeId, year, month, newLimitMinutes, justification]
+      properties:
+        employeeId: { type: integer }
+        year: { type: integer }
+        month: { type: integer }
+        newLimitMinutes: { type: integer }
+        justification: { type: string }

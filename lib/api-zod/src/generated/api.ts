@@ -2774,3 +2774,720 @@ export const GetEmployeesIdOvertimeResponseItem = zod.object({
 export const GetEmployeesIdOvertimeResponse = zod.array(
   GetEmployeesIdOvertimeResponseItem,
 );
+
+/**
+ * @summary List all leave types
+ */
+export const ListLeaveTypesQueryParams = zod.object({
+  isActive: zod.coerce.boolean().optional(),
+});
+
+export const ListLeaveTypesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().nullish(),
+  annualQuota: zod.string(),
+  carryForwardEnabled: zod.boolean(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  advanceNoticeDays: zod.number(),
+  requiresHrApproval: zod.boolean(),
+  requiresHodApproval: zod.boolean(),
+  allowHalfDay: zod.boolean(),
+  lopByDefault: zod.boolean(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListLeaveTypesResponse = zod.array(ListLeaveTypesResponseItem);
+
+/**
+ * @summary Create a new leave type
+ */
+export const CreateLeaveTypeBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().nullish(),
+  annualQuota: zod.string(),
+  carryForwardEnabled: zod.boolean().optional(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean().optional(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  advanceNoticeDays: zod.number().optional(),
+  requiresHrApproval: zod.boolean().optional(),
+  requiresHodApproval: zod.boolean().optional(),
+  allowHalfDay: zod.boolean().optional(),
+  lopByDefault: zod.boolean().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get a leave type
+ */
+export const GetLeaveTypeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetLeaveTypeResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().nullish(),
+  annualQuota: zod.string(),
+  carryForwardEnabled: zod.boolean(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  advanceNoticeDays: zod.number(),
+  requiresHrApproval: zod.boolean(),
+  requiresHodApproval: zod.boolean(),
+  allowHalfDay: zod.boolean(),
+  lopByDefault: zod.boolean(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update a leave type
+ */
+export const UpdateLeaveTypeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateLeaveTypeBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().nullish(),
+  annualQuota: zod.string(),
+  carryForwardEnabled: zod.boolean().optional(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean().optional(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  advanceNoticeDays: zod.number().optional(),
+  requiresHrApproval: zod.boolean().optional(),
+  requiresHodApproval: zod.boolean().optional(),
+  allowHalfDay: zod.boolean().optional(),
+  lopByDefault: zod.boolean().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateLeaveTypeResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().nullish(),
+  annualQuota: zod.string(),
+  carryForwardEnabled: zod.boolean(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  advanceNoticeDays: zod.number(),
+  requiresHrApproval: zod.boolean(),
+  requiresHodApproval: zod.boolean(),
+  allowHalfDay: zod.boolean(),
+  lopByDefault: zod.boolean(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Deactivate a leave type
+ */
+export const DeleteLeaveTypeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteLeaveTypeResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+  description: zod.string().nullish(),
+  annualQuota: zod.string(),
+  carryForwardEnabled: zod.boolean(),
+  carryForwardMax: zod.string().nullish(),
+  encashmentEnabled: zod.boolean(),
+  applicableEmploymentTypes: zod.array(zod.string()).nullish(),
+  minConsecutiveDays: zod.string().nullish(),
+  maxConsecutiveDays: zod.string().nullish(),
+  advanceNoticeDays: zod.number(),
+  requiresHrApproval: zod.boolean(),
+  requiresHodApproval: zod.boolean(),
+  allowHalfDay: zod.boolean(),
+  lopByDefault: zod.boolean(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List leave applications (filtered by role/employee)
+ */
+export const ListLeaveApplicationsQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+  fromDate: zod.date().optional(),
+  toDate: zod.date().optional(),
+  departmentId: zod.coerce.number().optional(),
+  leaveTypeId: zod.coerce.number().optional(),
+});
+
+export const ListLeaveApplicationsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string(),
+  documentUrl: zod.string().nullish(),
+  status: zod.string(),
+  isLop: zod.boolean(),
+  lopConfirmed: zod.boolean(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrActionedById: zod.number().nullish(),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  cancelledById: zod.number().nullish(),
+  cancellationReason: zod.string().nullish(),
+  cancelledAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListLeaveApplicationsResponse = zod.array(
+  ListLeaveApplicationsResponseItem,
+);
+
+/**
+ * @summary Submit a leave application
+ */
+export const SubmitLeaveApplicationBody = zod.object({
+  leaveTypeId: zod.number(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  isHalfDay: zod.boolean().optional(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string().optional(),
+  documentUrl: zod.string().nullish(),
+  lopConfirmed: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get a leave application
+ */
+export const GetLeaveApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetLeaveApplicationResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string(),
+  documentUrl: zod.string().nullish(),
+  status: zod.string(),
+  isLop: zod.boolean(),
+  lopConfirmed: zod.boolean(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrActionedById: zod.number().nullish(),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  cancelledById: zod.number().nullish(),
+  cancellationReason: zod.string().nullish(),
+  cancelledAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary HOD approves or rejects leave application
+ */
+export const HodActionLeaveParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const HodActionLeaveBody = zod.object({
+  action: zod.enum(["Approved", "Rejected"]),
+  remarks: zod.string().nullish(),
+});
+
+export const HodActionLeaveResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string(),
+  documentUrl: zod.string().nullish(),
+  status: zod.string(),
+  isLop: zod.boolean(),
+  lopConfirmed: zod.boolean(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrActionedById: zod.number().nullish(),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  cancelledById: zod.number().nullish(),
+  cancellationReason: zod.string().nullish(),
+  cancelledAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary HR approves or rejects leave application
+ */
+export const HrActionLeaveParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const HrActionLeaveBody = zod.object({
+  action: zod.enum(["Approved", "Rejected"]),
+  remarks: zod.string().nullish(),
+});
+
+export const HrActionLeaveResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string(),
+  documentUrl: zod.string().nullish(),
+  status: zod.string(),
+  isLop: zod.boolean(),
+  lopConfirmed: zod.boolean(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrActionedById: zod.number().nullish(),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  cancelledById: zod.number().nullish(),
+  cancellationReason: zod.string().nullish(),
+  cancelledAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Cancel a leave application
+ */
+export const CancelLeaveApplicationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CancelLeaveApplicationBody = zod.object({
+  reason: zod.string().nullish(),
+});
+
+export const CancelLeaveApplicationResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string(),
+  documentUrl: zod.string().nullish(),
+  status: zod.string(),
+  isLop: zod.boolean(),
+  lopConfirmed: zod.boolean(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrActionedById: zod.number().nullish(),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  cancelledById: zod.number().nullish(),
+  cancellationReason: zod.string().nullish(),
+  cancelledAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List leave balances for an employee
+ */
+export const ListLeaveBalancesQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  year: zod.coerce.number().optional(),
+});
+
+export const ListLeaveBalancesResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  year: zod.number(),
+  allocated: zod.string(),
+  used: zod.string(),
+  pending: zod.string(),
+  carryForward: zod.string(),
+  available: zod.string(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListLeaveBalancesResponse = zod.array(
+  ListLeaveBalancesResponseItem,
+);
+
+/**
+ * @summary Initialize/reset leave balances for a year
+ */
+export const InitializeLeaveBalancesBody = zod.object({
+  year: zod.number(),
+  employeeId: zod.number().nullish(),
+});
+
+export const InitializeLeaveBalancesResponse = zod.object({
+  count: zod.number(),
+});
+
+/**
+ * @summary Get team leave calendar
+ */
+export const GetLeaveCalendarQueryParams = zod.object({
+  month: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetLeaveCalendarResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string(),
+  departmentName: zod.string().nullish(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  status: zod.string(),
+});
+export const GetLeaveCalendarResponse = zod.array(GetLeaveCalendarResponseItem);
+
+/**
+ * @summary List blackout dates
+ */
+export const ListBlackoutDatesQueryParams = zod.object({
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const ListBlackoutDatesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  departmentId: zod.number().nullish(),
+  reason: zod.string().nullish(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListBlackoutDatesResponse = zod.array(
+  ListBlackoutDatesResponseItem,
+);
+
+/**
+ * @summary Create a blackout date range
+ */
+export const CreateBlackoutDateBody = zod.object({
+  name: zod.string(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  departmentId: zod.number().nullish(),
+  reason: zod.string().nullish(),
+});
+
+/**
+ * @summary Delete a blackout date
+ */
+export const DeleteBlackoutDateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteBlackoutDateResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  departmentId: zod.number().nullish(),
+  reason: zod.string().nullish(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List permission applications
+ */
+export const ListPermissionsQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+  month: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const ListPermissionsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  permissionDate: zod.coerce.date(),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  durationMinutes: zod.number(),
+  reason: zod.string(),
+  status: zod.string(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  isOverride: zod.boolean(),
+  overrideJustification: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListPermissionsResponse = zod.array(ListPermissionsResponseItem);
+
+/**
+ * @summary Submit a permission application
+ */
+export const SubmitPermissionBody = zod.object({
+  permissionDate: zod.coerce.date(),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  reason: zod.string(),
+  isOverride: zod.boolean().optional(),
+  overrideJustification: zod.string().nullish(),
+});
+
+/**
+ * @summary Get a permission application
+ */
+export const GetPermissionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPermissionResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  permissionDate: zod.coerce.date(),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  durationMinutes: zod.number(),
+  reason: zod.string(),
+  status: zod.string(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  isOverride: zod.boolean(),
+  overrideJustification: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary HOD approves or rejects permission
+ */
+export const ActionPermissionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ActionPermissionBody = zod.object({
+  action: zod.enum(["Approved", "Rejected"]),
+  remarks: zod.string().nullish(),
+});
+
+export const ActionPermissionResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  permissionDate: zod.coerce.date(),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  durationMinutes: zod.number(),
+  reason: zod.string(),
+  status: zod.string(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  isOverride: zod.boolean(),
+  overrideJustification: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Cancel a permission application
+ */
+export const CancelPermissionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CancelPermissionResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  permissionDate: zod.coerce.date(),
+  startTime: zod.string(),
+  endTime: zod.string(),
+  durationMinutes: zod.number(),
+  reason: zod.string(),
+  status: zod.string(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  isOverride: zod.boolean(),
+  overrideJustification: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Get permission register for employee/month
+ */
+export const GetPermissionRegisterQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  month: zod.coerce.string().optional(),
+});
+
+export const GetPermissionRegisterResponse = zod.object({
+  employeeId: zod.number(),
+  year: zod.number(),
+  month: zod.number(),
+  usedMinutes: zod.number(),
+  limitMinutes: zod.number(),
+  remainingMinutes: zod.number(),
+  applications: zod.array(
+    zod.object({
+      id: zod.number(),
+      employeeId: zod.number(),
+      employeeName: zod.string().nullish(),
+      employeeCode: zod.string().nullish(),
+      departmentName: zod.string().nullish(),
+      permissionDate: zod.coerce.date(),
+      startTime: zod.string(),
+      endTime: zod.string(),
+      durationMinutes: zod.number(),
+      reason: zod.string(),
+      status: zod.string(),
+      hodActionedById: zod.number().nullish(),
+      hodRemarks: zod.string().nullish(),
+      hodActionedAt: zod.coerce.date().nullish(),
+      isOverride: zod.boolean(),
+      overrideJustification: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary HR overrides monthly permission limit for an employee
+ */
+export const OverridePermissionLimitBody = zod.object({
+  employeeId: zod.number(),
+  year: zod.number(),
+  month: zod.number(),
+  newLimitMinutes: zod.number(),
+  justification: zod.string(),
+});
+
+export const OverridePermissionLimitResponse = zod.object({
+  employeeId: zod.number(),
+  year: zod.number(),
+  month: zod.number(),
+  usedMinutes: zod.number(),
+  limitMinutes: zod.number(),
+  remainingMinutes: zod.number(),
+  applications: zod.array(
+    zod.object({
+      id: zod.number(),
+      employeeId: zod.number(),
+      employeeName: zod.string().nullish(),
+      employeeCode: zod.string().nullish(),
+      departmentName: zod.string().nullish(),
+      permissionDate: zod.coerce.date(),
+      startTime: zod.string(),
+      endTime: zod.string(),
+      durationMinutes: zod.number(),
+      reason: zod.string(),
+      status: zod.string(),
+      hodActionedById: zod.number().nullish(),
+      hodRemarks: zod.string().nullish(),
+      hodActionedAt: zod.coerce.date().nullish(),
+      isOverride: zod.boolean(),
+      overrideJustification: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});

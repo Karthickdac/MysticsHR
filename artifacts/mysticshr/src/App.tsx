@@ -25,6 +25,11 @@ import ShiftCalendarPage from "@/pages/shifts/calendar";
 import AttendancePage from "@/pages/attendance/index";
 import AttendanceRegularizationPage from "@/pages/attendance/regularization";
 import AttendanceSummaryPage from "@/pages/attendance/summary";
+import LeavePage from "@/pages/leave/index";
+import LeaveTypesPage from "@/pages/leave/types";
+import LeaveCalendarPage from "@/pages/leave/calendar";
+import LeaveApprovalsPage from "@/pages/leave/approvals";
+import PermissionsPage from "@/pages/permissions/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -374,6 +379,46 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
                 <AttendancePage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/leave/types">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
+                <LeaveTypesPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/leave/calendar">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <LeaveCalendarPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/leave/approvals">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod"]}>
+                <LeaveApprovalsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/leave">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <LeavePage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/permissions">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <PermissionsPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

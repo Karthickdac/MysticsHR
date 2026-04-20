@@ -14,6 +14,8 @@ import employeesExtendedRouter from "./employees-extended";
 import onboardingRouter from "./onboarding";
 import shiftsRouter from "./shifts";
 import attendanceRouter from "./attendance";
+import leaveRouter from "./leave";
+import permissionsRouter from "./permissions";
 
 const router: IRouter = Router();
 
@@ -31,6 +33,8 @@ router.use(employeesExtendedRouter);
 router.use(onboardingRouter);
 router.use(shiftsRouter);
 router.use(attendanceRouter);
+router.use(leaveRouter);
+router.use(permissionsRouter);
 router.use(auditLogsRouter);
 
 export default router;

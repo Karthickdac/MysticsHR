@@ -1341,6 +1341,273 @@ export interface AuditLogListResponse {
   offset: number;
 }
 
+export interface LeaveType {
+  id: number;
+  name: string;
+  code: string;
+  /** @nullable */
+  description?: string | null;
+  annualQuota: string;
+  carryForwardEnabled: boolean;
+  /** @nullable */
+  carryForwardMax?: string | null;
+  encashmentEnabled: boolean;
+  /** @nullable */
+  applicableEmploymentTypes?: string[] | null;
+  /** @nullable */
+  minConsecutiveDays?: string | null;
+  /** @nullable */
+  maxConsecutiveDays?: string | null;
+  advanceNoticeDays: number;
+  requiresHrApproval: boolean;
+  requiresHodApproval: boolean;
+  allowHalfDay: boolean;
+  lopByDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLeaveTypeBody {
+  name: string;
+  code: string;
+  /** @nullable */
+  description?: string | null;
+  annualQuota: string;
+  carryForwardEnabled?: boolean;
+  /** @nullable */
+  carryForwardMax?: string | null;
+  encashmentEnabled?: boolean;
+  /** @nullable */
+  applicableEmploymentTypes?: string[] | null;
+  /** @nullable */
+  minConsecutiveDays?: string | null;
+  /** @nullable */
+  maxConsecutiveDays?: string | null;
+  advanceNoticeDays?: number;
+  requiresHrApproval?: boolean;
+  requiresHodApproval?: boolean;
+  allowHalfDay?: boolean;
+  lopByDefault?: boolean;
+  isActive?: boolean;
+}
+
+export interface LeaveApplication {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  departmentName?: string | null;
+  leaveTypeId: number;
+  /** @nullable */
+  leaveTypeName?: string | null;
+  /** @nullable */
+  leaveTypeCode?: string | null;
+  fromDate: string;
+  toDate: string;
+  totalDays: string;
+  isHalfDay: boolean;
+  /** @nullable */
+  halfDaySession?: string | null;
+  reason: string;
+  /** @nullable */
+  documentUrl?: string | null;
+  status: string;
+  isLop: boolean;
+  lopConfirmed: boolean;
+  /** @nullable */
+  hodActionedById?: number | null;
+  /** @nullable */
+  hodRemarks?: string | null;
+  /** @nullable */
+  hodActionedAt?: string | null;
+  /** @nullable */
+  hrActionedById?: number | null;
+  /** @nullable */
+  hrRemarks?: string | null;
+  /** @nullable */
+  hrActionedAt?: string | null;
+  /** @nullable */
+  cancelledById?: number | null;
+  /** @nullable */
+  cancellationReason?: string | null;
+  /** @nullable */
+  cancelledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitLeaveApplicationBody {
+  leaveTypeId: number;
+  fromDate: string;
+  toDate: string;
+  isHalfDay?: boolean;
+  /** @nullable */
+  halfDaySession?: string | null;
+  reason?: string;
+  /** @nullable */
+  documentUrl?: string | null;
+  lopConfirmed?: boolean;
+}
+
+export type LeaveActionBodyAction =
+  (typeof LeaveActionBodyAction)[keyof typeof LeaveActionBodyAction];
+
+export const LeaveActionBodyAction = {
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface LeaveActionBody {
+  action: LeaveActionBodyAction;
+  /** @nullable */
+  remarks?: string | null;
+}
+
+export interface CancelLeaveBody {
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface LeaveBalance {
+  id: number;
+  employeeId: number;
+  leaveTypeId: number;
+  /** @nullable */
+  leaveTypeName?: string | null;
+  /** @nullable */
+  leaveTypeCode?: string | null;
+  year: number;
+  allocated: string;
+  used: string;
+  pending: string;
+  carryForward: string;
+  available: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InitLeaveBalancesBody {
+  year: number;
+  /** @nullable */
+  employeeId?: number | null;
+}
+
+export interface LeaveCalendarEntry {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  /** @nullable */
+  departmentName?: string | null;
+  /** @nullable */
+  leaveTypeName?: string | null;
+  /** @nullable */
+  leaveTypeCode?: string | null;
+  fromDate: string;
+  toDate: string;
+  totalDays: string;
+  isHalfDay: boolean;
+  status: string;
+}
+
+export interface BlackoutDate {
+  id: number;
+  name: string;
+  fromDate: string;
+  toDate: string;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  createdById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBlackoutDateBody {
+  name: string;
+  fromDate: string;
+  toDate: string;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface PermissionApplication {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  /** @nullable */
+  departmentName?: string | null;
+  permissionDate: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  reason: string;
+  status: string;
+  /** @nullable */
+  hodActionedById?: number | null;
+  /** @nullable */
+  hodRemarks?: string | null;
+  /** @nullable */
+  hodActionedAt?: string | null;
+  isOverride: boolean;
+  /** @nullable */
+  overrideJustification?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitPermissionBody {
+  permissionDate: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+  isOverride?: boolean;
+  /** @nullable */
+  overrideJustification?: string | null;
+}
+
+export type PermissionActionBodyAction =
+  (typeof PermissionActionBodyAction)[keyof typeof PermissionActionBodyAction];
+
+export const PermissionActionBodyAction = {
+  Approved: "Approved",
+  Rejected: "Rejected",
+} as const;
+
+export interface PermissionActionBody {
+  action: PermissionActionBodyAction;
+  /** @nullable */
+  remarks?: string | null;
+}
+
+export interface PermissionRegister {
+  employeeId: number;
+  year: number;
+  month: number;
+  usedMinutes: number;
+  limitMinutes: number;
+  remainingMinutes: number;
+  applications: PermissionApplication[];
+}
+
+export interface PermissionOverrideBody {
+  employeeId: number;
+  year: number;
+  month: number;
+  newLimitMinutes: number;
+  justification: string;
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -1574,6 +1841,58 @@ export const GetAttendanceRegularizationsStatus = {
 } as const;
 
 export type GetEmployeesIdOvertimeParams = {
+  /**
+   * YYYY-MM
+   */
+  month?: string;
+};
+
+export type ListLeaveTypesParams = {
+  isActive?: boolean;
+};
+
+export type ListLeaveApplicationsParams = {
+  employeeId?: number;
+  status?: string;
+  fromDate?: string;
+  toDate?: string;
+  departmentId?: number;
+  leaveTypeId?: number;
+};
+
+export type ListLeaveBalancesParams = {
+  employeeId?: number;
+  year?: number;
+};
+
+export type InitializeLeaveBalances200 = {
+  count: number;
+};
+
+export type GetLeaveCalendarParams = {
+  /**
+   * YYYY-MM
+   */
+  month?: string;
+  departmentId?: number;
+};
+
+export type ListBlackoutDatesParams = {
+  departmentId?: number;
+};
+
+export type ListPermissionsParams = {
+  employeeId?: number;
+  status?: string;
+  /**
+   * YYYY-MM
+   */
+  month?: string;
+  departmentId?: number;
+};
+
+export type GetPermissionRegisterParams = {
+  employeeId?: number;
   /**
    * YYYY-MM
    */

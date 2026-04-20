@@ -164,6 +164,20 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Onboarding checklist auto-seeds 10 default tasks across 4 categories: HR (3), IT (3), Department (2), Employee (2)
 - Completion % = (completed tasks / total tasks) × 100
 
+## Leave & Permission Management (Task #5)
+
+- 7 DB tables: `leave_types`, `leave_balances`, `leave_applications`, `leave_accrual_history`, `blackout_dates`, `permission_applications`, `permission_registers`
+- Backend routes: `routes/leave.ts` (leave type CRUD, application workflow, balance tracking, calendar, blackout dates) and `routes/permissions.ts` (permission applications, monthly register, HR override)
+- Leave types configurable: CL, SL, EL, Maternity/Paternity, Comp-Off, Bereavement, Marriage, and custom types with annual quota, carry-forward, encashment, advance notice, HOD/HR approval flags
+- Multi-level approval: Employee → HOD → HR Manager (configurable per leave type via requiresHodApproval/requiresHrApproval flags)
+- Policy validations: balance check (LOP warning flow), advance notice, blackout date overlap, duplicate application overlap
+- Leave balances initialize via `POST /leave/balances/initialize`; available = allocated + carryForward - used - pending
+- Permission monthly limit defaults to 240 minutes (4hrs); enforced on submission; HR can override per-employee per-month
+- Permission approval auto-updates `permission_registers.usedMinutes`; cancellation restores balance
+- All mutations wrapped in `db.transaction()` for atomicity; state-machine guards prevent re-processing
+- HOD scope: HOD can only action requests from employees in their department (403 otherwise)
+- Frontend pages: `/leave` (apply + balance summary + my applications), `/leave/types` (HR config), `/leave/calendar` (team calendar + blackout dates), `/leave/approvals` (HOD/HR queue + balance init), `/permissions` (apply + monthly register + HR override)
+
 ## Attendance & Shift Management (Task #4)
 
 - 6 DB tables: `shift_templates`, `shift_assignments`, `shift_swaps`, `attendance_records`, `attendance_regularizations`, `overtime_records`

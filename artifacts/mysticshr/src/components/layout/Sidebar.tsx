@@ -15,6 +15,8 @@ import {
   Menu,
   Clock,
   CalendarCheck,
+  Umbrella,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,6 +38,8 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
     { name: "Onboarding", href: "/onboarding", icon: ClipboardList, roles: ["super_admin", "hr_manager", "hr_executive", "hod"] },
     { name: "Shifts", href: "/shifts", icon: Clock, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
     { name: "Attendance", href: "/attendance", icon: CalendarCheck, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Leave", href: "/leave", icon: Umbrella, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
+    { name: "Permissions", href: "/permissions", icon: Timer, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Departments", href: "/departments", icon: Building2, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Designations", href: "/designations", icon: Briefcase, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Users", href: "/users", icon: ShieldCheck, roles: ["super_admin", "hr_manager"] },
