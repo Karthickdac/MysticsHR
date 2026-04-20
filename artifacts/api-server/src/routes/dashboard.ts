@@ -6,21 +6,23 @@ import {
   departmentsTable,
   auditLogsTable,
 } from "@workspace/db/schema";
-import { eq, sql, desc, gte, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, isNull } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/dashboard/kpis", requireHrmsUser, async (req, res) => {
   try {
+    const notDeleted = isNull(employeesTable.deletedAt);
+
     const [headcountRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(employeesTable)
-      .where(isNull(employeesTable.deletedAt));
+      .where(notDeleted);
 
     const [activeRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(employeesTable)
-      .where(eq(employeesTable.status, "Active"));
+      .where(and(notDeleted, eq(employeesTable.status, "Active")));
 
     const firstOfMonth = new Date();
     firstOfMonth.setDate(1);
@@ -30,18 +32,21 @@ router.get("/dashboard/kpis", requireHrmsUser, async (req, res) => {
       .select({ count: sql<number>`count(*)::int` })
       .from(employeesTable)
       .where(
-        sql`${employeesTable.dateOfJoining} >= ${firstOfMonth.toISOString().split("T")[0]} AND ${employeesTable.deletedAt} IS NULL`
+        and(
+          notDeleted,
+          sql`${employeesTable.dateOfJoining} >= ${firstOfMonth.toISOString().split("T")[0]}`
+        )
       );
 
     const [separatedRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(employeesTable)
-      .where(eq(employeesTable.status, "Separated"));
+      .where(and(notDeleted, eq(employeesTable.status, "Separated")));
 
     const [onLeaveRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(employeesTable)
-      .where(eq(employeesTable.status, "On Leave of Absence"));
+      .where(and(notDeleted, eq(employeesTable.status, "On Leave of Absence")));
 
     const totalHeadcount = headcountRow?.count ?? 0;
     const activeEmployees = activeRow?.count ?? 0;
@@ -108,7 +113,7 @@ router.get("/dashboard/headcount-by-department", requireHrmsUser, async (req, re
         employeesTable,
         sql`${employeesTable.departmentId} = ${departmentsTable.id} AND ${employeesTable.deletedAt} IS NULL AND ${employeesTable.status} != 'Separated'`
       )
-      .where(eq(departmentsTable.isActive, true))
+      .where(and(eq(departmentsTable.isActive, true), isNull(departmentsTable.deletedAt)))
       .groupBy(departmentsTable.id, departmentsTable.name)
       .orderBy(desc(sql`count(${employeesTable.id})`));
 

@@ -237,7 +237,11 @@ function ClerkProviderWithRoutes() {
             </ProtectedRoute>
           </Route>
           <Route path="/employees/:id">
-            <ProtectedRoute><EmployeeDetailPage /></ProtectedRoute>
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]}>
+                <EmployeeDetailPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
           <Route path="/employees">
             <ProtectedRoute>
