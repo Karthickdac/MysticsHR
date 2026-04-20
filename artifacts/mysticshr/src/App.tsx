@@ -401,6 +401,14 @@ function ClerkProviderWithRoutes() {
             </ProtectedRoute>
           </Route>
 
+          <Route path="/my-attendance">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <AttendancePage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
           <Route path="/leave/types">
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>

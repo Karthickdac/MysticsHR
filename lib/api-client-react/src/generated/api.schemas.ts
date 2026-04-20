@@ -302,6 +302,29 @@ export interface RegularizationActionBody {
   remarks?: string | null;
 }
 
+export type MyAttendanceTodayAttendanceStatus =
+  (typeof MyAttendanceTodayAttendanceStatus)[keyof typeof MyAttendanceTodayAttendanceStatus];
+
+export const MyAttendanceTodayAttendanceStatus = {
+  Not_Clocked_In: "Not Clocked In",
+  Clocked_In: "Clocked In",
+  Clocked_Out: "Clocked Out",
+} as const;
+
+export type MyAttendanceTodayShift = {
+  name: string;
+  startTime: string;
+  endTime: string;
+  expectedMinutes: number;
+} | null;
+
+export interface MyAttendanceToday {
+  attendanceDate: string;
+  attendanceStatus: MyAttendanceTodayAttendanceStatus;
+  record?: AttendanceRecord | null;
+  shift?: MyAttendanceTodayShift;
+}
+
 export interface OvertimeRecord {
   id: number;
   employeeId: number;

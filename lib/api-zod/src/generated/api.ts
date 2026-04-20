@@ -2686,6 +2686,70 @@ export const GetAttendanceSummaryResponse = zod.array(
 );
 
 /**
+ * @summary Get the calling employee's clock-in status and today's record
+ */
+export const GetMyAttendanceTodayResponse = zod.object({
+  attendanceDate: zod.coerce.date(),
+  attendanceStatus: zod.enum(["Not Clocked In", "Clocked In", "Clocked Out"]),
+  record: zod
+    .union([
+      zod.object({
+        id: zod.number(),
+        employeeId: zod.number(),
+        employeeName: zod.string().nullish(),
+        employeeCode: zod.string().nullish(),
+        attendanceDate: zod.coerce.date(),
+        signInTime: zod.coerce.date().nullish(),
+        signOutTime: zod.coerce.date().nullish(),
+        totalMinutesWorked: zod.number().nullish(),
+        breakDurationMinutes: zod.number().nullish(),
+        overtimeMinutes: zod.number().nullish(),
+        status: zod.string(),
+        isHrOverride: zod.boolean(),
+        overrideReason: zod.string().nullish(),
+        notes: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+  shift: zod
+    .union([
+      zod.object({
+        name: zod.string(),
+        startTime: zod.string(),
+        endTime: zod.string(),
+        expectedMinutes: zod.number(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+});
+
+/**
+ * @summary Clock out for the current day (self-service)
+ */
+export const ClockOutMyAttendanceResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  attendanceDate: zod.coerce.date(),
+  signInTime: zod.coerce.date().nullish(),
+  signOutTime: zod.coerce.date().nullish(),
+  totalMinutesWorked: zod.number().nullish(),
+  breakDurationMinutes: zod.number().nullish(),
+  overtimeMinutes: zod.number().nullish(),
+  status: zod.string(),
+  isHrOverride: zod.boolean(),
+  overrideReason: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List regularization requests
  */
 export const GetAttendanceRegularizationsQueryParams = zod.object({

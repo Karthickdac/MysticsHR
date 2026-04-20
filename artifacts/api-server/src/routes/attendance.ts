@@ -506,6 +506,119 @@ router.post("/attendance/regularizations/:id/action", requireHrmsUser, requireRo
   }
 });
 
+// --- EMPLOYEE SELF-SERVICE CLOCK IN/OUT ---
+
+async function getCallerEmployeeId(hrmsUserId: number, cachedEmployeeId: number | null | undefined): Promise<number | null> {
+  if (cachedEmployeeId) return cachedEmployeeId;
+  const [u] = await db.select({ employeeId: hrmsUsersTable.employeeId }).from(hrmsUsersTable).where(eq(hrmsUsersTable.id, hrmsUserId));
+  return u?.employeeId ?? null;
+}
+
+function todayStr(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+router.get("/attendance/me/today", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const empId = await getCallerEmployeeId(req.hrmsUser!.id, req.hrmsUser!.employeeId);
+    if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
+    const today = todayStr();
+    const [record] = await db.select().from(attendanceRecordsTable)
+      .where(and(eq(attendanceRecordsTable.employeeId, empId), eq(attendanceRecordsTable.attendanceDate, today)));
+    const template = await getActiveShiftTemplate(empId, today);
+    let attendanceStatus: "Not Clocked In" | "Clocked In" | "Clocked Out" = "Not Clocked In";
+    if (record?.signInTime && record?.signOutTime) attendanceStatus = "Clocked Out";
+    else if (record?.signInTime) attendanceStatus = "Clocked In";
+    res.json({
+      attendanceDate: today,
+      attendanceStatus,
+      record: record ?? null,
+      shift: template ? {
+        name: template.name,
+        startTime: template.startTime,
+        endTime: template.endTime,
+        expectedMinutes: template.minWorkingHoursMinutes ?? 480,
+      } : null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/attendance/me/clock-in", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const empId = await getCallerEmployeeId(req.hrmsUser!.id, req.hrmsUser!.employeeId);
+    if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
+    const today = todayStr();
+    const period = new Date(today);
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance", period.getFullYear(), period.getMonth() + 1);
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
+
+    const [existing] = await db.select().from(attendanceRecordsTable)
+      .where(and(eq(attendanceRecordsTable.employeeId, empId), eq(attendanceRecordsTable.attendanceDate, today)));
+    if (existing?.signInTime) { res.status(422).json({ error: "You have already clocked in for today" }); return; }
+
+    const now = new Date();
+    let record: typeof attendanceRecordsTable.$inferSelect | undefined;
+    if (existing) {
+      [record] = await db.update(attendanceRecordsTable)
+        .set({ signInTime: now, status: "Present", updatedAt: new Date() })
+        .where(eq(attendanceRecordsTable.id, existing.id)).returning();
+    } else {
+      [record] = await db.insert(attendanceRecordsTable).values({
+        employeeId: empId, attendanceDate: today, signInTime: now, breakDurationMinutes: 0, status: "Present",
+      }).returning();
+    }
+    if (record) {
+      await logAudit({ user: req.hrmsUser, action: "CLOCK_IN", module: "Attendance", recordId: record.id, newValue: now.toISOString(), ipAddress: req.ip });
+    }
+    res.status(201).json(record);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/attendance/me/clock-out", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const empId = await getCallerEmployeeId(req.hrmsUser!.id, req.hrmsUser!.employeeId);
+    if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
+    const today = todayStr();
+    const period = new Date(today);
+    const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance", period.getFullYear(), period.getMonth() + 1);
+    if (lockError) { res.status(422).json({ error: lockError }); return; }
+
+    const [existing] = await db.select().from(attendanceRecordsTable)
+      .where(and(eq(attendanceRecordsTable.employeeId, empId), eq(attendanceRecordsTable.attendanceDate, today)));
+    if (!existing?.signInTime) { res.status(422).json({ error: "You haven't clocked in yet today" }); return; }
+    if (existing.signOutTime) { res.status(422).json({ error: "You have already clocked out for today" }); return; }
+
+    const signOut = new Date();
+    const breakMins = existing.breakDurationMinutes ?? 0;
+    const totalMins = computeMinutesWorked(existing.signInTime, signOut, breakMins);
+    const template = await getActiveShiftTemplate(empId, today);
+    const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
+    const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
+    const overtimeMins = template
+      ? computeOvertimeMinutes(signOut, today, template.startTime, template.endTime, overtimeThreshold)
+      : 0;
+    const newStatus: AttendanceStatus = computeStatus(totalMins, minWorkingMins);
+
+    const [updated] = await db.update(attendanceRecordsTable)
+      .set({ signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, updatedAt: new Date() })
+      .where(eq(attendanceRecordsTable.id, existing.id)).returning();
+    if (updated) {
+      await upsertOvertimeRecord(updated.id, empId, today, overtimeMins, template?.shiftRatePerHour);
+      await logAudit({ user: req.hrmsUser, action: "CLOCK_OUT", module: "Attendance", recordId: updated.id, newValue: signOut.toISOString(), ipAddress: req.ip });
+    }
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/attendance/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
   try {
     const [record] = await db

@@ -196,6 +196,7 @@ import type {
   LoanRepayment,
   ManagerEvaluation,
   MoveCandidateStageBody,
+  MyAttendanceToday,
   NotificationTemplate,
   OfferLetter,
   OnboardingChecklist,
@@ -10328,6 +10329,243 @@ export function useGetAttendanceSummary<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get the calling employee's clock-in status and today's record
+ */
+export const getGetMyAttendanceTodayUrl = () => {
+  return `/api/attendance/me/today`;
+};
+
+export const getMyAttendanceToday = async (
+  options?: RequestInit,
+): Promise<MyAttendanceToday> => {
+  return customFetch<MyAttendanceToday>(getGetMyAttendanceTodayUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMyAttendanceTodayQueryKey = () => {
+  return [`/api/attendance/me/today`] as const;
+};
+
+export const getGetMyAttendanceTodayQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyAttendanceToday>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyAttendanceToday>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMyAttendanceTodayQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMyAttendanceToday>>
+  > = ({ signal }) => getMyAttendanceToday({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyAttendanceToday>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyAttendanceTodayQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyAttendanceToday>>
+>;
+export type GetMyAttendanceTodayQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the calling employee's clock-in status and today's record
+ */
+
+export function useGetMyAttendanceToday<
+  TData = Awaited<ReturnType<typeof getMyAttendanceToday>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyAttendanceToday>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyAttendanceTodayQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Clock in for the current day (self-service)
+ */
+export const getClockInMyAttendanceUrl = () => {
+  return `/api/attendance/me/clock-in`;
+};
+
+export const clockInMyAttendance = async (
+  options?: RequestInit,
+): Promise<AttendanceRecord> => {
+  return customFetch<AttendanceRecord>(getClockInMyAttendanceUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getClockInMyAttendanceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clockInMyAttendance>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clockInMyAttendance>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["clockInMyAttendance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clockInMyAttendance>>,
+    void
+  > = () => {
+    return clockInMyAttendance(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClockInMyAttendanceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clockInMyAttendance>>
+>;
+
+export type ClockInMyAttendanceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Clock in for the current day (self-service)
+ */
+export const useClockInMyAttendance = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clockInMyAttendance>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clockInMyAttendance>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getClockInMyAttendanceMutationOptions(options));
+};
+
+/**
+ * @summary Clock out for the current day (self-service)
+ */
+export const getClockOutMyAttendanceUrl = () => {
+  return `/api/attendance/me/clock-out`;
+};
+
+export const clockOutMyAttendance = async (
+  options?: RequestInit,
+): Promise<AttendanceRecord> => {
+  return customFetch<AttendanceRecord>(getClockOutMyAttendanceUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getClockOutMyAttendanceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clockOutMyAttendance>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clockOutMyAttendance>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["clockOutMyAttendance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clockOutMyAttendance>>,
+    void
+  > = () => {
+    return clockOutMyAttendance(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClockOutMyAttendanceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clockOutMyAttendance>>
+>;
+
+export type ClockOutMyAttendanceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Clock out for the current day (self-service)
+ */
+export const useClockOutMyAttendance = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clockOutMyAttendance>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clockOutMyAttendance>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getClockOutMyAttendanceMutationOptions(options));
+};
 
 /**
  * @summary List regularization requests

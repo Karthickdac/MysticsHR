@@ -2242,6 +2242,45 @@ paths:
                 items:
                   $ref: "#/components/schemas/AttendanceMonthlySummary"
 
+  /attendance/me/today:
+    get:
+      operationId: getMyAttendanceToday
+      tags: [Attendance]
+      summary: Get the calling employee's clock-in status and today's record
+      responses:
+        "200":
+          description: Today's self-service status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyAttendanceToday"
+
+  /attendance/me/clock-in:
+    post:
+      operationId: clockInMyAttendance
+      tags: [Attendance]
+      summary: Clock in for the current day (self-service)
+      responses:
+        "201":
+          description: Clocked in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/me/clock-out:
+    post:
+      operationId: clockOutMyAttendance
+      tags: [Attendance]
+      summary: Clock out for the current day (self-service)
+      responses:
+        "200":
+          description: Clocked out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
   /attendance/regularizations:
     get:
       summary: List regularization requests
@@ -5556,6 +5595,27 @@ components:
       properties:
         action: { type: string, enum: [Approved, Rejected] }
         remarks: { type: ["string", "null"] }
+
+    MyAttendanceToday:
+      type: object
+      required: [attendanceDate, attendanceStatus]
+      properties:
+        attendanceDate: { type: string, format: date }
+        attendanceStatus: { type: string, enum: ["Not Clocked In", "Clocked In", "Clocked Out"] }
+        record:
+          oneOf:
+            - $ref: "#/components/schemas/AttendanceRecord"
+            - type: "null"
+        shift:
+          oneOf:
+            - type: object
+              required: [name, startTime, endTime, expectedMinutes]
+              properties:
+                name: { type: string }
+                startTime: { type: string }
+                endTime: { type: string }
+                expectedMinutes: { type: integer }
+            - type: "null"
 
     OvertimeRecord:
       type: object

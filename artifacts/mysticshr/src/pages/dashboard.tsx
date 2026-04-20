@@ -12,6 +12,8 @@ import {
 import { Users, UserCheck, TrendingDown, Calendar, BriefcaseBusiness, Clock, UserX, Activity, type LucideIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ClockInWidget } from "@/components/attendance/ClockInWidget";
+import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 
 const STATUS_COLORS: Record<string, string> = {
   "Active": "hsl(145 58% 36%)",
@@ -48,6 +50,8 @@ export default function DashboardPage() {
   const { data: activity } = useGetDashboardRecentActivity({ limit: 8 });
   const { data: headcount } = useGetDashboardHeadcountByDepartment();
   const { data: statusBreakdown } = useGetDashboardEmployeeStatusBreakdown();
+  const { hrmsUser } = useCurrentHrmsUser();
+  const showClockWidget = !!hrmsUser?.employeeId;
 
   return (
     <div className="space-y-6">
@@ -55,6 +59,12 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground mt-1">Live HR operations overview</p>
       </div>
+
+      {showClockWidget && (
+        <div className="grid md:grid-cols-2 gap-4">
+          <ClockInWidget />
+        </div>
+      )}
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
