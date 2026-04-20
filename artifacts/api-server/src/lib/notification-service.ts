@@ -285,6 +285,11 @@ function getDefaultSubject(eventType: string): string {
     exit_clearance_done: "Your Exit Clearance is Complete",
     exit_initiated: "Your Exit Request Has Been Processed",
     id_card_generated: "Your ID Card is Ready",
+    no_sign_in: "Action Required: No Attendance Sign-In Detected",
+    no_sign_out: "Reminder: Please Sign Out for Today",
+    overtime_alert: "Overtime Threshold Exceeded Today",
+    consecutive_absence: "Absence Alert — Consecutive Days Detected",
+    onboarding_doc_pending: "Action Required: Complete Pre-Onboarding Documents",
   };
   return subjects[eventType] ?? `Notification: ${eventType}`;
 }
@@ -308,6 +313,11 @@ function getDefaultEmailBody(eventType: string, vars: Record<string, string>): s
     exit_initiated: `${greet}<p>Your exit request status has been updated to <strong>${vars.status ?? "Clearance Pending"}</strong>. Please complete all clearance tasks in the MysticsHR portal.</p>`,
     offer_letter_issued: `${greet}<p>Congratulations! An offer letter for the position of <strong>${vars.jobTitle ?? ""}</strong> has been issued to you with offer code <strong>${vars.offerCode ?? ""}</strong>. Your proposed joining date is <strong>${vars.joiningDate ?? ""}</strong>. Please log in to MysticsHR to review and accept.</p>`,
     id_card_generated: `${greet}<p>Your ID card is now ready. Log in to MysticsHR to download it.</p>`,
+    no_sign_in: `${greet}<p>Our system has not recorded a sign-in for you today. If you are working, please update your attendance immediately through MysticsHR or contact HR.</p>`,
+    no_sign_out: `${greet}<p>You have a sign-in record for today but no sign-out has been recorded. Please update your attendance or contact HR to avoid payroll discrepancies.</p>`,
+    overtime_alert: `${greet}<p>Your total working hours today have exceeded the overtime threshold (<strong>${vars.hours ?? "9"} hours</strong>). Please ensure this is approved by your manager.</p>`,
+    consecutive_absence: `${greet}<p>Our records indicate you have been absent for <strong>${vars.days ?? "2"}</strong> or more consecutive days. If this is due to a medical or personal reason, please apply for leave in MysticsHR or contact HR as soon as possible.</p>`,
+    onboarding_doc_pending: `${greet}<p>You have pending pre-onboarding documents that must be completed before your joining date of <strong>${vars.joiningDate ?? "your joining date"}</strong>. Please log in to the MysticsHR Pre-Onboarding portal to complete your checklist.</p>`,
   };
 
   return `<div style="font-family:sans-serif;max-width:600px;margin:auto">${bodies[eventType] ?? `${greet}<p>You have a new notification regarding ${eventType.replace(/_/g, " ")}.</p>`}${footer}</div>`;

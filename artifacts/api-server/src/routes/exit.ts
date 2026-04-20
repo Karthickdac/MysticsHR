@@ -362,17 +362,33 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
     if (status === "Clearance Pending" || status === "Clearance Complete" || status === "Separated") {
       const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
         .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, existing.employeeId)).limit(1);
-      if (empUser?.email) {
-        import("../lib/notification-service").then(({ dispatchNotification }) => {
-          const eventType = status === "Separated" ? "exit_clearance_done" : "exit_initiated";
-          dispatchNotification({
+      const isCompletion = status === "Clearance Complete" || status === "Separated";
+      import("../lib/notification-service").then(async ({ dispatchNotification }) => {
+        const eventType = isCompletion ? "exit_clearance_done" : "exit_initiated";
+        // Notify the employee
+        if (empUser?.email) {
+          await dispatchNotification({
             eventType, module: "exit",
             recipientEmail: empUser.email, recipientName: empUser.name,
             variables: { status, recipientName: empUser.name },
             entityType: "exit_request", entityId: id,
           }).catch(() => {});
-        }).catch(() => {});
-      }
+        }
+        // On completion, also notify HR + Finance (super_admin, hr_manager) to initiate FnF
+        if (isCompletion) {
+          const { getUsersByRoles } = await import("./system-config");
+          const hrUsers = await getUsersByRoles(["super_admin", "hr_manager", "payroll_admin"]);
+          const empName = empUser?.name ?? "An employee";
+          await Promise.allSettled(hrUsers.map(hr =>
+            dispatchNotification({
+              eventType: "exit_clearance_completed", module: "exit",
+              recipientEmail: hr.email, recipientName: hr.name,
+              variables: { employeeName: empName, employeeId: String(existing.employeeId), recipientName: hr.name },
+              entityType: "exit_request", entityId: id,
+            })
+          ));
+        }
+      }).catch(() => {});
     }
 
     res.json(await enrichExitRequest(updated));

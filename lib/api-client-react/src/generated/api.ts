@@ -138,6 +138,7 @@ import type {
   GetPtReportParams,
   GetRecruitmentPipelineReport200,
   GetRecruitmentPipelineReportParams,
+  GetRolePermissions200,
   GetShiftSwapsParams,
   GetShiftsCalendarParams,
   GetShiftsTemplatesParams,
@@ -276,6 +277,8 @@ import type {
   UpdatePreOnboardingDocumentBody,
   UpdatePreOnboardingRecordBody,
   UpdateRequisitionBody,
+  UpdateRolePermissions200,
+  UpdateRolePermissionsBody,
   UpdateSalaryStructureBody,
   UpdateSystemSettings200,
   UpdateSystemSettingsBody,
@@ -24055,4 +24058,166 @@ export const useDeleteApprovalChain = <
   TContext
 > => {
   return useMutation(getDeleteApprovalChainMutationOptions(options));
+};
+
+/**
+ * @summary Get RBAC permission matrix (all roles × modules × actions)
+ */
+export const getGetRolePermissionsUrl = () => {
+  return `/api/role-permissions`;
+};
+
+export const getRolePermissions = async (
+  options?: RequestInit,
+): Promise<GetRolePermissions200> => {
+  return customFetch<GetRolePermissions200>(getGetRolePermissionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRolePermissionsQueryKey = () => {
+  return [`/api/role-permissions`] as const;
+};
+
+export const getGetRolePermissionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRolePermissions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRolePermissions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRolePermissionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRolePermissions>>
+  > = ({ signal }) => getRolePermissions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRolePermissions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRolePermissionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRolePermissions>>
+>;
+export type GetRolePermissionsQueryError = ErrorType<void>;
+
+/**
+ * @summary Get RBAC permission matrix (all roles × modules × actions)
+ */
+
+export function useGetRolePermissions<
+  TData = Awaited<ReturnType<typeof getRolePermissions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRolePermissions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRolePermissionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update RBAC permission matrix
+ */
+export const getUpdateRolePermissionsUrl = () => {
+  return `/api/role-permissions`;
+};
+
+export const updateRolePermissions = async (
+  updateRolePermissionsBody: UpdateRolePermissionsBody,
+  options?: RequestInit,
+): Promise<UpdateRolePermissions200> => {
+  return customFetch<UpdateRolePermissions200>(getUpdateRolePermissionsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateRolePermissionsBody),
+  });
+};
+
+export const getUpdateRolePermissionsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRolePermissions>>,
+    TError,
+    { data: BodyType<UpdateRolePermissionsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateRolePermissions>>,
+  TError,
+  { data: BodyType<UpdateRolePermissionsBody> },
+  TContext
+> => {
+  const mutationKey = ["updateRolePermissions"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateRolePermissions>>,
+    { data: BodyType<UpdateRolePermissionsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateRolePermissions(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateRolePermissionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateRolePermissions>>
+>;
+export type UpdateRolePermissionsMutationBody =
+  BodyType<UpdateRolePermissionsBody>;
+export type UpdateRolePermissionsMutationError = ErrorType<void>;
+
+/**
+ * @summary Update RBAC permission matrix
+ */
+export const useUpdateRolePermissions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRolePermissions>>,
+    TError,
+    { data: BodyType<UpdateRolePermissionsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateRolePermissions>>,
+  TError,
+  { data: BodyType<UpdateRolePermissionsBody> },
+  TContext
+> => {
+  return useMutation(getUpdateRolePermissionsMutationOptions(options));
 };

@@ -17,8 +17,10 @@ import {
   appraisalOutcomesTable,
   jobRequisitionsTable,
   permissionApplicationsTable,
+  preOnboardingRecordsTable,
+  preOnboardingDocumentsTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, isNotNull, ne, sql } from "drizzle-orm";
+import { eq, and, gte, lte, isNotNull, ne, sql, lt, count } from "drizzle-orm";
 import { generateTablePdf } from "./pdf";
 import { logger } from "./logger";
 
@@ -455,10 +457,11 @@ async function remindPendingLeaveApprovals() {
   }
 }
 
-/** Escalate overdue helpdesk tickets that have breached their SLA */
+/** Escalate overdue helpdesk tickets — notifies assignee + their manager/HOD + HR */
 async function escalateSlaBreaches() {
   try {
     const { dispatchNotification } = await import("../lib/notification-service");
+    const { getUsersByRoles } = await import("../routes/system-config");
     const now = new Date();
     const overdue = await db.select({
       id: helpdeskTicketsTable.id,
@@ -472,28 +475,216 @@ async function escalateSlaBreaches() {
         lte(helpdeskTicketsTable.slaDeadline, now),
       ));
 
+    if (overdue.length === 0) return;
+
+    // Get HR managers for escalation
+    const hrManagers = await getUsersByRoles(["super_admin", "hr_manager", "hr_executive"]);
+
     for (const ticket of overdue) {
-      // Notify assigned user
+      const slaLabel = ticket.slaDeadline ? new Date(ticket.slaDeadline).toLocaleString("en-IN") : "";
+      const vars = { ticketId: String(ticket.id), subject: ticket.subject, slaDeadline: slaLabel };
+
+      // 1. Notify the assigned user
       if (ticket.assignedToUserId) {
-        const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
           .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, ticket.assignedToUserId));
         if (assignee?.email) {
           await dispatchNotification({
             eventType: "helpdesk_sla_breach", module: "helpdesk",
             recipientEmail: assignee.email, recipientName: assignee.name,
-            variables: {
-              ticketId: String(ticket.id),
-              subject: ticket.subject,
-              slaDeadline: ticket.slaDeadline ? new Date(ticket.slaDeadline).toLocaleString("en-IN") : "",
-              recipientName: assignee.name,
-            },
+            variables: { ...vars, recipientName: assignee.name },
             entityType: "helpdesk_ticket", entityId: ticket.id,
           }).catch(() => {});
         }
+        // 2. Notify the assignee's HOD/manager
+        if (assignee?.employeeId) {
+          const [assigneeEmp] = await db.select({ departmentId: employeesTable.departmentId })
+            .from(employeesTable).where(eq(employeesTable.id, assignee.employeeId));
+          if (assigneeEmp?.departmentId) {
+            const hodUsers = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+              .from(hrmsUsersTable)
+              .leftJoin(employeesTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+              .where(and(
+                eq(hrmsUsersTable.role, "hod"),
+                eq(employeesTable.departmentId, assigneeEmp.departmentId),
+                eq(hrmsUsersTable.isActive, true),
+              ));
+            for (const hod of hodUsers) {
+              if (hod.email) {
+                await dispatchNotification({
+                  eventType: "helpdesk_sla_breach", module: "helpdesk",
+                  recipientEmail: hod.email, recipientName: hod.name,
+                  variables: { ...vars, recipientName: hod.name },
+                  entityType: "helpdesk_ticket", entityId: ticket.id,
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+      }
+      // 3. Notify HR managers
+      for (const hr of hrManagers) {
+        await dispatchNotification({
+          eventType: "helpdesk_sla_breach", module: "helpdesk",
+          recipientEmail: hr.email, recipientName: hr.name,
+          variables: { ...vars, recipientName: hr.name },
+          entityType: "helpdesk_ticket", entityId: ticket.id,
+        }).catch(() => {});
       }
     }
   } catch (e) {
     logger.error({ err: e }, "[scheduler] escalateSlaBreaches error");
+  }
+}
+
+/** Alert employees who have no sign-out record for today (run after EOD) */
+async function alertNoSignOut() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    const today = new Date().toISOString().slice(0, 10);
+    // Get all records with sign-in but no sign-out
+    const noSignOut = await db.select({
+      employeeId: attendanceRecordsTable.employeeId,
+    }).from(attendanceRecordsTable)
+      .where(and(
+        eq(attendanceRecordsTable.attendanceDate, today),
+        isNotNull(attendanceRecordsTable.signInTime),
+        sql`${attendanceRecordsTable.signOutTime} IS NULL`,
+      ));
+
+    for (const record of noSignOut) {
+      const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, record.employeeId)).limit(1);
+      if (!empUser?.email) continue;
+      await dispatchNotification({
+        eventType: "no_sign_out", module: "attendance",
+        recipientEmail: empUser.email, recipientName: empUser.name ?? "",
+        variables: { recipientName: empUser.name ?? "" },
+      }).catch(() => {});
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] alertNoSignOut error");
+  }
+}
+
+/** Overtime threshold alert — notify employees whose overtime minutes exceeded threshold today */
+async function alertOvertimeThreshold() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    const OVERTIME_THRESHOLD_MINUTES = 9 * 60; // 9 hours working = overtime
+    const today = new Date().toISOString().slice(0, 10);
+    const overtimeEmployees = await db.select({
+      employeeId: attendanceRecordsTable.employeeId,
+      totalMinutesWorked: attendanceRecordsTable.totalMinutesWorked,
+    }).from(attendanceRecordsTable)
+      .where(and(
+        eq(attendanceRecordsTable.attendanceDate, today),
+        isNotNull(attendanceRecordsTable.totalMinutesWorked),
+        gte(attendanceRecordsTable.totalMinutesWorked, OVERTIME_THRESHOLD_MINUTES),
+      ));
+
+    for (const record of overtimeEmployees) {
+      const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, record.employeeId)).limit(1);
+      if (!empUser?.email) continue;
+      await dispatchNotification({
+        eventType: "overtime_alert", module: "attendance",
+        recipientEmail: empUser.email, recipientName: empUser.name ?? "",
+        variables: { recipientName: empUser.name ?? "", hours: String(Math.floor((record.totalMinutesWorked ?? 0) / 60)) },
+      }).catch(() => {});
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] alertOvertimeThreshold error");
+  }
+}
+
+/** Consecutive absence alert — find employees absent 2+ consecutive days */
+async function alertConsecutiveAbsences() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    // Check last 3 days for consecutive absences
+    const today = new Date();
+    const threeDaysAgo = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayStr = today.toISOString().slice(0, 10);
+
+    const activeEmployees = await db.select({
+      id: employeesTable.id,
+      email: hrmsUsersTable.email,
+      name: hrmsUsersTable.name,
+    }).from(employeesTable)
+      .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+      .where(and(eq(employeesTable.isActive, true), isNotNull(hrmsUsersTable.email)));
+
+    const recentRecords = await db.select({
+      employeeId: attendanceRecordsTable.employeeId,
+      attendanceDate: attendanceRecordsTable.attendanceDate,
+    }).from(attendanceRecordsTable)
+      .where(and(
+        gte(attendanceRecordsTable.attendanceDate, threeDaysAgo),
+        lte(attendanceRecordsTable.attendanceDate, todayStr),
+      ));
+
+    const presentMap = new Map<number, Set<string>>();
+    for (const r of recentRecords) {
+      if (!presentMap.has(r.employeeId)) presentMap.set(r.employeeId, new Set());
+      presentMap.get(r.employeeId)!.add(String(r.attendanceDate));
+    }
+
+    for (const emp of activeEmployees) {
+      if (!emp.email) continue;
+      const days = presentMap.get(emp.id) ?? new Set<string>();
+      // Count consecutive absences (no record = absent)
+      let absent = 0;
+      for (let i = 1; i <= 3; i++) {
+        const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        if (!days.has(d)) absent++;
+      }
+      if (absent >= 2) {
+        await dispatchNotification({
+          eventType: "consecutive_absence", module: "attendance",
+          recipientEmail: emp.email, recipientName: emp.name ?? "",
+          variables: { days: String(absent), recipientName: emp.name ?? "" },
+        }).catch(() => {});
+      }
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] alertConsecutiveAbsences error");
+  }
+}
+
+/** Pre-onboarding pending document reminders — notify candidates with pending docs */
+async function remindPreOnboardingPending() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    // Get all active pre-onboarding records with pending documents
+    const pendingRecords = await db.select({
+      id: preOnboardingRecordsTable.id,
+      candidateId: preOnboardingRecordsTable.candidateId,
+      expectedJoiningDate: preOnboardingRecordsTable.expectedJoiningDate,
+      status: preOnboardingRecordsTable.status,
+    }).from(preOnboardingRecordsTable)
+      .where(and(
+        eq(preOnboardingRecordsTable.status, "Pending"),
+        isNotNull(preOnboardingRecordsTable.expectedJoiningDate),
+      ));
+
+    for (const record of pendingRecords) {
+      // Get candidate email from candidates table
+      const { candidatesTable } = await import("@workspace/db/schema");
+      const [candidate] = await db.select({ email: candidatesTable.email, firstName: candidatesTable.firstName, lastName: candidatesTable.lastName })
+        .from(candidatesTable).where(eq(candidatesTable.id, record.candidateId)).limit(1);
+      if (!candidate?.email) continue;
+
+      const joiningDate = record.expectedJoiningDate ? String(record.expectedJoiningDate) : "";
+      await dispatchNotification({
+        eventType: "onboarding_doc_pending", module: "pre_onboarding",
+        recipientEmail: candidate.email, recipientName: `${candidate.firstName} ${candidate.lastName}`,
+        variables: { joiningDate, recipientName: `${candidate.firstName} ${candidate.lastName}` },
+        entityType: "pre_onboarding_record", entityId: record.id,
+      }).catch(() => {});
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] remindPreOnboardingPending error");
   }
 }
 
@@ -551,6 +742,22 @@ export function startScheduler(_port: number) {
   // At 18:30 daily — alert employees with no attendance record today
   cron.schedule("30 18 * * *", () => {
     void alertAttendanceAnomalies();
+  });
+  // At 19:00 daily — alert employees who signed in but didn't sign out
+  cron.schedule("0 19 * * *", () => {
+    void alertNoSignOut();
+  });
+  // At 19:30 daily — alert employees who exceeded overtime threshold
+  cron.schedule("30 19 * * *", () => {
+    void alertOvertimeThreshold();
+  });
+  // At 09:00 daily — check for consecutive absences (2+ days)
+  cron.schedule("0 9 * * *", () => {
+    void alertConsecutiveAbsences();
+  });
+  // At 10:00 daily — remind candidates with pending pre-onboarding documents
+  cron.schedule("0 10 * * *", () => {
+    void remindPreOnboardingPending();
   });
   // Run once 5s after startup to catch any overdue schedules
   setTimeout(() => void runSchedulerTick(), 5_000);

@@ -180,7 +180,7 @@ router.put("/role-permissions", requireHrmsUser, requireRole(...SUPER_ADMIN), as
 });
 
 // ─── Utility: Get all active users for broadcast notifications ────────────────
-export async function getUsersByRoles(roles: string[]): Promise<Array<{ id: string; email: string; name: string }>> {
+export async function getUsersByRoles(roles: string[]): Promise<Array<{ id: number; email: string; name: string }>> {
   const users = await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name })
     .from(hrmsUsersTable)
     .where(and(

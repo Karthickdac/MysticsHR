@@ -6305,3 +6305,36 @@ export const UpdateApprovalChainResponse = zod.object({
 export const DeleteApprovalChainParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary Get RBAC permission matrix (all roles × modules × actions)
+ */
+export const GetRolePermissionsResponse = zod.record(
+  zod.string(),
+  zod
+    .record(zod.string(), zod.record(zod.string(), zod.boolean()))
+    .describe(
+      "Permissions for a single role — map of module keys to allowed actions",
+    ),
+);
+
+/**
+ * @summary Update RBAC permission matrix
+ */
+export const UpdateRolePermissionsBody = zod.record(
+  zod.string(),
+  zod
+    .record(zod.string(), zod.record(zod.string(), zod.boolean()))
+    .describe(
+      "Permissions for a single role — map of module keys to allowed actions",
+    ),
+);
+
+export const UpdateRolePermissionsResponse = zod.record(
+  zod.string(),
+  zod
+    .record(zod.string(), zod.record(zod.string(), zod.boolean()))
+    .describe(
+      "Permissions for a single role — map of module keys to allowed actions",
+    ),
+);

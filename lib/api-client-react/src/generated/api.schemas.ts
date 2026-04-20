@@ -2940,6 +2940,13 @@ export interface CreateApprovalChainBody {
   conditions?: CreateApprovalChainBodyConditions;
 }
 
+/**
+ * Permissions for a single role — map of module keys to allowed actions
+ */
+export interface RolePermissions {
+  [key: string]: { [key: string]: boolean };
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -3703,3 +3710,9 @@ export type UpdateSystemSettingsBody = { [key: string]: unknown };
 export type UpdateSystemSettings200 = {
   success?: boolean;
 };
+
+export type GetRolePermissions200 = { [key: string]: RolePermissions };
+
+export type UpdateRolePermissionsBody = { [key: string]: RolePermissions };
+
+export type UpdateRolePermissions200 = { [key: string]: RolePermissions };

@@ -8,6 +8,9 @@ import {
   useUpdateApprovalChain,
   useDeleteApprovalChain,
   getListApprovalChainsQueryKey,
+  useGetRolePermissions,
+  useUpdateRolePermissions,
+  getGetRolePermissionsQueryKey,
   type ApprovalChainConfig,
 } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -580,16 +583,23 @@ const ALL_ROLES = ["super_admin","hr_manager","hr_executive","hod","payroll_admi
 type HrmsRole = typeof ALL_ROLES[number];
 
 function RolePermissionsTab() {
+  const queryClient = useQueryClient();
+  const { data: serverMatrix, isLoading } = useGetRolePermissions();
   const [matrix, setMatrix] = useState<Record<string, Record<string, HrmsRole[]>>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch("/api/role-permissions", { credentials: "include" })
-      .then(r => r.json())
-      .then(data => { setMatrix(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+    if (serverMatrix) setMatrix(serverMatrix as Record<string, Record<string, HrmsRole[]>>);
+  }, [serverMatrix]);
+
+  const updateMutation = useUpdateRolePermissions({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetRolePermissionsQueryKey() });
+        toast({ title: "Permissions saved", description: "Role permission matrix updated." });
+      },
+      onError: () => toast({ title: "Error", description: "Failed to save permissions.", variant: "destructive" }),
+    },
+  });
 
   function toggleRole(module: string, action: string, role: HrmsRole) {
     setMatrix(prev => {
@@ -601,24 +611,11 @@ function RolePermissionsTab() {
     });
   }
 
-  async function save() {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/role-permissions", {
-        method: "PUT", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(matrix),
-      });
-      if (!res.ok) throw new Error("Failed");
-      toast({ title: "Permissions saved", description: "Role permission matrix updated." });
-    } catch {
-      toast({ title: "Error", description: "Failed to save permissions.", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
+  function save() {
+    updateMutation.mutate({ data: matrix as Record<string, Record<string, boolean>> });
   }
 
-  if (loading) return <div className="text-sm text-muted-foreground p-4">Loading permissions...</div>;
+  if (isLoading) return <div className="text-sm text-muted-foreground p-4">Loading permissions...</div>;
 
   return (
     <Card>
@@ -664,7 +661,7 @@ function RolePermissionsTab() {
           </Table>
         </div>
         <div className="mt-4">
-          <Button onClick={save} disabled={saving}>Save Permissions</Button>
+          <Button onClick={save} disabled={updateMutation.isPending}>Save Permissions</Button>
         </div>
       </CardContent>
     </Card>
