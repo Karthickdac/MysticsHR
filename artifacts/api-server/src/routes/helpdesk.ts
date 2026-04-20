@@ -230,6 +230,16 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
       event: `Ticket created with priority ${priority}. SLA deadline: ${slaDeadline.toISOString()}`,
     });
 
+    // Record initial auto-assignment in assignment history for audit trail
+    if (assignedToUserId) {
+      await db.insert(ticketAssignmentsTable).values({
+        ticketId: ticket.id,
+        assignedToUserId,
+        assignedByUserId: null,
+        note: `Auto-assigned based on category: ${category}`,
+      });
+    }
+
     res.status(201).json(await enrichTicket(ticket));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
