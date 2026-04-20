@@ -86,6 +86,7 @@ import type {
   OnboardingTask,
   OvertimeRecord,
   PatchOnboardingChecklistsIdBody,
+  PostDepartmentsIdShiftAssignments201,
   PostEmployeesBulkImportBody,
   PostEmployeesIdOnboardingChecklistBody,
   PostEmployeesIdOnboardingChecklistWelcomeEmail200,
@@ -8953,6 +8954,99 @@ export const usePostEmployeesIdShiftAssignments = <
 > => {
   return useMutation(
     getPostEmployeesIdShiftAssignmentsMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Bulk-assign shift template to all employees in a department
+ */
+export const getPostDepartmentsIdShiftAssignmentsUrl = (id: number) => {
+  return `/api/departments/${id}/shift-assignments`;
+};
+
+export const postDepartmentsIdShiftAssignments = async (
+  id: number,
+  createShiftAssignmentBody: CreateShiftAssignmentBody,
+  options?: RequestInit,
+): Promise<PostDepartmentsIdShiftAssignments201> => {
+  return customFetch<PostDepartmentsIdShiftAssignments201>(
+    getPostDepartmentsIdShiftAssignmentsUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createShiftAssignmentBody),
+    },
+  );
+};
+
+export const getPostDepartmentsIdShiftAssignmentsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postDepartmentsIdShiftAssignments>>,
+    TError,
+    { id: number; data: BodyType<CreateShiftAssignmentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postDepartmentsIdShiftAssignments>>,
+  TError,
+  { id: number; data: BodyType<CreateShiftAssignmentBody> },
+  TContext
+> => {
+  const mutationKey = ["postDepartmentsIdShiftAssignments"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postDepartmentsIdShiftAssignments>>,
+    { id: number; data: BodyType<CreateShiftAssignmentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postDepartmentsIdShiftAssignments(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostDepartmentsIdShiftAssignmentsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postDepartmentsIdShiftAssignments>>
+>;
+export type PostDepartmentsIdShiftAssignmentsMutationBody =
+  BodyType<CreateShiftAssignmentBody>;
+export type PostDepartmentsIdShiftAssignmentsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Bulk-assign shift template to all employees in a department
+ */
+export const usePostDepartmentsIdShiftAssignments = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postDepartmentsIdShiftAssignments>>,
+    TError,
+    { id: number; data: BodyType<CreateShiftAssignmentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postDepartmentsIdShiftAssignments>>,
+  TError,
+  { id: number; data: BodyType<CreateShiftAssignmentBody> },
+  TContext
+> => {
+  return useMutation(
+    getPostDepartmentsIdShiftAssignmentsMutationOptions(options),
   );
 };
 

@@ -1502,6 +1502,10 @@ export type GetShiftsTemplatesParams = {
   departmentId?: number;
 };
 
+export type PostDepartmentsIdShiftAssignments201 = {
+  count: number;
+};
+
 export type GetShiftsCalendarParams = {
   /**
    * YYYY-MM

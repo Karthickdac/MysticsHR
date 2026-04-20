@@ -9,14 +9,16 @@ import {
   usePostShiftSwapsIdHodAction,
   usePostShiftSwapsIdHrAction,
   useListEmployees,
+  useListDepartments,
   useGetEmployeesIdShiftAssignments,
   usePostEmployeesIdShiftAssignments,
+  usePostDepartmentsIdShiftAssignments,
   useDeleteShiftAssignmentsId,
   getGetShiftsTemplatesQueryKey,
   getGetShiftSwapsQueryKey,
   getGetEmployeesIdShiftAssignmentsQueryKey,
 } from "@workspace/api-client-react";
-import type { GetShiftsTemplatesQueryResult, GetShiftSwapsQueryResult, GetEmployeesIdShiftAssignmentsQueryResult, Employee } from "@workspace/api-client-react";
+import type { GetShiftsTemplatesQueryResult, GetShiftSwapsQueryResult, GetEmployeesIdShiftAssignmentsQueryResult, Employee, Department } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +51,9 @@ interface TemplateFormValue {
   overtimeThresholdMinutes: number;
   weeklyOff: string[];
   notes: string;
+  departmentId: number | null;
+  shiftRatePerHour: string;
+  nightDifferentialRate: string;
   [key: string]: unknown;
 }
 
@@ -58,8 +63,8 @@ const statusColors: Record<string, string> = {
   Rejected: "bg-red-100 text-red-800",
 };
 
-function TemplateForm({ initial, onSave, onCancel, saving, error }: {
-  initial: TemplateFormValue; onSave: (v: TemplateFormValue) => void; onCancel: () => void; saving: boolean; error: string;
+function TemplateForm({ initial, departments, onSave, onCancel, saving, error }: {
+  initial: TemplateFormValue; departments: Department[]; onSave: (v: TemplateFormValue) => void; onCancel: () => void; saving: boolean; error: string;
 }) {
   const [form, setForm] = useState(initial);
   const [weeklyOff, setWeeklyOff] = useState<string[]>(initial.weeklyOff ?? []);
@@ -81,6 +86,16 @@ function TemplateForm({ initial, onSave, onCancel, saving, error }: {
           <Select value={form.shiftType} onValueChange={v => setForm({ ...form, shiftType: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>{SHIFT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Department (optional)</Label>
+          <Select value={form.departmentId?.toString() ?? "none"} onValueChange={v => setForm({ ...form, departmentId: v === "none" ? null : Number(v) })}>
+            <SelectTrigger><SelectValue placeholder="All departments" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">All departments</SelectItem>
+              {departments.map((d: Department) => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+            </SelectContent>
           </Select>
         </div>
         <div>
@@ -106,6 +121,14 @@ function TemplateForm({ initial, onSave, onCancel, saving, error }: {
         <div>
           <Label>OT Threshold (min)</Label>
           <Input type="number" value={form.overtimeThresholdMinutes} onChange={e => setForm({ ...form, overtimeThresholdMinutes: Number(e.target.value) })} />
+        </div>
+        <div>
+          <Label>Shift Rate / Hour (₹)</Label>
+          <Input type="number" step="0.01" value={form.shiftRatePerHour} onChange={e => setForm({ ...form, shiftRatePerHour: e.target.value })} placeholder="0.00" />
+        </div>
+        <div>
+          <Label>Night Differential Rate (₹)</Label>
+          <Input type="number" step="0.01" value={form.nightDifferentialRate} onChange={e => setForm({ ...form, nightDifferentialRate: e.target.value })} placeholder="0.00" />
         </div>
         <div className="col-span-2">
           <Label>Notes</Label>
@@ -143,6 +166,7 @@ export default function ShiftsPage() {
   const { data: swaps = [], isLoading: swapLoading } = useGetShiftSwaps({});
   const { data: _empResponse } = useListEmployees({});
   const employees = _empResponse?.data ?? [];
+  const { data: departments = [] } = useListDepartments();
 
   const createTmpl = usePostShiftsTemplates();
   const patchTmpl = usePatchShiftsTemplatesId();
@@ -160,15 +184,21 @@ export default function ShiftsPage() {
   const [swapAction, setSwapAction] = useState<{ id: number; type: "hod" | "hr" } | null>(null);
   const [actionRemarks, setActionRemarks] = useState("");
 
-  const blankTemplate = { name: "", shiftType: "Fixed", startTime: "09:00", endTime: "18:00", gracePeriodMinutes: 5, breakDurationMinutes: 30, minWorkingHoursMinutes: 480, overtimeThresholdMinutes: 30, weeklyOff: ["Saturday", "Sunday"], notes: "" };
+  const blankTemplate: TemplateFormValue = { name: "", shiftType: "Fixed", startTime: "09:00", endTime: "18:00", gracePeriodMinutes: 5, breakDurationMinutes: 30, minWorkingHoursMinutes: 480, overtimeThresholdMinutes: 30, weeklyOff: ["Saturday", "Sunday"], notes: "", departmentId: null, shiftRatePerHour: "", nightDifferentialRate: "" };
 
-  // Assignment tab state
+  // Assignment tab state — per employee
   const [selectedEmpId, setSelectedEmpId] = useState<number | null>(null);
   const [assignForm, setAssignForm] = useState({ shiftTemplateId: 0, effectiveFrom: "", effectiveTo: "" });
   const [assignError, setAssignError] = useState("");
   const { data: assignments = [] } = useGetEmployeesIdShiftAssignments(selectedEmpId ?? 0, { query: { enabled: !!selectedEmpId, queryKey: getGetEmployeesIdShiftAssignmentsQueryKey(selectedEmpId ?? 0) } });
   const createAssign = usePostEmployeesIdShiftAssignments();
   const deleteAssign = useDeleteShiftAssignmentsId();
+
+  // Department bulk assignment state
+  const [deptAssignForm, setDeptAssignForm] = useState({ departmentId: 0, shiftTemplateId: 0, effectiveFrom: "", effectiveTo: "" });
+  const [deptAssignError, setDeptAssignError] = useState("");
+  const [deptAssignResult, setDeptAssignResult] = useState<string | null>(null);
+  const deptAssign = usePostDepartmentsIdShiftAssignments();
 
   async function handleSaveTemplate(data: TemplateFormValue) {
     setTmplError("");
@@ -245,6 +275,23 @@ export default function ShiftsPage() {
     }
   }
 
+  async function handleDeptAssign() {
+    setDeptAssignError("");
+    setDeptAssignResult(null);
+    if (!deptAssignForm.departmentId || !deptAssignForm.shiftTemplateId || !deptAssignForm.effectiveFrom) {
+      setDeptAssignError("Department, shift template and effective from are required");
+      return;
+    }
+    try {
+      const result = await deptAssign.mutateAsync({ id: deptAssignForm.departmentId, data: { shiftTemplateId: deptAssignForm.shiftTemplateId, effectiveFrom: deptAssignForm.effectiveFrom, effectiveTo: deptAssignForm.effectiveTo || undefined } });
+      setDeptAssignResult(`Successfully assigned to ${(result as { count: number }).count} employee(s).`);
+      setDeptAssignForm({ departmentId: 0, shiftTemplateId: 0, effectiveFrom: "", effectiveTo: "" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setDeptAssignError(err?.message ?? "Failed to assign shift to department");
+    }
+  }
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex justify-between items-center">
@@ -307,6 +354,50 @@ export default function ShiftsPage() {
         {/* ASSIGNMENTS TAB */}
         {canManage && (
           <TabsContent value="assignments" className="space-y-4">
+            {/* Department bulk assignment */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Assign Shift to Entire Department</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {deptAssignError && <p className="text-red-500 text-sm">{deptAssignError}</p>}
+                {deptAssignResult && <p className="text-green-600 text-sm">{deptAssignResult}</p>}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Department *</Label>
+                    <Select value={deptAssignForm.departmentId ? deptAssignForm.departmentId.toString() : ""} onValueChange={v => setDeptAssignForm({ ...deptAssignForm, departmentId: Number(v) })}>
+                      <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                      <SelectContent>
+                        {(departments as Department[]).map((d: Department) => (
+                          <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Shift Template *</Label>
+                    <Select value={deptAssignForm.shiftTemplateId ? deptAssignForm.shiftTemplateId.toString() : ""} onValueChange={v => setDeptAssignForm({ ...deptAssignForm, shiftTemplateId: Number(v) })}>
+                      <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
+                      <SelectContent>
+                        {templates.filter((t) => t.isActive).map((t) => (
+                          <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Effective From *</Label>
+                    <Input type="date" value={deptAssignForm.effectiveFrom} onChange={e => setDeptAssignForm({ ...deptAssignForm, effectiveFrom: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Effective To</Label>
+                    <Input type="date" value={deptAssignForm.effectiveTo} onChange={e => setDeptAssignForm({ ...deptAssignForm, effectiveTo: e.target.value })} />
+                  </div>
+                </div>
+                <Button onClick={handleDeptAssign} disabled={deptAssign.isPending}>
+                  {deptAssign.isPending ? "Assigning..." : "Assign to Department"}
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader><CardTitle className="text-base">Assign Shift to Employee</CardTitle></CardHeader>
               <CardContent className="space-y-3">
@@ -419,7 +510,8 @@ export default function ShiftsPage() {
             <DialogTitle>{editingTmpl ? "Edit" : "New"} Shift Template</DialogTitle>
           </DialogHeader>
           <TemplateForm
-            initial={editingTmpl ? { ...editingTmpl, weeklyOff: editingTmpl.weeklyOff ?? [], notes: editingTmpl.notes ?? "" } : blankTemplate}
+            initial={editingTmpl ? { ...editingTmpl, weeklyOff: editingTmpl.weeklyOff ?? [], notes: editingTmpl.notes ?? "", departmentId: editingTmpl.departmentId ?? null, shiftRatePerHour: editingTmpl.shiftRatePerHour ?? "", nightDifferentialRate: editingTmpl.nightDifferentialRate ?? "" } : blankTemplate}
+            departments={departments as Department[]}
             onSave={handleSaveTemplate}
             onCancel={() => setShowTmplForm(false)}
             saving={createTmpl.isPending || patchTmpl.isPending}

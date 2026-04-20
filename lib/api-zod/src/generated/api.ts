@@ -2381,6 +2381,20 @@ export const PostEmployeesIdShiftAssignmentsBody = zod.object({
 });
 
 /**
+ * @summary Bulk-assign shift template to all employees in a department
+ */
+export const PostDepartmentsIdShiftAssignmentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostDepartmentsIdShiftAssignmentsBody = zod.object({
+  shiftTemplateId: zod.number(),
+  effectiveFrom: zod.coerce.date(),
+  effectiveTo: zod.coerce.date().nullish(),
+  notes: zod.string().nullish(),
+});
+
+/**
  * @summary Delete shift assignment
  */
 export const DeleteShiftAssignmentsIdParams = zod.object({

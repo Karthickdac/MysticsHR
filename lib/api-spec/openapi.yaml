@@ -2001,6 +2001,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/ShiftAssignment"
 
+  /departments/{id}/shift-assignments:
+    post:
+      summary: Bulk-assign shift template to all employees in a department
+      operationId: postDepartmentsIdShiftAssignments
+      tags: [Shifts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShiftAssignmentBody"
+      responses:
+        "201":
+          description: Created — returns count of assignments created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                required: [count]
+
   /shift-assignments/{id}:
     delete:
       summary: Delete shift assignment
