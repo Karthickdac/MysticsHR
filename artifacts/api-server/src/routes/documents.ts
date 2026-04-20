@@ -7,6 +7,7 @@ import {
   issuedDocumentsTable,
   employeesTable,
   hrmsUsersTable,
+  exitRequestsTable,
 } from "@workspace/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { generatePdf, substituteTemplate } from "../lib/pdf";
@@ -214,6 +215,27 @@ router.get("/documents/issued/:id/download", requireHrmsUser, requireRole(...ALL
         .where(eq(hrmsUsersTable.id, u.id));
       if (!user?.employeeId || user.employeeId !== doc.employeeId) {
         res.status(403).json({ error: "Access denied" }); return;
+      }
+      // Enforce 6-month post-separation document access window for ex-employees
+      const [exitReq] = await db.select({ actualLwd: exitRequestsTable.actualLwd, requestedLwd: exitRequestsTable.requestedLwd })
+        .from(exitRequestsTable)
+        .where(and(
+          eq(exitRequestsTable.employeeId, user.employeeId),
+          eq(exitRequestsTable.status, "Separated"),
+        ))
+        .orderBy(desc(exitRequestsTable.updatedAt))
+        .limit(1);
+      if (exitReq) {
+        const lwd = exitReq.actualLwd ?? exitReq.requestedLwd;
+        if (lwd) {
+          const lwdDate = new Date(lwd);
+          const sixMonthsAfterLwd = new Date(lwdDate);
+          sixMonthsAfterLwd.setMonth(sixMonthsAfterLwd.getMonth() + 6);
+          if (new Date() > sixMonthsAfterLwd) {
+            res.status(403).json({ error: "Document access expired: ex-employee document retention period (6 months post-separation) has elapsed." });
+            return;
+          }
+        }
       }
     }
 

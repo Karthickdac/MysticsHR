@@ -8,8 +8,12 @@ import {
   attendanceRecordsTable,
   leaveApplicationsTable,
   leaveTypesTable,
+  exitRequestsTable,
+  payrollRecordsTable,
+  payrollRunsTable,
+  helpdeskTicketsTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, isNotNull, ne, sql } from "drizzle-orm";
 import { generateTablePdf } from "./pdf";
 import { logger } from "./logger";
 
@@ -119,8 +123,64 @@ async function fetchReportData(reportType: string, filters: Record<string, unkno
           .limit(500);
         return rows as Record<string, unknown>[];
       }
+      case "payroll-register": {
+        const month = filters["month"] ? Number(filters["month"]) : new Date().getMonth() + 1;
+        const year = filters["year"] ? Number(filters["year"]) : new Date().getFullYear();
+        const conds = [
+          eq(payrollRunsTable.periodMonth, month),
+          eq(payrollRunsTable.periodYear, year),
+        ];
+        if (deptId) conds.push(eq(employeesTable.departmentId, deptId));
+        const rows = await db.select({
+          employeeCode: employeesTable.employeeId,
+          employeeName: employeesTable.firstName,
+          grossPay: payrollRecordsTable.grossEarnings,
+          totalDeductions: payrollRecordsTable.totalDeductions,
+          netPay: payrollRecordsTable.netPay,
+          month: payrollRunsTable.periodMonth,
+          year: payrollRunsTable.periodYear,
+        }).from(payrollRecordsTable)
+          .innerJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
+          .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
+          .where(and(...conds))
+          .limit(500);
+        return rows as Record<string, unknown>[];
+      }
+      case "attrition": {
+        const conds = [isNotNull(exitRequestsTable.actualLwd)];
+        if (fromDate) conds.push(gte(exitRequestsTable.actualLwd, fromDate));
+        if (toDate) conds.push(lte(exitRequestsTable.actualLwd, toDate));
+        if (deptId) conds.push(eq(employeesTable.departmentId, deptId));
+        const rows = await db.select({
+          employeeName: employeesTable.firstName,
+          employeeCode: employeesTable.employeeId,
+          dateOfJoining: employeesTable.dateOfJoining,
+          lastWorkingDay: exitRequestsTable.actualLwd,
+          exitType: exitRequestsTable.exitType,
+          status: exitRequestsTable.status,
+        }).from(exitRequestsTable)
+          .leftJoin(employeesTable, eq(exitRequestsTable.employeeId, employeesTable.id))
+          .where(and(...conds))
+          .limit(500);
+        return rows as Record<string, unknown>[];
+      }
+      case "helpdesk-sla": {
+        const conds = [];
+        if (fromDate) conds.push(gte(helpdeskTicketsTable.createdAt, new Date(fromDate)));
+        if (toDate) conds.push(lte(helpdeskTicketsTable.createdAt, new Date(toDate)));
+        const rows = await db.select({
+          category: helpdeskTicketsTable.category,
+          priority: helpdeskTicketsTable.priority,
+          status: helpdeskTicketsTable.status,
+          createdAt: helpdeskTicketsTable.createdAt,
+          resolvedAt: helpdeskTicketsTable.resolvedAt,
+        }).from(helpdeskTicketsTable)
+          .where(conds.length ? and(...conds) : undefined)
+          .limit(500);
+        return rows as Record<string, unknown>[];
+      }
       default:
-        logger.warn({ reportType }, "[scheduler] no direct query defined for report type; skipping data fetch");
+        logger.info({ reportType }, "[scheduler] no direct query for this report type; sending empty report");
         return [];
     }
   } catch (err) {
@@ -192,9 +252,41 @@ async function sendScheduledReport(
   logger.info({ scheduleId: schedule.id, recipients: schedule.recipients }, "[scheduler] report email sent");
 }
 
+// ─── LWD+1 automatic access revocation ────────────────────────────────────────
+async function revokeAccessForPastLwd() {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    // Find FnF-Approved or Separated exit requests where LWD < today (meaning LWD+1 has passed)
+    // and the employee still has isActive=true
+    const pending = await db.select({
+      employeeId: exitRequestsTable.employeeId,
+      actualLwd: exitRequestsTable.actualLwd,
+      requestedLwd: exitRequestsTable.requestedLwd,
+    }).from(exitRequestsTable)
+      .innerJoin(employeesTable, and(
+        eq(exitRequestsTable.employeeId, employeesTable.id),
+        eq(employeesTable.isActive, true),
+      ))
+      .where(and(
+        sql`${exitRequestsTable.status} IN ('FnF Approved', 'Separated')`,
+        sql`COALESCE(${exitRequestsTable.actualLwd}, ${exitRequestsTable.requestedLwd}) < ${today}`,
+      ));
+
+    for (const row of pending) {
+      await db.update(employeesTable)
+        .set({ status: "Separated", isActive: false, updatedAt: new Date() })
+        .where(eq(employeesTable.id, row.employeeId));
+      logger.info({ employeeId: row.employeeId, lwd: row.actualLwd ?? row.requestedLwd }, "[scheduler] auto-revoked system access (LWD+1 passed)");
+    }
+  } catch (err) {
+    logger.error({ err }, "[scheduler] LWD+1 access revocation failed");
+  }
+}
+
 // ─── Main scheduler tick ──────────────────────────────────────────────────────
 async function runSchedulerTick() {
   logger.debug("[scheduler] tick");
+  await revokeAccessForPastLwd();
   let schedules: Array<{
     id: number; reportType: string; name: string; frequency: string;
     recipients: string[]; filters: unknown; lastRunAt: Date | null;
