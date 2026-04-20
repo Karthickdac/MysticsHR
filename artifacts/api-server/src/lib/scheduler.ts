@@ -413,13 +413,146 @@ async function runSchedulerTick() {
   }
 }
 
+// ─── Automated notification jobs ──────────────────────────────────────────────
+
+/** Remind HOD/HR about leave applications pending for more than 24 hours */
+async function remindPendingLeaveApprovals() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const pending = await db.select({
+      id: leaveApplicationsTable.id,
+      employeeId: leaveApplicationsTable.employeeId,
+      fromDate: leaveApplicationsTable.fromDate,
+      toDate: leaveApplicationsTable.toDate,
+      createdAt: leaveApplicationsTable.createdAt,
+    }).from(leaveApplicationsTable)
+      .where(and(
+        eq(leaveApplicationsTable.status, "Pending"),
+        lte(leaveApplicationsTable.createdAt, threshold),
+      ));
+
+    if (pending.length === 0) return;
+
+    const hodUsers = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+      .from(hrmsUsersTable)
+      .where(and(eq(hrmsUsersTable.isActive, true), eq(hrmsUsersTable.role, "hod")));
+
+    for (const user of hodUsers) {
+      if (!user.email) continue;
+      await dispatchNotification({
+        eventType: "leave_submitted", module: "leave",
+        recipientEmail: user.email, recipientName: user.name,
+        variables: {
+          employeeName: `${pending.length} application(s)`, fromDate: "", toDate: "",
+          days: String(pending.length), leaveType: "various",
+          recipientName: user.name,
+        },
+      }).catch(() => {});
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] remindPendingLeaveApprovals error");
+  }
+}
+
+/** Escalate overdue helpdesk tickets that have breached their SLA */
+async function escalateSlaBreaches() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    const now = new Date();
+    const overdue = await db.select({
+      id: helpdeskTicketsTable.id,
+      subject: helpdeskTicketsTable.subject,
+      slaDeadline: helpdeskTicketsTable.slaDeadline,
+      assignedToUserId: helpdeskTicketsTable.assignedToUserId,
+    }).from(helpdeskTicketsTable)
+      .where(and(
+        ne(helpdeskTicketsTable.status, "Closed"),
+        isNotNull(helpdeskTicketsTable.slaDeadline),
+        lte(helpdeskTicketsTable.slaDeadline, now),
+      ));
+
+    for (const ticket of overdue) {
+      // Notify assigned user
+      if (ticket.assignedToUserId) {
+        const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+          .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, ticket.assignedToUserId));
+        if (assignee?.email) {
+          await dispatchNotification({
+            eventType: "helpdesk_sla_breach", module: "helpdesk",
+            recipientEmail: assignee.email, recipientName: assignee.name,
+            variables: {
+              ticketId: String(ticket.id),
+              subject: ticket.subject,
+              slaDeadline: ticket.slaDeadline ? new Date(ticket.slaDeadline).toLocaleString("en-IN") : "",
+              recipientName: assignee.name,
+            },
+            entityType: "helpdesk_ticket", entityId: ticket.id,
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] escalateSlaBreaches error");
+  }
+}
+
+/** Alert employees who have no attendance record for today */
+async function alertAttendanceAnomalies() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    const today = new Date().toISOString().slice(0, 10);
+    const hour = new Date().getHours();
+
+    // Only run end-of-day check (after 18:00)
+    if (hour < 18) return;
+
+    const allActive = await db.select({
+      id: employeesTable.id,
+      email: hrmsUsersTable.email,
+      name: hrmsUsersTable.name,
+    }).from(employeesTable)
+      .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+      .where(eq(employeesTable.isActive, true));
+
+    const todayRecords = await db.select({ employeeId: attendanceRecordsTable.employeeId })
+      .from(attendanceRecordsTable)
+      .where(eq(attendanceRecordsTable.attendanceDate, today));
+
+    const presentIds = new Set(todayRecords.map(r => r.employeeId));
+
+    for (const emp of allActive) {
+      if (!emp.email || presentIds.has(emp.id)) continue;
+      await dispatchNotification({
+        eventType: "no_sign_in", module: "attendance",
+        recipientEmail: emp.email, recipientName: emp.name ?? "",
+        variables: { recipientName: emp.name ?? "" },
+      }).catch(() => {});
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] alertAttendanceAnomalies error");
+  }
+}
+
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 export function startScheduler(_port: number) {
-  // Run every hour at minute 0
+  // Run every hour at minute 0 — scheduled report delivery
   cron.schedule("0 * * * *", () => {
     void runSchedulerTick();
   });
+  // Every 4 hours — remind HOD/HR about pending leave approvals (>24h old)
+  cron.schedule("0 */4 * * *", () => {
+    void remindPendingLeaveApprovals();
+  });
+  // Every hour — escalate SLA breaches for overdue helpdesk tickets
+  cron.schedule("30 * * * *", () => {
+    void escalateSlaBreaches();
+  });
+  // At 18:30 daily — alert employees with no attendance record today
+  cron.schedule("30 18 * * *", () => {
+    void alertAttendanceAnomalies();
+  });
   // Run once 5s after startup to catch any overdue schedules
   setTimeout(() => void runSchedulerTick(), 5_000);
-  logger.info("[scheduler] started — runs every hour at :00");
+  logger.info("[scheduler] started — runs every hour at :00 + notification jobs");
 }

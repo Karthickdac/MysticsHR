@@ -358,6 +358,23 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
 
     await logAudit({ user: u, action: "update_exit_request", module: "exit", recordId: id });
 
+    // Notify employee of status change
+    if (status === "Clearance Pending" || status === "Clearance Complete" || status === "Separated") {
+      const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, existing.employeeId)).limit(1);
+      if (empUser?.email) {
+        import("../lib/notification-service").then(({ dispatchNotification }) => {
+          const eventType = status === "Separated" ? "exit_clearance_done" : "exit_initiated";
+          dispatchNotification({
+            eventType, module: "exit",
+            recipientEmail: empUser.email, recipientName: empUser.name,
+            variables: { status, recipientName: empUser.name },
+            entityType: "exit_request", entityId: id,
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+    }
+
     res.json(await enrichExitRequest(updated));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

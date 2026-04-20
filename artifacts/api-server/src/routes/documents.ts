@@ -184,6 +184,20 @@ router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), as
 
     await logAudit({ user: u, action: "generate_document", module: "documents", recordId: issued.id });
 
+    // Notify the employee that a document has been issued to them
+    const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+      .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, employeeId)).limit(1);
+    if (empUser?.email) {
+      import("../lib/notification-service").then(({ dispatchNotification }) => {
+        dispatchNotification({
+          eventType: "document_issued", module: "documents",
+          recipientEmail: empUser.email, recipientName: empUser.name,
+          variables: { documentType, recipientName: empUser.name },
+          entityType: "issued_document", entityId: issued.id,
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+
     res.status(201).json({
       id: issued.id,
       employeeId: issued.employeeId,

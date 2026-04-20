@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2 } from "lucide-react";
+import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2, Lock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 // ─── Settings form helper ─────────────────────────────────────────────────────
@@ -574,6 +574,103 @@ function PayrollSettingsTab() {
   );
 }
 
+// ─── RBAC Permissions Tab ─────────────────────────────────────────────────────
+
+const ALL_ROLES = ["super_admin","hr_manager","hr_executive","hod","payroll_admin","employee"] as const;
+type HrmsRole = typeof ALL_ROLES[number];
+
+function RolePermissionsTab() {
+  const [matrix, setMatrix] = useState<Record<string, Record<string, HrmsRole[]>>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/role-permissions", { credentials: "include" })
+      .then(r => r.json())
+      .then(data => { setMatrix(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  function toggleRole(module: string, action: string, role: HrmsRole) {
+    setMatrix(prev => {
+      const current = prev[module]?.[action] ?? [];
+      const next = current.includes(role)
+        ? current.filter(r => r !== role)
+        : [...current, role];
+      return { ...prev, [module]: { ...prev[module], [action]: next } };
+    });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/role-permissions", {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(matrix),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "Permissions saved", description: "Role permission matrix updated." });
+    } catch {
+      toast({ title: "Error", description: "Failed to save permissions.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="text-sm text-muted-foreground p-4">Loading permissions...</div>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><Lock className="w-4 h-4" />Role Permission Matrix</CardTitle>
+        <CardDescription>Configure which roles can perform each action across modules. Only super admin can modify this.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[120px]">Module / Action</TableHead>
+                {ALL_ROLES.map(r => (
+                  <TableHead key={r} className="text-center text-xs capitalize">{r.replace("_", " ")}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(matrix).map(([module, actions]) =>
+                Object.entries(actions).map(([action, roles], idx) => (
+                  <TableRow key={`${module}.${action}`}>
+                    <TableCell className="text-xs">
+                      {idx === 0 && <span className="font-semibold capitalize block">{module}</span>}
+                      <span className="text-muted-foreground capitalize">{action}</span>
+                    </TableCell>
+                    {ALL_ROLES.map(role => (
+                      <TableCell key={role} className="text-center">
+                        <input
+                          type="checkbox"
+                          checked={roles.includes(role)}
+                          onChange={() => toggleRole(module, action, role)}
+                          className="h-4 w-4 cursor-pointer"
+                          disabled={role === "super_admin"}
+                          title={role === "super_admin" ? "Super admin always has full access" : `Toggle ${role} for ${module}.${action}`}
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="mt-4">
+          <Button onClick={save} disabled={saving}>Save Permissions</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SystemConfigPage() {
@@ -593,6 +690,7 @@ export default function SystemConfigPage() {
             <TabsTrigger value="payroll">Payroll Settings</TabsTrigger>
             <TabsTrigger value="approval">Approval Chains</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="org" className="mt-4"><OrgProfileTab /></TabsContent>
@@ -601,6 +699,7 @@ export default function SystemConfigPage() {
           <TabsContent value="payroll" className="mt-4"><PayrollSettingsTab /></TabsContent>
           <TabsContent value="approval" className="mt-4"><ApprovalChainsTab /></TabsContent>
           <TabsContent value="security" className="mt-4"><SecurityTab /></TabsContent>
+          <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
         </Tabs>
       </div>
     </MainLayout>

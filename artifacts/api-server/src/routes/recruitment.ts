@@ -864,6 +864,21 @@ router.post("/offers/:id/issue", requireHrmsUser, requireRole(...HR_WRITE_ROLES)
       .set({ stage: "Offer Issued", updatedAt: new Date() })
       .where(eq(candidatesTable.id, row.candidateId));
     await logAudit({ user: req.hrmsUser, action: "ISSUE", module: "Offers", recordId: id, ipAddress: req.ip });
+
+    // Notify candidate that their offer letter has been issued
+    const [candidate] = await db.select({ email: candidatesTable.email, firstName: candidatesTable.firstName, lastName: candidatesTable.lastName })
+      .from(candidatesTable).where(eq(candidatesTable.id, row.candidateId)).limit(1);
+    if (candidate?.email) {
+      import("../lib/notification-service").then(({ dispatchNotification }) => {
+        dispatchNotification({
+          eventType: "offer_letter_issued", module: "recruitment",
+          recipientEmail: candidate.email, recipientName: `${candidate.firstName} ${candidate.lastName}`,
+          variables: { jobTitle: row.jobTitle, joiningDate: row.joiningDate ?? "", offerCode: row.offerCode, recipientName: `${candidate.firstName} ${candidate.lastName}` },
+          entityType: "offer_letter", entityId: id,
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+
     res.json(row);
   } catch (err) {
     console.error(err);

@@ -282,6 +282,8 @@ function getDefaultSubject(eventType: string): string {
     helpdesk_ticket_raised: "Helpdesk Ticket Assigned to You",
     helpdesk_sla_breach: "⚠️ SLA Breach Alert — Helpdesk Ticket",
     exit_clearance_completed: "Exit Clearance Completed — FnF Initiation Required",
+    exit_clearance_done: "Your Exit Clearance is Complete",
+    exit_initiated: "Your Exit Request Has Been Processed",
     id_card_generated: "Your ID Card is Ready",
   };
   return subjects[eventType] ?? `Notification: ${eventType}`;
@@ -297,12 +299,14 @@ function getDefaultEmailBody(eventType: string, vars: Record<string, string>): s
     leave_rejected: `${greet}<p>Your leave request from <strong>${vars.fromDate ?? ""}</strong> to <strong>${vars.toDate ?? ""}</strong> has been <strong style="color:red">rejected</strong>.</p><p>Reason: ${vars.reason ?? "Not provided"}</p>`,
     payslip_published: `${greet}<p>Your payslip for <strong>${vars.period ?? "the current period"}</strong> is now available. Log in to your ESS portal to view and download.</p>`,
     payroll_locked: `${greet}<p>The payroll for period <strong>${vars.period ?? ""}</strong> has been locked. Please complete all final processing steps.</p>`,
-    offer_letter_issued: `${greet}<p>Congratulations! An offer letter has been issued for the position of <strong>${vars.designation ?? ""}</strong>. Please review and respond within <strong>${vars.deadline ?? "the specified time"}</strong>.</p>`,
     onboarding_access: `${greet}<p>Welcome to Automystics Technologies! Your pre-onboarding portal is now active. Please complete your checklist before your joining date of <strong>${vars.joiningDate ?? ""}</strong>.</p>`,
-    document_issued: `${greet}<p>A document (<strong>${vars.documentName ?? "document"}</strong>) has been issued to you. Log in to MysticsHR to download it securely.</p>`,
+    document_issued: `${greet}<p>A document (<strong>${vars.documentType ?? "document"}</strong>) has been issued to you. Log in to MysticsHR to download it securely.</p>`,
     helpdesk_ticket_raised: `${greet}<p>A helpdesk ticket (<strong>#${vars.ticketId ?? ""}</strong>) has been assigned to you: <em>${vars.subject ?? ""}</em>.</p><p>SLA Deadline: <strong>${vars.slaDeadline ?? ""}</strong></p>`,
     helpdesk_sla_breach: `${greet}<p>⚠️ Helpdesk ticket <strong>#${vars.ticketId ?? ""}</strong> has breached its SLA deadline. Immediate action is required.</p>`,
     exit_clearance_completed: `${greet}<p>Exit clearance for <strong>${vars.employeeName ?? "an employee"}</strong> (${vars.employeeId ?? ""}) is fully completed. Please initiate the Final & Full Settlement process.</p>`,
+    exit_clearance_done: `${greet}<p>Your exit clearance has been completed. HR will initiate your Full and Final Settlement shortly. Thank you for your contributions to Automystics Technologies.</p>`,
+    exit_initiated: `${greet}<p>Your exit request status has been updated to <strong>${vars.status ?? "Clearance Pending"}</strong>. Please complete all clearance tasks in the MysticsHR portal.</p>`,
+    offer_letter_issued: `${greet}<p>Congratulations! An offer letter for the position of <strong>${vars.jobTitle ?? ""}</strong> has been issued to you with offer code <strong>${vars.offerCode ?? ""}</strong>. Your proposed joining date is <strong>${vars.joiningDate ?? ""}</strong>. Please log in to MysticsHR to review and accept.</p>`,
     id_card_generated: `${greet}<p>Your ID card is now ready. Log in to MysticsHR to download it.</p>`,
   };
 

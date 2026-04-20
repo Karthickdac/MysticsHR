@@ -431,18 +431,21 @@ router.post("/payroll/locks/:year/:month/lock", requireHrmsUser, requireRole(...
       [lock] = await db.insert(payrollLocksTable).values({ year, month, isLocked: true, lockedById: req.hrmsUser!.id, lockedAt: new Date() }).returning();
     }
     await logAudit({ user: req.hrmsUser, action: "PAYROLL_LOCK", module: "Payroll", recordId: lock.id, newValue: `${year}-${month}`, ipAddress: req.ip });
-    // Notify HR managers about payroll lock
+    // Notify all HR + Payroll Admin users about payroll lock
     const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const periodLabel = `${monthNames[(month - 1) % 12]} ${year}`;
-    import("../lib/notification-service").then(({ dispatchNotification }) => {
-      dispatchNotification({
-        eventType: "payroll_locked", module: "payroll",
-        recipientEmail: req.hrmsUser!.email,
-        recipientName: req.hrmsUser!.name,
-        variables: { period: periodLabel, recipientName: req.hrmsUser!.name },
-        entityType: "payroll_lock", entityId: lock.id,
-      }).catch(() => {});
-    });
+    import("../lib/notification-service").then(async ({ dispatchNotification }) => {
+      const { getUsersByRoles } = await import("./system-config");
+      const recipients = await getUsersByRoles(["super_admin", "hr_manager", "payroll_admin"]);
+      await Promise.allSettled(recipients.map(u =>
+        dispatchNotification({
+          eventType: "payroll_locked", module: "payroll",
+          recipientEmail: u.email, recipientName: u.name,
+          variables: { period: periodLabel, recipientName: u.name },
+          entityType: "payroll_lock", entityId: lock.id,
+        })
+      ));
+    }).catch(() => {});
     res.json(lock);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -922,6 +925,22 @@ router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole(...PAYROLL
     }
 
     await logAudit({ user: req.hrmsUser, action: "PAYROLL_APPROVE", module: "Payroll", recordId: runId, newValue: `${run.periodYear}-${run.periodMonth}`, ipAddress: req.ip });
+    // Notify each employee that their payslip is available
+    const monthName = new Date(run.periodYear, run.periodMonth - 1).toLocaleString("en-IN", { month: "long" });
+    const period = `${monthName} ${run.periodYear}`;
+    import("../lib/notification-service").then(async ({ dispatchNotification }) => {
+      await Promise.allSettled(records.map(async record => {
+        const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+          .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, record.employeeId)).limit(1);
+        if (!empUser?.email) return;
+        return dispatchNotification({
+          eventType: "payslip_published", module: "payroll",
+          recipientEmail: empUser.email, recipientName: empUser.name,
+          variables: { period, recipientName: empUser.name },
+          entityType: "payroll_run", entityId: runId,
+        });
+      }));
+    }).catch(() => {});
     res.json({ message: "Payroll approved and payslips generated." });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
