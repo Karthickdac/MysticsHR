@@ -96,8 +96,9 @@ export default function ExitDetailPage() {
     computeFnf.mutate({ id, data: fnfForm as any }, { onSuccess: () => setFnfModal(false) });
   }
 
-  function handleApproveFnf(approverRole: "hr" | "finance") {
-    approveFnf.mutate({ id, data: { approverRole } as any });
+  function handleApproveFnf() {
+    // approverRole is derived server-side from the user's session role
+    approveFnf.mutate({ id, data: {} as any });
   }
 
   function handleSubmitInterview(e: React.FormEvent) {
@@ -324,8 +325,8 @@ export default function ExitDetailPage() {
                         <CheckCircle2 className="w-4 h-4" />
                         Approved
                       </div>
-                    ) : isHr && hrmsUser?.role === "hr_manager" ? (
-                      <Button size="sm" className="mt-2 h-7 text-xs" onClick={() => handleApproveFnf("hr")}>
+                    ) : isHr && (hrmsUser?.role === "hr_manager" || hrmsUser?.role === "super_admin") ? (
+                      <Button size="sm" className="mt-2 h-7 text-xs" onClick={() => handleApproveFnf()}>
                         Approve (HR)
                       </Button>
                     ) : (
@@ -339,8 +340,8 @@ export default function ExitDetailPage() {
                         <CheckCircle2 className="w-4 h-4" />
                         Approved
                       </div>
-                    ) : isHr ? (
-                      <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => handleApproveFnf("finance")}>
+                    ) : hrmsUser?.role === "payroll_admin" || hrmsUser?.role === "super_admin" ? (
+                      <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => handleApproveFnf()}>
                         Approve (Finance)
                       </Button>
                     ) : (

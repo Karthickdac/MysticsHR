@@ -19,6 +19,8 @@ import {
   helpdeskTicketsTable,
   reportSchedulesTable,
   savedReportTemplatesTable,
+  permissionApplicationsTable,
+  permissionRegistersTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, sql, desc, count, or } from "drizzle-orm";
 
@@ -443,6 +445,210 @@ router.get("/reports/recruitment-pipeline", requireHrmsUser, requireRole(...MANA
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── PERMISSION USAGE REPORT ──────────────────────────────────────────────────
+router.get("/reports/permission-usage", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const { fromDate, toDate, departmentId, status } = req.query as Record<string, string>;
+
+    const conds: ReturnType<typeof eq>[] = [];
+    if (fromDate) conds.push(gte(permissionApplicationsTable.permissionDate, fromDate));
+    if (toDate) conds.push(lte(permissionApplicationsTable.permissionDate, toDate));
+    if (status) conds.push(eq(permissionApplicationsTable.status, status as "Pending" | "Approved" | "Rejected"));
+
+    const rows = await db.select({
+      id: permissionApplicationsTable.id,
+      employeeId: permissionApplicationsTable.employeeId,
+      permissionDate: permissionApplicationsTable.permissionDate,
+      startTime: permissionApplicationsTable.startTime,
+      endTime: permissionApplicationsTable.endTime,
+      durationMinutes: permissionApplicationsTable.durationMinutes,
+      reason: permissionApplicationsTable.reason,
+      status: permissionApplicationsTable.status,
+      isOverride: permissionApplicationsTable.isOverride,
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      employeeCode: employeesTable.employeeId,
+      department: departmentsTable.name,
+    }).from(permissionApplicationsTable)
+      .leftJoin(employeesTable, eq(permissionApplicationsTable.employeeId, employeesTable.id))
+      .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+      .where(and(
+        ...(conds.length ? conds : [sql`1=1`]),
+        ...(departmentId ? [eq(employeesTable.departmentId, Number(departmentId))] : []),
+      ))
+      .orderBy(desc(permissionApplicationsTable.permissionDate));
+
+    const data = rows.map(r => ({
+      ...r,
+      employeeName: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : null,
+      durationHours: Number((r.durationMinutes / 60).toFixed(2)),
+    }));
+
+    // Monthly register summary
+    const register = await db.select({
+      employeeId: permissionRegistersTable.employeeId,
+      year: permissionRegistersTable.year,
+      month: permissionRegistersTable.month,
+      usedMinutes: permissionRegistersTable.usedMinutes,
+      limitMinutes: permissionRegistersTable.limitMinutes,
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      department: departmentsTable.name,
+    }).from(permissionRegistersTable)
+      .leftJoin(employeesTable, eq(permissionRegistersTable.employeeId, employeesTable.id))
+      .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+      .where(departmentId ? eq(employeesTable.departmentId, Number(departmentId)) : sql`1=1`)
+      .orderBy(desc(permissionRegistersTable.year), desc(permissionRegistersTable.month));
+
+    res.json({ data, total: data.length, registerSummary: register });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── HELPDESK SLA REPORT ──────────────────────────────────────────────────────
+router.get("/reports/helpdesk-sla", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const { fromDate, toDate, priority, status } = req.query as Record<string, string>;
+
+    const conds: ReturnType<typeof eq>[] = [];
+    if (fromDate) conds.push(gte(helpdeskTicketsTable.createdAt, new Date(fromDate)));
+    if (toDate) conds.push(lte(helpdeskTicketsTable.createdAt, new Date(toDate)));
+    if (priority) conds.push(eq(helpdeskTicketsTable.priority, priority as "Low" | "Medium" | "High" | "Urgent"));
+    if (status) conds.push(eq(helpdeskTicketsTable.status, status as "Open" | "In Progress" | "Resolved" | "Closed"));
+
+    const rows = await db.select({
+      id: helpdeskTicketsTable.id,
+      subject: helpdeskTicketsTable.subject,
+      category: helpdeskTicketsTable.category,
+      priority: helpdeskTicketsTable.priority,
+      status: helpdeskTicketsTable.status,
+      slaBreached: helpdeskTicketsTable.slaBreached,
+      slaDeadline: helpdeskTicketsTable.slaDeadline,
+      resolvedAt: helpdeskTicketsTable.resolvedAt,
+      closedAt: helpdeskTicketsTable.closedAt,
+      createdAt: helpdeskTicketsTable.createdAt,
+      assigneeName: hrmsUsersTable.name,
+      raisedBy: employeesTable.firstName,
+      raisedByLast: employeesTable.lastName,
+      department: departmentsTable.name,
+    }).from(helpdeskTicketsTable)
+      .leftJoin(hrmsUsersTable, eq(helpdeskTicketsTable.assignedToUserId, hrmsUsersTable.id))
+      .leftJoin(employeesTable, eq(helpdeskTicketsTable.raisedByEmployeeId, employeesTable.id))
+      .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(helpdeskTicketsTable.createdAt));
+
+    const data = rows.map(r => {
+      const resolvedMs = r.resolvedAt && r.createdAt
+        ? r.resolvedAt.getTime() - r.createdAt.getTime()
+        : null;
+      return {
+        ...r,
+        raisedByName: r.raisedBy && r.raisedByLast ? `${r.raisedBy} ${r.raisedByLast}` : null,
+        resolutionHours: resolvedMs !== null ? Math.round(resolvedMs / 36000) / 100 : null,
+      };
+    });
+
+    // Summary: breach counts by priority
+    const breachSummary = ["Low", "Medium", "High", "Urgent"].map(p => ({
+      priority: p,
+      total: data.filter(r => r.priority === p).length,
+      breached: data.filter(r => r.priority === p && r.slaBreached).length,
+      avgResolutionHours: (() => {
+        const resolved = data.filter(r => r.priority === p && r.resolutionHours !== null);
+        return resolved.length > 0 ? Math.round(resolved.reduce((s, r) => s + (r.resolutionHours ?? 0), 0) / resolved.length * 100) / 100 : null;
+      })(),
+    }));
+
+    res.json({ data, total: data.length, breachSummary });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── STATUTORY COMPLIANCE REPORT ──────────────────────────────────────────────
+// Summarizes PF (12% employer + 12% employee) and ESI (3.25% employer + 0.75% employee) contributions from payroll data
+router.get("/reports/statutory-compliance", requireHrmsUser, requireRole(...HR_ROLES, "payroll_admin"), async (req, res) => {
+  try {
+    const { month, year, departmentId } = req.query as Record<string, string>;
+
+    const PF_WAGE_CEILING = 15000; // INR — PF computed on min(basic, 15000)
+    const EPF_EMPLOYER_RATE = 0.12;
+    const EPF_EMPLOYEE_RATE = 0.12;
+    const ESI_WAGE_CEILING = 21000;
+    const ESI_EMPLOYER_RATE = 0.0325;
+    const ESI_EMPLOYEE_RATE = 0.0075;
+
+    const runConds: ReturnType<typeof eq>[] = [];
+    if (month) runConds.push(eq(payrollRunsTable.month, Number(month)));
+    if (year) runConds.push(eq(payrollRunsTable.year, Number(year)));
+
+    const runs = await db.select().from(payrollRunsTable)
+      .where(runConds.length ? and(...runConds) : undefined)
+      .orderBy(desc(payrollRunsTable.year), desc(payrollRunsTable.month));
+
+    if (runs.length === 0) { res.json({ data: [], total: 0, summary: {} }); return; }
+
+    const runId = runs[0].id;
+    const rows = await db.select({
+      employeeId: payrollRecordsTable.employeeId,
+      grossEarnings: payrollRecordsTable.grossEarnings,
+      netPay: payrollRecordsTable.netPay,
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      employeeCode: employeesTable.employeeId,
+      department: departmentsTable.name,
+      ctc: employeesTable.ctc,
+    }).from(payrollRecordsTable)
+      .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
+      .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+      .where(and(
+        eq(payrollRecordsTable.payrollRunId, runId),
+        ...(departmentId ? [eq(employeesTable.departmentId, Number(departmentId))] : []),
+      ))
+      .orderBy(employeesTable.firstName);
+
+    const data = rows.map(r => {
+      const gross = Number(r.grossEarnings ?? 0);
+      // Approximate basic as 40% of gross for PF purposes (customize per salary structure)
+      const basicForPf = Math.min(gross * 0.4, PF_WAGE_CEILING);
+      const pfEmployer = Math.round(basicForPf * EPF_EMPLOYER_RATE);
+      const pfEmployee = Math.round(basicForPf * EPF_EMPLOYEE_RATE);
+
+      const esiEligible = gross <= ESI_WAGE_CEILING;
+      const esiEmployer = esiEligible ? Math.round(gross * ESI_EMPLOYER_RATE) : 0;
+      const esiEmployee = esiEligible ? Math.round(gross * ESI_EMPLOYEE_RATE) : 0;
+
+      return {
+        employeeId: r.employeeId,
+        employeeCode: r.employeeCode,
+        employeeName: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : null,
+        department: r.department,
+        grossEarnings: gross,
+        pfEmployer,
+        pfEmployee,
+        pfTotal: pfEmployer + pfEmployee,
+        esiEligible,
+        esiEmployer,
+        esiEmployee,
+        esiTotal: esiEmployer + esiEmployee,
+        totalStatutory: pfEmployer + pfEmployee + esiEmployer + esiEmployee,
+      };
+    });
+
+    const summary = {
+      month: runs[0].month,
+      year: runs[0].year,
+      totalPfEmployer: data.reduce((s, r) => s + r.pfEmployer, 0),
+      totalPfEmployee: data.reduce((s, r) => s + r.pfEmployee, 0),
+      totalEsiEmployer: data.reduce((s, r) => s + r.esiEmployer, 0),
+      totalEsiEmployee: data.reduce((s, r) => s + r.esiEmployee, 0),
+      totalStatutory: data.reduce((s, r) => s + r.totalStatutory, 0),
+      headcount: data.length,
+      esiEligibleCount: data.filter(r => r.esiEligible).length,
+    };
+
+    res.json({ data, total: data.length, summary, runId, month: runs[0].month, year: runs[0].year });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 // ─── REPORT SCHEDULES ─────────────────────────────────────────────────────────
 router.get("/report-schedules", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
@@ -540,6 +746,8 @@ router.delete("/report-templates/:id", requireHrmsUser, requireRole(...MANAGER_R
 });
 
 // ─── CUSTOM REPORT RUNNER ─────────────────────────────────────────────────────
+// Applies filters from the request body to the underlying employee dataset.
+// Supported filters: departmentId, designationId, employmentType, status, location, isActive
 router.post("/reports/custom", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
     const { reportType, selectedFields, filters = {} } = req.body;
@@ -547,22 +755,23 @@ router.post("/reports/custom", requireHrmsUser, requireRole(...MANAGER_ROLES), a
       res.status(400).json({ error: "reportType and selectedFields are required" }); return;
     }
 
-    // Run the base report based on reportType and filter/select the requested fields
-    const VALID_REPORTS: Record<string, string> = {
-      "employee-directory": "/reports/employee-directory",
-      "attendance-summary": "/reports/attendance-summary",
-      "leave-utilization": "/reports/leave-utilization",
-      "headcount": "/reports/headcount",
-      "attrition": "/reports/attrition",
-      "performance-summary": "/reports/performance-summary",
-      "recruitment-pipeline": "/reports/recruitment-pipeline",
-    };
-
-    if (!VALID_REPORTS[reportType]) {
+    const VALID_REPORT_TYPES = new Set([
+      "employee-directory", "attendance-summary", "leave-utilization", "headcount",
+      "attrition", "performance-summary", "recruitment-pipeline",
+      "permission-usage", "helpdesk-sla", "statutory-compliance",
+    ]);
+    if (!VALID_REPORT_TYPES.has(reportType)) {
       res.status(400).json({ error: `Unknown reportType: ${reportType}` }); return;
     }
 
-    // Re-use existing report logic by querying employees with field selection
+    // Build filter conditions from the provided filters object
+    const conds: ReturnType<typeof eq>[] = [eq(employeesTable.isActive, true)];
+    if (filters.departmentId) conds.push(eq(employeesTable.departmentId, Number(filters.departmentId)));
+    if (filters.designationId) conds.push(eq(employeesTable.designationId, Number(filters.designationId)));
+    if (filters.employmentType) conds.push(eq(employeesTable.employmentType, filters.employmentType));
+    if (filters.status) conds.push(eq(employeesTable.status, filters.status));
+    if (filters.location) conds.push(eq(employeesTable.location, filters.location));
+
     const allEmployees = await db.select({
       id: employeesTable.id,
       employeeCode: employeesTable.employeeId,
@@ -582,22 +791,23 @@ router.post("/reports/custom", requireHrmsUser, requireRole(...MANAGER_ROLES), a
     }).from(employeesTable)
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
       .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
-      .where(eq(employeesTable.isActive, true))
+      .where(and(...conds))
       .orderBy(employeesTable.firstName);
 
-    const allFields = Object.keys(allEmployees[0] ?? {});
-    const fields = selectedFields.filter((f: string) => allFields.includes(f));
+    // Validate selectedFields against available fields to prevent injection
+    const availableFields = new Set(Object.keys(allEmployees[0] ?? {}));
+    const fields = selectedFields.filter((f: string) => availableFields.has(f));
 
     const data = allEmployees.map(row => {
-      const filtered: Record<string, any> = {};
+      const filtered: Record<string, unknown> = {};
       for (const field of fields) {
-        filtered[field] = (row as any)[field];
+        filtered[field] = (row as Record<string, unknown>)[field];
       }
       filtered.employeeName = `${row.firstName} ${row.lastName}`;
       return filtered;
     });
 
-    res.json({ data, total: data.length });
+    res.json({ data, total: data.length, appliedFilters: filters, reportType });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

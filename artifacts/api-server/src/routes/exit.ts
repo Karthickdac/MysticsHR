@@ -13,6 +13,8 @@ import {
   leaveTypesTable,
   issuedDocumentsTable,
   documentTemplatesTable,
+  payrollRecordsTable,
+  payrollRunsTable,
 } from "@workspace/db/schema";
 import { eq, and, desc, or, sql } from "drizzle-orm";
 import { logAudit } from "../lib/audit";
@@ -225,6 +227,12 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
     const [existing] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Exit request not found" }); return; }
 
+    // Notice period waiver/buyout requires HR Manager or super_admin authorization
+    if ((noticePeriodWaived === true || noticePeriodBuyout === true) &&
+        u.role !== "super_admin" && u.role !== "hr_manager") {
+      res.status(403).json({ error: "Only HR Manager or Super Admin can waive or buyout notice periods" }); return;
+    }
+
     const updates: Partial<typeof exitRequestsTable.$inferInsert> = { updatedAt: new Date() };
     if (status !== undefined) updates.status = status;
     if (actualLwd !== undefined) updates.actualLwd = actualLwd;
@@ -266,7 +274,21 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
 // ─── LIST CLEARANCE TASKS ─────────────────────────────────────────────────────
 router.get("/exit/requests/:id/clearance-tasks", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
+    const u = req.hrmsUser!;
     const id = Number(req.params.id);
+    const isHr = (HR_ROLES as readonly string[]).includes(u.role);
+
+    // Verify the exit request exists and enforce ownership for non-HR users
+    const [exitReq] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, id));
+    if (!exitReq) { res.status(404).json({ error: "Exit request not found" }); return; }
+
+    if (!isHr) {
+      const emp = await getEmployeeForUser(u.id);
+      if (!emp || emp.id !== exitReq.employeeId) {
+        res.status(403).json({ error: "Access denied" }); return;
+      }
+    }
+
     const rows = await db.select({
       id: exitClearanceTasksTable.id,
       exitRequestId: exitClearanceTasksTable.exitRequestId,
@@ -288,6 +310,8 @@ router.get("/exit/requests/:id/clearance-tasks", requireHrmsUser, requireRole(..
 });
 
 // ─── UPDATE CLEARANCE TASK ────────────────────────────────────────────────────
+// Authorization: HR roles can complete/waive any task.
+// Non-HR users may only update a task if they are explicitly assigned to it.
 router.put("/exit/clearance-tasks/:taskId", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
@@ -297,6 +321,18 @@ router.put("/exit/clearance-tasks/:taskId", requireHrmsUser, requireRole(...ALL_
 
     const [task] = await db.select().from(exitClearanceTasksTable).where(eq(exitClearanceTasksTable.id, taskId));
     if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+
+    const isHr = (HR_ROLES as readonly string[]).includes(u.role);
+    if (!isHr) {
+      // Non-HR users must be explicitly assigned to this task
+      if (task.assignedToUserId !== u.id) {
+        res.status(403).json({ error: "You are not authorized to update this clearance task" }); return;
+      }
+      // Non-HR users cannot Waive — only HR can waive
+      if (status === "Waived") {
+        res.status(403).json({ error: "Only HR can waive clearance tasks" }); return;
+      }
+    }
 
     const updates: Partial<typeof exitClearanceTasksTable.$inferInsert> = { status };
     if (remarks !== undefined) updates.remarks = remarks;
@@ -323,6 +359,98 @@ router.put("/exit/clearance-tasks/:taskId", requireHrmsUser, requireRole(...ALL_
     }
 
     res.json({ ...updated, assigneeName: null });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── SUGGEST FnF VALUES (auto-compute from payroll + leave data) ──────────────
+router.get("/exit/requests/:id/fnf/suggest", requireHrmsUser, requireRole(...HR_ROLES, "payroll_admin"), async (req, res) => {
+  try {
+    const exitRequestId = Number(req.params.id);
+    const [exitReq] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, exitRequestId));
+    if (!exitReq) { res.status(404).json({ error: "Exit request not found" }); return; }
+
+    const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, exitReq.employeeId));
+    if (!emp) { res.status(404).json({ error: "Employee not found" }); return; }
+
+    // ── Last payroll record ──────────────────────────────────────────────────
+    const latestPayrollRun = await db.select().from(payrollRunsTable)
+      .where(eq(payrollRunsTable.status, "Approved"))
+      .orderBy(desc(payrollRunsTable.year), desc(payrollRunsTable.month))
+      .limit(1);
+
+    let pendingSalary = 0;
+    let dailyRate = 0;
+    if (latestPayrollRun.length > 0) {
+      const [record] = await db.select().from(payrollRecordsTable)
+        .where(and(
+          eq(payrollRecordsTable.payrollRunId, latestPayrollRun[0].id),
+          eq(payrollRecordsTable.employeeId, exitReq.employeeId),
+        ));
+      if (record) {
+        const gross = Number(record.grossEarnings ?? 0);
+        const present = Number(record.presentDays ?? 26);
+        dailyRate = present > 0 ? gross / present : gross / 26;
+        // Pending salary is the last month's net pay as the baseline
+        pendingSalary = Number(record.netPay ?? 0);
+      }
+    }
+
+    // Fallback: derive daily rate from CTC
+    if (dailyRate === 0 && emp.ctc) {
+      dailyRate = Number(emp.ctc) / 12 / 26;
+    }
+
+    // ── Gratuity (Gratuity Act: tenure >= 5 yrs, formula = 15 × last salary/26 × years) ──
+    let gratuity = 0;
+    const tenureYears = emp.dateOfJoining
+      ? (Date.now() - new Date(emp.dateOfJoining).getTime()) / (1000 * 60 * 60 * 24 * 365)
+      : 0;
+    if (tenureYears >= 5) {
+      const monthlySalary = dailyRate * 26;
+      gratuity = Math.round((15 * monthlySalary / 26) * Math.floor(tenureYears));
+    }
+
+    // ── Leave encashment (earned leave with encashment enabled) ──────────────
+    let leaveEncashment = 0;
+    const balances = await db.select({
+      available: leaveBalancesTable.available,
+      encashmentEnabled: leaveTypesTable.encashmentEnabled,
+    }).from(leaveBalancesTable)
+      .leftJoin(leaveTypesTable, eq(leaveBalancesTable.leaveTypeId, leaveTypesTable.id))
+      .where(eq(leaveBalancesTable.employeeId, exitReq.employeeId));
+
+    for (const b of balances) {
+      if (b.encashmentEnabled) {
+        leaveEncashment += Number(b.available ?? 0) * dailyRate;
+      }
+    }
+    leaveEncashment = Math.round(leaveEncashment);
+
+    // ── Notice period short-fall LOP ─────────────────────────────────────────
+    let noticePeriodLop = 0;
+    if (!exitReq.noticePeriodWaived && !exitReq.noticePeriodBuyout && exitReq.requestedLwd && exitReq.actualLwd) {
+      const requestedLwdDate = new Date(exitReq.requestedLwd);
+      const actualLwdDate = new Date(exitReq.actualLwd);
+      const shortfallDays = Math.max(0, Math.round((requestedLwdDate.getTime() - actualLwdDate.getTime()) / (1000 * 60 * 60 * 24)));
+      noticePeriodLop = Math.round(shortfallDays * dailyRate);
+    }
+
+    res.json({
+      pendingSalary: Math.round(pendingSalary),
+      leaveEncashment,
+      gratuity,
+      bonusProration: 0,
+      noticePeriodLop,
+      otherDeductions: 0,
+      dailyRate: Math.round(dailyRate * 100) / 100,
+      tenureYears: Math.round(tenureYears * 10) / 10,
+      notes: {
+        pendingSalary: "Based on last approved payroll net pay",
+        leaveEncashment: `Based on ${balances.filter(b => b.encashmentEnabled).length} encashable leave type(s)`,
+        gratuity: tenureYears >= 5 ? `Eligible — ${Math.floor(tenureYears)} years tenure` : "Not eligible — tenure < 5 years",
+        noticePeriodLop: exitReq.noticePeriodWaived ? "Waived" : exitReq.noticePeriodBuyout ? "Buyout" : `Short-fall LOP estimate`,
+      },
+    });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
@@ -414,22 +542,28 @@ router.post("/exit/requests/:id/fnf", requireHrmsUser, requireRole(...HR_ROLES, 
 });
 
 // ─── APPROVE FnF ──────────────────────────────────────────────────────────────
+// approverRole is derived server-side from the user's session role — never trusted from the request body.
+// HR roles (super_admin, hr_manager, hr_executive) → provide HR approval
+// Finance roles (payroll_admin) → provide Finance approval
 router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR_ROLES, "payroll_admin"), async (req, res) => {
   try {
     const u = req.hrmsUser!;
     const exitRequestId = Number(req.params.id);
-    const { approverRole, remarks } = req.body;
-    if (!approverRole) { res.status(400).json({ error: "approverRole is required" }); return; }
+    const { remarks } = req.body;
+
+    // Derive approver lane from session role — never trust client-supplied value
+    const isHrRole = (HR_ROLES as readonly string[]).includes(u.role);
+    const approverLane: "hr" | "finance" = isHrRole ? "hr" : "finance";
 
     const [fnf] = await db.select().from(fnfComputationsTable)
       .where(eq(fnfComputationsTable.exitRequestId, exitRequestId));
     if (!fnf) { res.status(404).json({ error: "FnF computation not found — compute FnF first" }); return; }
 
     const updates: Partial<typeof fnfComputationsTable.$inferInsert> = { updatedAt: new Date() };
-    if (approverRole === "hr") {
+    if (approverLane === "hr") {
       updates.hrApprovedByUserId = u.id;
       updates.hrApprovedAt = new Date();
-    } else if (approverRole === "finance") {
+    } else {
       updates.financeApprovedByUserId = u.id;
       updates.financeApprovedAt = new Date();
     }
@@ -459,18 +593,22 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
             .where(and(eq(documentTemplatesTable.documentType, docType), eq(documentTemplatesTable.isActive, true)))
             .limit(1);
           if (tmpl) {
-            await db.insert(issuedDocumentsTable).values({
-              employeeId: exitReq.employeeId,
-              templateId: tmpl.id,
-              documentType: docType,
-              filename: `${docType.replace(/ /g, "_")}_${exitReq.employeeId}_${Date.now()}.pdf`,
-              generatedBy: u.id,
-              fieldValues: {
-                lastWorkingDay: exitReq.actualLwd ?? exitReq.requestedLwd,
-                currentDate: new Date().toLocaleDateString("en-IN"),
-              },
-              fileContent: "PENDING_GENERATION",
-            }).catch(() => {}); // Non-blocking — actual PDF generated separately
+            try {
+              await db.insert(issuedDocumentsTable).values({
+                employeeId: exitReq.employeeId,
+                templateId: tmpl.id,
+                documentType: docType,
+                filename: `${docType.replace(/ /g, "_")}_${exitReq.employeeId}_${Date.now()}.pdf`,
+                generatedBy: u.id,
+                fieldValues: {
+                  lastWorkingDay: exitReq.actualLwd ?? exitReq.requestedLwd,
+                  currentDate: new Date().toLocaleDateString("en-IN"),
+                },
+                fileContent: "PENDING_GENERATION",
+              });
+            } catch (docErr) {
+              console.error(`[FnF] Failed to issue ${docType} for employee ${exitReq.employeeId}:`, docErr);
+            }
           }
         }
       }
