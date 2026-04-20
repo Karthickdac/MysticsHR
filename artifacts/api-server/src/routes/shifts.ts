@@ -91,37 +91,36 @@ router.patch("/shifts/templates/:id", requireHrmsUser, requireRole(...HR_ROLES),
       .where(eq(shiftTemplatesTable.id, templateId))
       .returning();
 
-    await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "ShiftTemplates", recordId: updated.id, newValue: JSON.stringify(body), ipAddress: req.ip });
-
-    // Payroll impact notification: if shift rate changed, return affected employees
+    // Payroll impact: if shift rate changed, compute and audit affected employees
     const oldRate = before.shiftRatePerHour;
     const newRate = updated.shiftRatePerHour;
-    let payrollImpact: { affectedCount: number; affectedEmployees: { id: number; firstName: string; lastName: string; employeeId: string }[] } | null = null;
-
     if (oldRate !== newRate) {
-      const affectedAssignments = await db
-        .select({
-          id: employeesTable.id,
-          firstName: employeesTable.firstName,
-          lastName: employeesTable.lastName,
-          employeeId: employeesTable.employeeId,
-        })
+      const today = new Date().toISOString().slice(0, 10);
+      const affectedEmployees = await db
+        .select({ id: employeesTable.id, firstName: employeesTable.firstName, lastName: employeesTable.lastName, employeeId: employeesTable.employeeId })
         .from(shiftAssignmentsTable)
         .innerJoin(employeesTable, eq(shiftAssignmentsTable.employeeId, employeesTable.id))
         .where(
           and(
             eq(shiftAssignmentsTable.shiftTemplateId, templateId),
-            or(isNull(shiftAssignmentsTable.effectiveTo), gte(shiftAssignmentsTable.effectiveTo, new Date().toISOString().slice(0, 10))),
+            or(isNull(shiftAssignmentsTable.effectiveTo), gte(shiftAssignmentsTable.effectiveTo, today)),
           )
         );
-
-      payrollImpact = {
-        affectedCount: affectedAssignments.length,
-        affectedEmployees: affectedAssignments,
-      };
+      // Audit payroll impact so HR can track which employees are affected
+      await logAudit({
+        user: req.hrmsUser,
+        action: "SHIFT_RATE_CHANGE",
+        module: "ShiftTemplates",
+        recordId: templateId,
+        previousValue: String(oldRate ?? "null"),
+        newValue: `${newRate ?? "null"} — affects ${affectedEmployees.length} employee(s): ${affectedEmployees.map(e => e.employeeId).join(", ")}`,
+        ipAddress: req.ip,
+      });
+    } else {
+      await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "ShiftTemplates", recordId: updated.id, newValue: JSON.stringify(body), ipAddress: req.ip });
     }
 
-    res.json({ template: updated, payrollImpact });
+    res.json(updated);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -409,9 +408,19 @@ router.post("/shift-swaps/:id/hod-action", requireHrmsUser, requireRole("super_a
 router.post("/shift-swaps/:id/hr-action", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const { action, remarks } = req.body as { action: "Approved" | "Rejected"; remarks?: string };
+    const swapId = Number(req.params.id);
+
+    // State machine: HR action is only permitted after HOD has approved
+    const [swap] = await db.select({ hodStatus: shiftSwapsTable.hodStatus }).from(shiftSwapsTable).where(eq(shiftSwapsTable.id, swapId));
+    if (!swap) { res.status(404).json({ error: "Not found" }); return; }
+    if (swap.hodStatus !== "Approved") {
+      res.status(422).json({ error: "HR action is not permitted until HOD has approved this swap request" });
+      return;
+    }
+
     const [updated] = await db.update(shiftSwapsTable)
       .set({ hrStatus: action, hrRemarks: remarks ?? null, hrActionedById: req.hrmsUser.id, hrActionedAt: new Date(), updatedAt: new Date() })
-      .where(eq(shiftSwapsTable.id, Number(req.params.id)))
+      .where(eq(shiftSwapsTable.id, swapId))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     await logAudit({ user: req.hrmsUser, action: `HR_${action.toUpperCase()}`, module: "ShiftSwaps", recordId: updated.id, newValue: action, ipAddress: req.ip });

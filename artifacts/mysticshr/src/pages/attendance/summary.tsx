@@ -8,6 +8,17 @@ import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 type SummaryRow = GetAttendanceSummaryQueryResult[number];
 
+interface SummaryTotals {
+  totalPresent: number;
+  totalAbsent: number;
+  totalHalfDay: number;
+  totalOnLeave: number;
+  totalWeekOff: number;
+  totalHoliday: number;
+  totalOvertimeMinutes: number;
+  totalMinutesWorked: number;
+}
+
 function monthLabel(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
 }
@@ -48,7 +59,7 @@ export default function AttendanceSummaryPage() {
     URL.revokeObjectURL(url);
   }
 
-  const totals = summaries.reduce((acc: any, s: SummaryRow) => ({
+  const totals = summaries.reduce((acc: SummaryTotals, s: SummaryRow) => ({
     totalPresent: acc.totalPresent + s.totalPresent,
     totalAbsent: acc.totalAbsent + s.totalAbsent,
     totalHalfDay: acc.totalHalfDay + s.totalHalfDay,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGetShiftsCalendar, useListEmployees } from "@workspace/api-client-react";
-import type { GetShiftsCalendarQueryResult } from "@workspace/api-client-react";
+import type { GetShiftsCalendarQueryResult, Employee } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -63,7 +63,7 @@ export default function ShiftCalendarPage() {
             <SelectTrigger className="w-52"><SelectValue placeholder="All Employees" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Employees</SelectItem>
-              {employees.map((e: any) => (
+              {employees.map((e: Employee) => (
                 <SelectItem key={e.id} value={e.id.toString()}>{e.firstName} {e.lastName}</SelectItem>
               ))}
             </SelectContent>

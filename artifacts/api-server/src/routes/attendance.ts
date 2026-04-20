@@ -50,6 +50,40 @@ function computeStatus(minutesWorked: number | null, minWorkingMins: number): At
 }
 
 /**
+ * Overtime occurs when the employee's sign-out time exceeds the shift end time
+ * by more than the configured overtime threshold. For night shifts (where endTime
+ * is numerically earlier than startTime, e.g. 22:00–06:00), the shift end is
+ * assumed to fall on the next calendar day.
+ *
+ * @param signOut       Actual sign-out timestamp (UTC)
+ * @param attendanceDate Date string "YYYY-MM-DD"
+ * @param shiftStartTime Shift start "HH:MM" (used to detect overnight shifts)
+ * @param shiftEndTime   Shift end   "HH:MM"
+ * @param thresholdMins  Minutes beyond shift end before OT kicks in
+ * @returns Overtime minutes (0 if none)
+ */
+function computeOvertimeMinutes(
+  signOut: Date | null,
+  attendanceDate: string,
+  shiftStartTime: string,
+  shiftEndTime: string,
+  thresholdMins: number,
+): number {
+  if (!signOut) return 0;
+  const [startH, startM] = shiftStartTime.split(":").map(Number);
+  const [endH, endM] = shiftEndTime.split(":").map(Number);
+  const crossesMidnight = endH * 60 + endM < startH * 60 + startM;
+
+  const [year, month, day] = attendanceDate.split("-").map(Number);
+  const shiftEnd = new Date(Date.UTC(year, month - 1, day, endH, endM, 0, 0));
+  if (crossesMidnight) shiftEnd.setUTCDate(shiftEnd.getUTCDate() + 1);
+
+  const excessMs = signOut.getTime() - shiftEnd.getTime();
+  const excessMins = Math.round(excessMs / 60000);
+  return excessMins > thresholdMins ? excessMins - thresholdMins : 0;
+}
+
+/**
  * Resolves the active shift template for a given employee on a given date.
  * Considers both open-ended assignments (effectiveTo IS NULL) and date-bounded
  * assignments that overlap the target date (effectiveTo >= date).
@@ -147,8 +181,8 @@ router.post("/attendance", requireHrmsUser, requireRole(...HR_ROLES), async (req
     const template = await getActiveShiftTemplate(body.employeeId, body.attendanceDate);
     const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
     const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
-    const overtimeMins = totalMins !== null && totalMins > minWorkingMins + overtimeThreshold
-      ? totalMins - minWorkingMins
+    const overtimeMins = template
+      ? computeOvertimeMinutes(signOut, body.attendanceDate, template.startTime, template.endTime, overtimeThreshold)
       : 0;
     const computedStatus: AttendanceStatus = body.status ?? computeStatus(totalMins, minWorkingMins);
 
@@ -362,7 +396,9 @@ router.post("/attendance/regularizations/:id/action", requireHrmsUser, requireRo
       const template = await getActiveShiftTemplate(reg.employeeId, reg.attendanceDate);
       const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
       const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
-      const overtimeMins = totalMins !== null && totalMins > minWorkingMins + overtimeThreshold ? totalMins - minWorkingMins : 0;
+      const overtimeMins = template
+        ? computeOvertimeMinutes(signOut, reg.attendanceDate, template.startTime, template.endTime, overtimeThreshold)
+        : 0;
       const newStatus: AttendanceStatus = computeStatus(totalMins, minWorkingMins);
       await db.update(attendanceRecordsTable)
         .set({ signInTime: signIn, signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, isHrOverride: false, updatedAt: new Date() })
@@ -428,7 +464,9 @@ router.patch("/attendance/:id", requireHrmsUser, requireRole(...HR_ROLES), async
     const template = await getActiveShiftTemplate(existing.employeeId, existing.attendanceDate);
     const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
     const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
-    const overtimeMins = totalMins !== null && totalMins > minWorkingMins + overtimeThreshold ? totalMins - minWorkingMins : 0;
+    const overtimeMins = template
+      ? computeOvertimeMinutes(signOut, existing.attendanceDate, template.startTime, template.endTime, overtimeThreshold)
+      : 0;
     const newStatus: AttendanceStatus = body.status ?? computeStatus(totalMins, minWorkingMins);
 
     const [updated] = await db.update(attendanceRecordsTable)

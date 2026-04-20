@@ -15,7 +15,7 @@ import {
   getGetShiftSwapsQueryKey,
   getGetEmployeesIdShiftAssignmentsQueryKey,
 } from "@workspace/api-client-react";
-import type { GetShiftsTemplatesQueryResult, GetShiftSwapsQueryResult } from "@workspace/api-client-react";
+import type { GetShiftsTemplatesQueryResult, GetShiftSwapsQueryResult, GetEmployeesIdShiftAssignmentsQueryResult, Employee } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,9 +32,24 @@ import { Link } from "wouter";
 
 type ShiftTemplate = GetShiftsTemplatesQueryResult[number];
 type ShiftSwap = GetShiftSwapsQueryResult[number];
+type ShiftAssignment = GetEmployeesIdShiftAssignmentsQueryResult[number];
 
 const SHIFT_TYPES = ["Fixed", "Flexible", "Rotational", "Night Shift"] as const;
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+interface TemplateFormValue {
+  name: string;
+  shiftType: string;
+  startTime: string;
+  endTime: string;
+  gracePeriodMinutes: number;
+  breakDurationMinutes: number;
+  minWorkingHoursMinutes: number;
+  overtimeThresholdMinutes: number;
+  weeklyOff: string[];
+  notes: string;
+  [key: string]: unknown;
+}
 
 const statusColors: Record<string, string> = {
   Pending: "bg-yellow-100 text-yellow-800",
@@ -43,7 +58,7 @@ const statusColors: Record<string, string> = {
 };
 
 function TemplateForm({ initial, onSave, onCancel, saving, error }: {
-  initial: any; onSave: (v: any) => void; onCancel: () => void; saving: boolean; error: string;
+  initial: TemplateFormValue; onSave: (v: TemplateFormValue) => void; onCancel: () => void; saving: boolean; error: string;
 }) {
   const [form, setForm] = useState(initial);
   const [weeklyOff, setWeeklyOff] = useState<string[]>(initial.weeklyOff ?? []);
@@ -150,20 +165,22 @@ export default function ShiftsPage() {
   const createAssign = usePostEmployeesIdShiftAssignments();
   const deleteAssign = useDeleteShiftAssignmentsId();
 
-  async function handleSaveTemplate(data: any) {
+  async function handleSaveTemplate(data: TemplateFormValue) {
     setTmplError("");
     if (!data.name || !data.startTime || !data.endTime) { setTmplError("Name, start time, and end time are required"); return; }
     try {
+      const apiData = { ...data, shiftType: data.shiftType as "Fixed" | "Flexible" | "Rotational" | "Night Shift" };
       if (editingTmpl) {
-        await patchTmpl.mutateAsync({ id: editingTmpl.id, data });
+        await patchTmpl.mutateAsync({ id: editingTmpl.id, data: apiData });
       } else {
-        await createTmpl.mutateAsync({ data });
+        await createTmpl.mutateAsync({ data: apiData });
       }
       await qc.invalidateQueries({ queryKey: getGetShiftsTemplatesQueryKey() });
       setShowTmplForm(false);
       setEditingTmpl(null);
-    } catch (e: any) {
-      setTmplError(e?.message ?? "Failed to save");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setTmplError(err?.message ?? "Failed to save");
     }
   }
 
@@ -184,8 +201,9 @@ export default function ShiftsPage() {
       await qc.invalidateQueries({ queryKey: getGetShiftSwapsQueryKey({}) });
       setSwapAction(null);
       setActionRemarks("");
-    } catch (e: any) {
-      alert(e?.message ?? "Action failed");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      alert(err?.message ?? "Action failed");
     }
   }
 
@@ -199,8 +217,9 @@ export default function ShiftsPage() {
       await createAssign.mutateAsync({ id: selectedEmpId, data: { shiftTemplateId: assignForm.shiftTemplateId, effectiveFrom: assignForm.effectiveFrom, effectiveTo: assignForm.effectiveTo || undefined } });
       await qc.invalidateQueries({ queryKey: getGetEmployeesIdShiftAssignmentsQueryKey(selectedEmpId) });
       setAssignForm({ shiftTemplateId: 0, effectiveFrom: "", effectiveTo: "" });
-    } catch (e: any) {
-      setAssignError(e?.message ?? "Failed to assign");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setAssignError(err?.message ?? "Failed to assign");
     }
   }
 
@@ -275,7 +294,7 @@ export default function ShiftsPage() {
                   <Select value={selectedEmpId?.toString() ?? ""} onValueChange={v => setSelectedEmpId(Number(v))}>
                     <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                     <SelectContent>
-                      {employees.map((e: any) => (
+                      {employees.map((e: Employee) => (
                         <SelectItem key={e.id} value={e.id.toString()}>{e.firstName} {e.lastName} ({e.employeeId})</SelectItem>
                       ))}
                     </SelectContent>
@@ -312,7 +331,7 @@ export default function ShiftsPage() {
                   <table className="w-full text-sm">
                     <thead><tr className="border-b"><th className="text-left py-1">Shift</th><th className="text-left py-1">From</th><th className="text-left py-1">To</th><th></th></tr></thead>
                     <tbody>
-                      {assignments.map((a: any) => (
+                      {assignments.map((a: ShiftAssignment) => (
                         <tr key={a.id} className="border-b last:border-0">
                           <td className="py-1">{a.shiftTemplateName}</td>
                           <td className="py-1">{a.effectiveFrom}</td>
@@ -373,7 +392,7 @@ export default function ShiftsPage() {
             <DialogTitle>{editingTmpl ? "Edit" : "New"} Shift Template</DialogTitle>
           </DialogHeader>
           <TemplateForm
-            initial={editingTmpl ? { ...editingTmpl } : blankTemplate}
+            initial={editingTmpl ? { ...editingTmpl, weeklyOff: editingTmpl.weeklyOff ?? [], notes: editingTmpl.notes ?? "" } : blankTemplate}
             onSave={handleSaveTemplate}
             onCancel={() => setShowTmplForm(false)}
             saving={createTmpl.isPending || patchTmpl.isPending}

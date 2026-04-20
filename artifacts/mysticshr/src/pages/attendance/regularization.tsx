@@ -5,7 +5,7 @@ import {
   usePostAttendanceRegularizationsIdAction,
   getGetAttendanceRegularizationsQueryKey,
 } from "@workspace/api-client-react";
-import type { GetAttendanceRegularizationsQueryResult } from "@workspace/api-client-react";
+import type { GetAttendanceRegularizationsQueryResult, GetAttendanceRegularizationsStatus } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,7 @@ export default function RegularizationPage() {
   const isEmployee = role === "employee";
 
   const [filterStatus, setFilterStatus] = useState("all");
-  const { data: requests = [], isLoading } = useGetAttendanceRegularizations(filterStatus === "all" ? {} : { status: filterStatus as any });
+  const { data: requests = [], isLoading } = useGetAttendanceRegularizations(filterStatus === "all" ? {} : { status: filterStatus as GetAttendanceRegularizationsStatus });
 
   const createReg = usePostAttendanceRegularizations();
   const actionReg = usePostAttendanceRegularizationsIdAction();
@@ -64,8 +64,9 @@ export default function RegularizationPage() {
       await qc.invalidateQueries({ queryKey: getGetAttendanceRegularizationsQueryKey({}) });
       setShowForm(false);
       setForm({ attendanceDate: "", requestedSignIn: "", requestedSignOut: "", reason: "" });
-    } catch (e: any) {
-      setFormError(e?.message ?? "Failed to submit");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setFormError(err?.message ?? "Failed to submit");
     }
   }
 
@@ -76,8 +77,9 @@ export default function RegularizationPage() {
       await qc.invalidateQueries({ queryKey: getGetAttendanceRegularizationsQueryKey({}) });
       setActionItem(null);
       setActionRemarks("");
-    } catch (e: any) {
-      alert(e?.message ?? "Action failed");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      alert(err?.message ?? "Action failed");
     }
   }
 
