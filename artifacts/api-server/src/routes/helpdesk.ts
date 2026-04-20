@@ -243,12 +243,13 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
 
     // Notify assignee about new ticket
     if (assignedToUserId) {
-      const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+      const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
         .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, assignedToUserId));
       if (assignee?.email) {
         dispatchNotification({
           eventType: "helpdesk_ticket_raised", module: "helpdesk",
           recipientEmail: assignee.email, recipientName: assignee.name ?? undefined,
+          recipientEmployeeDbId: assignee.employeeId,
           variables: {
             ticketId: String(ticket.id), subject, slaDeadline: slaDeadline.toISOString(),
             recipientName: assignee.name ?? "Team Member",

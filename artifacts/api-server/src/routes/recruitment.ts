@@ -873,6 +873,7 @@ router.post("/offers/:id/issue", requireHrmsUser, requireRole(...HR_WRITE_ROLES)
         dispatchNotification({
           eventType: "offer_letter_issued", module: "recruitment",
           recipientEmail: candidate.email, recipientName: `${candidate.firstName} ${candidate.lastName}`,
+          recipientCandidateId: row.candidateId,
           variables: { jobTitle: row.jobTitle, joiningDate: row.joiningDate ?? "", offerCode: row.offerCode, recipientName: `${candidate.firstName} ${candidate.lastName}` },
           entityType: "offer_letter", entityId: id,
         }).catch(() => {});

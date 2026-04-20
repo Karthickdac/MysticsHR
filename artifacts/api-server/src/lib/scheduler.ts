@@ -492,6 +492,7 @@ async function escalateSlaBreaches() {
           await dispatchNotification({
             eventType: "helpdesk_sla_breach", module: "helpdesk",
             recipientEmail: assignee.email, recipientName: assignee.name,
+            recipientEmployeeDbId: assignee.employeeId,
             variables: { ...vars, recipientName: assignee.name },
             entityType: "helpdesk_ticket", entityId: ticket.id,
           }).catch(() => {});
@@ -559,6 +560,7 @@ async function alertNoSignOut() {
       await dispatchNotification({
         eventType: "no_sign_out", module: "attendance",
         recipientEmail: empUser.email, recipientName: empUser.name ?? "",
+        recipientEmployeeDbId: record.employeeId,
         variables: { recipientName: empUser.name ?? "" },
       }).catch(() => {});
     }
@@ -590,6 +592,7 @@ async function alertOvertimeThreshold() {
       await dispatchNotification({
         eventType: "overtime_alert", module: "attendance",
         recipientEmail: empUser.email, recipientName: empUser.name ?? "",
+        recipientEmployeeDbId: record.employeeId,
         variables: { recipientName: empUser.name ?? "", hours: String(Math.floor((record.totalMinutesWorked ?? 0) / 60)) },
       }).catch(() => {});
     }
@@ -643,6 +646,7 @@ async function alertConsecutiveAbsences() {
         await dispatchNotification({
           eventType: "consecutive_absence", module: "attendance",
           recipientEmail: emp.email, recipientName: emp.name ?? "",
+          recipientEmployeeDbId: emp.id,
           variables: { days: String(absent), recipientName: emp.name ?? "" },
         }).catch(() => {});
       }
@@ -717,6 +721,7 @@ async function alertAttendanceAnomalies() {
       await dispatchNotification({
         eventType: "no_sign_in", module: "attendance",
         recipientEmail: emp.email, recipientName: emp.name ?? "",
+        recipientEmployeeDbId: emp.id,
         variables: { recipientName: emp.name ?? "" },
       }).catch(() => {});
     }

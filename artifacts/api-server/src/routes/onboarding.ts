@@ -146,6 +146,7 @@ router.post(
           dispatchNotification({
             eventType: "onboarding_access", module: "onboarding",
             recipientEmail: empUser.email, recipientName: empUser.name ?? "",
+            recipientEmployeeDbId: employeeId,
             variables: { recipientName: empUser.name ?? "" },
             entityType: "onboarding_checklist", entityId: checklist.id,
           }).catch(() => {});
@@ -604,6 +605,7 @@ router.get("/employees/:id/id-card", requireHrmsUser, requireRole(...HR_READ_ROL
         dispatchNotification({
           eventType: "id_card_generated", module: "onboarding",
           recipientEmail: emp.email, recipientName: empName,
+          recipientEmployeeDbId: emp.id,
           variables: { recipientName: empName, employeeId: String(emp.employeeId ?? "") },
           entityType: "onboarding_checklist", entityId: checklist.id,
         }).catch(() => {});

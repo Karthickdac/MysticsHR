@@ -370,6 +370,7 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
           await dispatchNotification({
             eventType, module: "exit",
             recipientEmail: empUser.email, recipientName: empUser.name,
+            recipientEmployeeDbId: existing.employeeId,
             variables: { status, recipientName: empUser.name },
             entityType: "exit_request", entityId: id,
           }).catch(() => {});
@@ -383,6 +384,7 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
             dispatchNotification({
               eventType: "exit_clearance_completed", module: "exit",
               recipientEmail: hr.email, recipientName: hr.name,
+              recipientEmployeeDbId: hr.employeeId,
               variables: { employeeName: empName, employeeId: String(existing.employeeId), recipientName: hr.name },
               entityType: "exit_request", entityId: id,
             })

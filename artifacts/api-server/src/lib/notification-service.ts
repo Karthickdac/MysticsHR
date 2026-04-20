@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import { db } from "./db";
-import { notificationLogsTable, notificationTemplatesTable, systemSettingsTable } from "@workspace/db/schema";
+import { notificationLogsTable, notificationTemplatesTable, systemSettingsTable, employeesTable, candidatesTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
 interface SendEmailOptions {
@@ -215,12 +215,30 @@ function interpolate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
 }
 
+/** Auto-resolve phone from employees table by DB employee row id */
+async function resolveEmployeePhone(employeeId?: number | null): Promise<string | undefined> {
+  if (!employeeId) return undefined;
+  const [row] = await db.select({ phone: employeesTable.phone }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+  return row?.phone ?? undefined;
+}
+
+/** Auto-resolve phone from candidates table by DB candidate row id */
+async function resolveCandidatePhone(candidateId?: number | null): Promise<string | undefined> {
+  if (!candidateId) return undefined;
+  const [row] = await db.select({ phone: candidatesTable.phone }).from(candidatesTable).where(eq(candidatesTable.id, candidateId)).limit(1);
+  return row?.phone ?? undefined;
+}
+
 export async function dispatchNotification(params: {
   eventType: string;
   module: string;
   recipientEmail?: string;
   recipientPhone?: string;
   recipientName?: string;
+  /** DB row id from employees table — used to auto-resolve phone for WhatsApp */
+  recipientEmployeeDbId?: number | null;
+  /** DB row id from candidates table — used to auto-resolve phone for WhatsApp */
+  recipientCandidateId?: number | null;
   variables?: Record<string, string>;
   entityType?: string;
   entityId?: number;
@@ -234,7 +252,8 @@ export async function dispatchNotification(params: {
     const vars = params.variables ?? {};
 
     const shouldEmail = tpl ? (tpl.channel === "email" || tpl.channel === "both") : true;
-    const shouldWA = tpl ? (tpl.channel === "whatsapp" || tpl.channel === "both") : false;
+    // Default to true so WhatsApp fires for all events (if credentials are configured)
+    const shouldWA = tpl ? (tpl.channel === "whatsapp" || tpl.channel === "both") : true;
 
     if (params.recipientEmail && shouldEmail) {
       const subject = tpl?.emailSubject ? interpolate(tpl.emailSubject, vars) : getDefaultSubject(params.eventType);
@@ -252,17 +271,23 @@ export async function dispatchNotification(params: {
       });
     }
 
-    if (params.recipientPhone && shouldWA) {
-      const msg = tpl?.whatsappTemplate ? interpolate(tpl.whatsappTemplate, vars) : getDefaultWhatsAppMsg(params.eventType, vars);
-      await sendWhatsApp({
-        to: params.recipientPhone,
-        toName: params.recipientName,
-        message: msg,
-        eventType: params.eventType,
-        module: params.module,
-        entityType: params.entityType,
-        entityId: params.entityId,
-      });
+    if (shouldWA) {
+      // Resolve phone: explicit > employee lookup > candidate lookup
+      const phone = params.recipientPhone
+        ?? await resolveEmployeePhone(params.recipientEmployeeDbId)
+        ?? await resolveCandidatePhone(params.recipientCandidateId);
+      if (phone) {
+        const msg = tpl?.whatsappTemplate ? interpolate(tpl.whatsappTemplate, vars) : getDefaultWhatsAppMsg(params.eventType, vars);
+        await sendWhatsApp({
+          to: phone,
+          toName: params.recipientName,
+          message: msg,
+          eventType: params.eventType,
+          module: params.module,
+          entityType: params.entityType,
+          entityId: params.entityId,
+        });
+      }
     }
   } catch (e) {
     console.error("[notification-service] dispatchNotification error:", e);

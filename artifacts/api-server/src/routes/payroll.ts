@@ -936,6 +936,7 @@ router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole(...PAYROLL
         return dispatchNotification({
           eventType: "payslip_published", module: "payroll",
           recipientEmail: empUser.email, recipientName: empUser.name,
+          recipientEmployeeDbId: record.employeeId,
           variables: { period, recipientName: empUser.name },
           entityType: "payroll_run", entityId: runId,
         });

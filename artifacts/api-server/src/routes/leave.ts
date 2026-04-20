@@ -696,6 +696,7 @@ router.post("/leave/applications/:id/hr-action", requireHrmsUser, requireRole(..
         module: "leave",
         recipientEmail: empUser.email,
         recipientName: empUser.name ?? undefined,
+        recipientEmployeeDbId: app.employeeId,
         variables: {
           fromDate: String(app.fromDate), toDate: String(app.toDate),
           leaveType: String(app.leaveTypeId), reason: remarks ?? "",

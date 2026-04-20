@@ -192,6 +192,7 @@ router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), as
         dispatchNotification({
           eventType: "document_issued", module: "documents",
           recipientEmail: empUser.email, recipientName: empUser.name,
+          recipientEmployeeDbId: employeeId,
           variables: { documentType, recipientName: empUser.name },
           entityType: "issued_document", entityId: issued.id,
         }).catch(() => {});
