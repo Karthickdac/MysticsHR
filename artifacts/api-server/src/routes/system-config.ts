@@ -197,6 +197,94 @@ router.put("/role-permissions", requireHrmsUser, requireRole(...SUPER_ADMIN), as
   }
 });
 
+// ─── Custom Employee Fields ───────────────────────────────────────────────────
+// Stored in system_settings with category="custom_employee_fields", key=unique ID
+
+router.get("/custom-fields", requireHrmsUser, requireRole("super_admin", "hr_manager"), async (_req, res) => {
+  try {
+    const rows = await db.select().from(systemSettingsTable)
+      .where(eq(systemSettingsTable.category, "custom_employee_fields"))
+      .orderBy(systemSettingsTable.key);
+    const fields = rows.map(r => {
+      try { return { id: r.key, ...(JSON.parse(r.value) as object) }; }
+      catch { return { id: r.key }; }
+    });
+    res.json(fields);
+  } catch { res.status(500).json({ error: "Failed to fetch custom fields" }); }
+});
+
+router.post("/custom-fields", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
+  try {
+    const { name, type, required, options, placeholder } = req.body;
+    if (!name || !type) { res.status(400).json({ error: "name and type are required" }); return; }
+    const id = `field_${Date.now()}`;
+    await db.insert(systemSettingsTable).values({
+      category: "custom_employee_fields", key: id,
+      value: JSON.stringify({ name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" }),
+    });
+    res.status(201).json({ id, name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" });
+  } catch { res.status(500).json({ error: "Failed to create custom field" }); }
+});
+
+router.put("/custom-fields/:id", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
+  try {
+    const { name, type, required, options, placeholder } = req.body;
+    const key = req.params.id;
+    const existing = await db.select({ id: systemSettingsTable.id }).from(systemSettingsTable)
+      .where(and(eq(systemSettingsTable.category, "custom_employee_fields"), eq(systemSettingsTable.key, key))).limit(1);
+    if (!existing.length) { res.status(404).json({ error: "Field not found" }); return; }
+    await db.update(systemSettingsTable)
+      .set({ value: JSON.stringify({ name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" }) })
+      .where(and(eq(systemSettingsTable.category, "custom_employee_fields"), eq(systemSettingsTable.key, key)));
+    res.json({ id: key, name, type, required: !!required, options: options ?? [], placeholder: placeholder ?? "" });
+  } catch { res.status(500).json({ error: "Failed to update custom field" }); }
+});
+
+router.delete("/custom-fields/:id", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
+  try {
+    await db.delete(systemSettingsTable)
+      .where(and(eq(systemSettingsTable.category, "custom_employee_fields"), eq(systemSettingsTable.key, req.params.id)));
+    res.status(204).end();
+  } catch { res.status(500).json({ error: "Failed to delete custom field" }); }
+});
+
+// ─── Leave Blackout Dates ─────────────────────────────────────────────────────
+// Stored in system_settings with category="leave_blackout_dates", key=unique ID
+
+router.get("/leave-blackouts", requireHrmsUser, requireRole("super_admin", "hr_manager", "hod", "employee", "payroll_admin"), async (_req, res) => {
+  try {
+    const rows = await db.select().from(systemSettingsTable)
+      .where(eq(systemSettingsTable.category, "leave_blackout_dates"))
+      .orderBy(systemSettingsTable.key);
+    const blackouts = rows.map(r => {
+      try { return { id: r.key, ...(JSON.parse(r.value) as object) }; }
+      catch { return { id: r.key }; }
+    });
+    res.json(blackouts);
+  } catch { res.status(500).json({ error: "Failed to fetch leave blackouts" }); }
+});
+
+router.post("/leave-blackouts", requireHrmsUser, requireRole("super_admin", "hr_manager"), async (req, res) => {
+  try {
+    const { name, startDate, endDate, reason } = req.body;
+    if (!name || !startDate || !endDate) { res.status(400).json({ error: "name, startDate, and endDate are required" }); return; }
+    const id = `blackout_${Date.now()}`;
+    await db.insert(systemSettingsTable).values({
+      category: "leave_blackout_dates", key: id,
+      value: JSON.stringify({ name, startDate, endDate, reason: reason ?? "" }),
+    });
+    res.status(201).json({ id, name, startDate, endDate, reason: reason ?? "" });
+  } catch { res.status(500).json({ error: "Failed to create leave blackout" }); }
+});
+
+router.delete("/leave-blackouts/:id", requireHrmsUser, requireRole("super_admin", "hr_manager"), async (req, res) => {
+  try {
+    await db.delete(systemSettingsTable)
+      .where(and(eq(systemSettingsTable.category, "leave_blackout_dates"), eq(systemSettingsTable.key, req.params.id)));
+    res.status(204).end();
+  } catch { res.status(500).json({ error: "Failed to delete leave blackout" }); }
+});
+
 // ─── Utility: Get all active users for broadcast notifications ────────────────
 export async function getUsersByRoles(roles: string[]): Promise<Array<{ id: number; email: string; name: string; employeeId: number | null }>> {
   const users = await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })

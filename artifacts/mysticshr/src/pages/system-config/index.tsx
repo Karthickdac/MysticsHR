@@ -27,8 +27,11 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2, Lock } from "lucide-react";
+import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2, Lock, FormInput, Ban } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+
+const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 // ─── Settings form helper ─────────────────────────────────────────────────────
 
@@ -669,6 +672,225 @@ function RolePermissionsTab() {
   );
 }
 
+// ─── Custom Employee Fields Tab ───────────────────────────────────────────────
+
+type CustomField = { id: string; name: string; type: string; required: boolean; options: string[]; placeholder?: string };
+
+function CustomEmployeeFieldsTab() {
+  const [fields, setFields] = useState<CustomField[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editField, setEditField] = useState<CustomField | null>(null);
+  const [form, setForm] = useState({ name: "", type: "text", required: false, options: "", placeholder: "" });
+
+  const fetchFields = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE_URL}/api/custom-fields`, { credentials: "include" });
+      if (r.ok) setFields(await r.json() as CustomField[]);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  };
+
+  useEffect(() => { void fetchFields(); }, []);
+
+  function openCreate() {
+    setEditField(null);
+    setForm({ name: "", type: "text", required: false, options: "", placeholder: "" });
+    setDialogOpen(true);
+  }
+
+  function openEdit(f: CustomField) {
+    setEditField(f);
+    setForm({ name: f.name, type: f.type, required: f.required, options: f.options.join(", "), placeholder: f.placeholder ?? "" });
+    setDialogOpen(true);
+  }
+
+  async function save() {
+    const payload = { name: form.name, type: form.type, required: form.required, options: form.options.split(",").map(s => s.trim()).filter(Boolean), placeholder: form.placeholder };
+    const url = editField ? `${BASE_URL}/api/custom-fields/${editField.id}` : `${BASE_URL}/api/custom-fields`;
+    const r = await fetch(url, { method: editField ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
+    if (r.ok) { toast({ title: editField ? "Field updated" : "Field created" }); setDialogOpen(false); void fetchFields(); }
+    else toast({ title: "Error", description: "Failed to save field", variant: "destructive" });
+  }
+
+  async function deleteField(id: string) {
+    if (!confirm("Delete this custom field?")) return;
+    const r = await fetch(`${BASE_URL}/api/custom-fields/${id}`, { method: "DELETE", credentials: "include" });
+    if (r.ok) { toast({ title: "Field deleted" }); void fetchFields(); }
+    else toast({ title: "Error", description: "Failed to delete field", variant: "destructive" });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><FormInput className="w-4 h-4" />Custom Employee Fields</CardTitle>
+        <CardDescription>Define additional data fields to capture on employee profiles. These appear in the employee form.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Button onClick={openCreate} size="sm" className="gap-1"><Plus className="w-4 h-4" />Add Custom Field</Button>
+        {loading ? <div className="text-sm text-muted-foreground">Loading...</div> : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Field Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Required</TableHead>
+                <TableHead>Options</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {fields.length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-6">No custom fields defined yet.</TableCell></TableRow>
+              )}
+              {fields.map(f => (
+                <TableRow key={f.id}>
+                  <TableCell className="font-medium text-sm">{f.name}</TableCell>
+                  <TableCell><Badge variant="secondary" className="capitalize">{f.type}</Badge></TableCell>
+                  <TableCell>{f.required ? <Badge variant="destructive" className="text-xs">Required</Badge> : <span className="text-muted-foreground text-xs">Optional</span>}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{f.options?.length > 0 ? f.options.join(", ") : "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(f)}><Pencil className="w-3 h-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteField(f.id)}><Trash2 className="w-3 h-3" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>{editField ? "Edit Custom Field" : "Add Custom Field"}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div><Label>Field Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Blood Group" /></div>
+            <div>
+              <Label>Field Type *</Label>
+              <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["text", "number", "date", "email", "phone", "dropdown", "textarea"].map(t => (
+                    <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.type === "dropdown" && (
+              <div><Label>Options (comma-separated) *</Label><Input value={form.options} onChange={e => setForm(f => ({ ...f, options: e.target.value }))} placeholder="Option A, Option B, Option C" /></div>
+            )}
+            <div><Label>Placeholder Text</Label><Input value={form.placeholder} onChange={e => setForm(f => ({ ...f, placeholder: e.target.value }))} placeholder="e.g. Enter blood group" /></div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.required} onCheckedChange={v => setForm(f => ({ ...f, required: v }))} id="cf-required" />
+              <Label htmlFor="cf-required">Required field</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!form.name || !form.type}>Save Field</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+// ─── Leave Blackout Dates Tab ─────────────────────────────────────────────────
+
+type LeaveBlackout = { id: string; name: string; startDate: string; endDate: string; reason: string };
+
+function LeaveBlackoutsTab() {
+  const [blackouts, setBlackouts] = useState<LeaveBlackout[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", startDate: "", endDate: "", reason: "" });
+
+  const fetchBlackouts = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${BASE_URL}/api/leave-blackouts`, { credentials: "include" });
+      if (r.ok) setBlackouts(await r.json() as LeaveBlackout[]);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  };
+
+  useEffect(() => { void fetchBlackouts(); }, []);
+
+  async function save() {
+    const r = await fetch(`${BASE_URL}/api/leave-blackouts`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+      body: JSON.stringify(form),
+    });
+    if (r.ok) { toast({ title: "Blackout period added" }); setDialogOpen(false); setForm({ name: "", startDate: "", endDate: "", reason: "" }); void fetchBlackouts(); }
+    else toast({ title: "Error", description: "Failed to add blackout period", variant: "destructive" });
+  }
+
+  async function deleteBlackout(id: string) {
+    if (!confirm("Remove this blackout period?")) return;
+    const r = await fetch(`${BASE_URL}/api/leave-blackouts/${id}`, { method: "DELETE", credentials: "include" });
+    if (r.ok) { toast({ title: "Blackout period removed" }); void fetchBlackouts(); }
+    else toast({ title: "Error", description: "Failed to delete blackout", variant: "destructive" });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><Ban className="w-4 h-4" />Leave Blackout Dates</CardTitle>
+        <CardDescription>Define date ranges during which leave applications are blocked (e.g. financial year-end, audits, peak project periods).</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Button onClick={() => setDialogOpen(true)} size="sm" className="gap-1"><Plus className="w-4 h-4" />Add Blackout Period</Button>
+        {loading ? <div className="text-sm text-muted-foreground">Loading...</div> : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name / Reason</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead>End Date</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {blackouts.length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-6">No blackout periods defined. Leaves can be applied for any date.</TableCell></TableRow>
+              )}
+              {blackouts.map(b => (
+                <TableRow key={b.id}>
+                  <TableCell className="font-medium text-sm">{b.name}</TableCell>
+                  <TableCell className="text-sm">{b.startDate}</TableCell>
+                  <TableCell className="text-sm">{b.endDate}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate">{b.reason || "—"}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteBlackout(b.id)}><Trash2 className="w-3 h-3" /></Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add Leave Blackout Period</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div><Label>Period Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Financial Year Close, Q1 Audit" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Start Date *</Label><Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} /></div>
+              <div><Label>End Date *</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
+            </div>
+            <div><Label>Notes / Reason</Label><Textarea value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} placeholder="Reason for leave restriction during this period" rows={2} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!form.name || !form.startDate || !form.endDate}>Add Blackout</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SystemConfigPage() {
@@ -689,6 +911,8 @@ export default function SystemConfigPage() {
             <TabsTrigger value="approval">Approval Chains</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
+            <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
+            <TabsTrigger value="leave-blackouts">Leave Blackouts</TabsTrigger>
           </TabsList>
 
           <TabsContent value="org" className="mt-4"><OrgProfileTab /></TabsContent>
@@ -698,6 +922,8 @@ export default function SystemConfigPage() {
           <TabsContent value="approval" className="mt-4"><ApprovalChainsTab /></TabsContent>
           <TabsContent value="security" className="mt-4"><SecurityTab /></TabsContent>
           <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
+          <TabsContent value="custom-fields" className="mt-4"><CustomEmployeeFieldsTab /></TabsContent>
+          <TabsContent value="leave-blackouts" className="mt-4"><LeaveBlackoutsTab /></TabsContent>
         </Tabs>
       </div>
     </MainLayout>

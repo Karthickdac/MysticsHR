@@ -19,8 +19,9 @@ import {
   permissionApplicationsTable,
   preOnboardingRecordsTable,
   preOnboardingDocumentsTable,
+  approvalChainConfigsTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, isNotNull, ne, sql, lt, count } from "drizzle-orm";
+import { eq, and, gte, lte, isNotNull, ne, sql, lt, count, inArray } from "drizzle-orm";
 import { generateTablePdf } from "./pdf";
 import { logger } from "./logger";
 
@@ -436,7 +437,7 @@ async function remindPendingLeaveApprovals() {
 
     if (pending.length === 0) return;
 
-    const hodUsers = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+    const hodUsers = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
       .from(hrmsUsersTable)
       .where(and(eq(hrmsUsersTable.isActive, true), eq(hrmsUsersTable.role, "hod")));
 
@@ -445,6 +446,7 @@ async function remindPendingLeaveApprovals() {
       await dispatchNotification({
         eventType: "leave_submitted", module: "leave",
         recipientEmail: user.email, recipientName: user.name,
+        recipientEmployeeDbId: user.employeeId,
         variables: {
           employeeName: `${pending.length} application(s)`, fromDate: "", toDate: "",
           days: String(pending.length), leaveType: "various",
@@ -535,6 +537,112 @@ async function escalateSlaBreaches() {
     }
   } catch (e) {
     logger.error({ err: e }, "[scheduler] escalateSlaBreaches error");
+  }
+}
+
+/**
+ * Config-driven escalation processor — reads approval_chain_configs and escalates
+ * pending transactions of each transactionType that have exceeded escalationAfterHours.
+ * Supported transactionTypes: "leave", "helpdesk", "exit", "payroll"
+ */
+async function processConfiguredEscalations() {
+  try {
+    const { dispatchNotification } = await import("../lib/notification-service");
+    const { getUsersByRoles } = await import("../routes/system-config");
+
+    const escalationConfigs = await db.select()
+      .from(approvalChainConfigsTable)
+      .where(and(
+        eq(approvalChainConfigsTable.isActive, true),
+        isNotNull(approvalChainConfigsTable.escalationAfterHours),
+        isNotNull(approvalChainConfigsTable.escalateTo),
+      ));
+
+    for (const config of escalationConfigs) {
+      const hours = config.escalationAfterHours ?? 24;
+      const threshold = new Date(Date.now() - hours * 60 * 60 * 1000);
+      const escalateTo = config.escalateTo;
+      if (!escalateTo) continue;
+
+      const recipientUsers = await getUsersByRoles([escalateTo]);
+      if (recipientUsers.length === 0) continue;
+
+      if (config.transactionType === "leave") {
+        const pending = await db.select({ id: leaveApplicationsTable.id })
+          .from(leaveApplicationsTable)
+          .where(and(
+            eq(leaveApplicationsTable.status, "Pending"),
+            lte(leaveApplicationsTable.createdAt, threshold),
+          ));
+        if (pending.length === 0) continue;
+
+        for (const user of recipientUsers) {
+          if (!user.email) continue;
+          await dispatchNotification({
+            eventType: "leave_submitted", module: "leave",
+            recipientEmail: user.email, recipientName: user.name,
+            recipientEmployeeDbId: user.employeeId,
+            variables: {
+              employeeName: `${pending.length} application(s)`,
+              fromDate: "", toDate: "", days: String(pending.length),
+              leaveType: "various", recipientName: user.name,
+            },
+          }).catch(() => {});
+        }
+      }
+
+      if (config.transactionType === "helpdesk") {
+        const overdue = await db.select({ id: helpdeskTicketsTable.id, subject: helpdeskTicketsTable.subject })
+          .from(helpdeskTicketsTable)
+          .where(and(
+            ne(helpdeskTicketsTable.status, "Closed"),
+            ne(helpdeskTicketsTable.status, "Resolved"),
+            lte(helpdeskTicketsTable.createdAt, threshold),
+          ));
+        if (overdue.length === 0) continue;
+
+        for (const user of recipientUsers) {
+          if (!user.email) continue;
+          await dispatchNotification({
+            eventType: "helpdesk_sla_breach", module: "helpdesk",
+            recipientEmail: user.email, recipientName: user.name,
+            recipientEmployeeDbId: user.employeeId,
+            variables: {
+              ticketId: overdue.map(t => String(t.id)).join(", "),
+              subject: `${overdue.length} ticket(s) past SLA (${hours}h)`,
+              slaDeadline: threshold.toISOString(), recipientName: user.name,
+            },
+            entityType: "helpdesk_ticket", entityId: overdue[0]?.id,
+          }).catch(() => {});
+        }
+      }
+
+      if (config.transactionType === "exit") {
+        const stalled = await db.select({ id: exitRequestsTable.id })
+          .from(exitRequestsTable)
+          .where(and(
+            ne(exitRequestsTable.status, "Separated"),
+            ne(exitRequestsTable.status, "Clearance Complete"),
+            lte(exitRequestsTable.updatedAt, threshold),
+          ));
+        if (stalled.length === 0) continue;
+
+        for (const user of recipientUsers) {
+          if (!user.email) continue;
+          await dispatchNotification({
+            eventType: "exit_initiated", module: "exit",
+            recipientEmail: user.email, recipientName: user.name,
+            recipientEmployeeDbId: user.employeeId,
+            variables: {
+              status: `${stalled.length} exit(s) pending >SLA (${hours}h)`,
+              recipientName: user.name,
+            },
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] processConfiguredEscalations error");
   }
 }
 
@@ -656,26 +764,41 @@ async function alertConsecutiveAbsences() {
   }
 }
 
-/** Pre-onboarding pending document reminders — notify candidates with pending docs */
+/** Pre-onboarding pending document reminders — notify candidates who have actual pending documents */
 async function remindPreOnboardingPending() {
   try {
     const { dispatchNotification } = await import("../lib/notification-service");
-    // Get all active pre-onboarding records with pending documents
-    const pendingRecords = await db.select({
+    const { candidatesTable } = await import("@workspace/db/schema");
+
+    // Step 1: Find pre-onboarding records with status In Progress or Pending and a joining date
+    const candidateRecords = await db.select({
       id: preOnboardingRecordsTable.id,
       candidateId: preOnboardingRecordsTable.candidateId,
       expectedJoiningDate: preOnboardingRecordsTable.expectedJoiningDate,
-      status: preOnboardingRecordsTable.status,
     }).from(preOnboardingRecordsTable)
       .where(and(
-        eq(preOnboardingRecordsTable.status, "Pending"),
+        inArray(preOnboardingRecordsTable.status, ["Pending", "In Progress"]),
         isNotNull(preOnboardingRecordsTable.expectedJoiningDate),
       ));
 
-    for (const record of pendingRecords) {
-      // Get candidate email from candidates table
-      const { candidatesTable } = await import("@workspace/db/schema");
-      const [candidate] = await db.select({ email: candidatesTable.email, firstName: candidatesTable.firstName, lastName: candidatesTable.lastName })
+    if (candidateRecords.length === 0) return;
+
+    // Step 2: Among those records, find which ones actually have at least one document with status "Pending"
+    const recordIdsWithPendingDocs = await db
+      .selectDistinct({ recordId: preOnboardingDocumentsTable.recordId })
+      .from(preOnboardingDocumentsTable)
+      .where(and(
+        eq(preOnboardingDocumentsTable.status, "Pending"),
+        inArray(preOnboardingDocumentsTable.recordId, candidateRecords.map(r => r.id)),
+      ));
+
+    const pendingDocRecordIds = new Set(recordIdsWithPendingDocs.map(r => r.recordId));
+
+    // Step 3: Only notify candidates whose record has pending documents
+    for (const record of candidateRecords) {
+      if (!pendingDocRecordIds.has(record.id)) continue;
+
+      const [candidate] = await db.select({ email: candidatesTable.email, firstName: candidatesTable.firstName, lastName: candidatesTable.lastName, phone: candidatesTable.phone })
         .from(candidatesTable).where(eq(candidatesTable.id, record.candidateId)).limit(1);
       if (!candidate?.email) continue;
 
@@ -683,6 +806,7 @@ async function remindPreOnboardingPending() {
       await dispatchNotification({
         eventType: "onboarding_doc_pending", module: "pre_onboarding",
         recipientEmail: candidate.email, recipientName: `${candidate.firstName} ${candidate.lastName}`,
+        recipientCandidateId: record.candidateId,
         variables: { joiningDate, recipientName: `${candidate.firstName} ${candidate.lastName}` },
         entityType: "pre_onboarding_record", entityId: record.id,
       }).catch(() => {});
@@ -743,6 +867,10 @@ export function startScheduler(_port: number) {
   // Every hour — escalate SLA breaches for overdue helpdesk tickets
   cron.schedule("30 * * * *", () => {
     void escalateSlaBreaches();
+  });
+  // Every 2 hours — run config-driven escalation processor (reads approval_chain_configs)
+  cron.schedule("45 */2 * * *", () => {
+    void processConfiguredEscalations();
   });
   // At 18:30 daily — alert employees with no attendance record today
   cron.schedule("30 18 * * *", () => {
