@@ -40,6 +40,7 @@ export default function PayrollDashboardPage() {
   const { role } = useCurrentHrmsUser();
   const isAdmin = ["super_admin", "payroll_admin"].includes(role ?? "");
   const isSuperAdmin = role === "super_admin";
+  const canApproveFinalize = isAdmin;
 
   const qc = useQueryClient();
   const now = new Date();
@@ -197,7 +198,7 @@ export default function PayrollDashboardPage() {
                   : "Payroll is open. Initiating a new run will auto-lock the period."}
               </p>
             </div>
-            {isSuperAdmin && (
+            {canApproveFinalize && (
               <Button variant={isCurrentlyLocked ? "outline" : "secondary"} size="sm" onClick={handleToggleLock} disabled={lockPayroll.isPending || unlockPayroll.isPending}>
                 {isCurrentlyLocked ? <><Unlock className="w-4 h-4 mr-1" />Unlock</> : <><Lock className="w-4 h-4 mr-1" />Lock</>}
               </Button>
@@ -277,12 +278,12 @@ export default function PayrollDashboardPage() {
                                 <RefreshCw className="w-3 h-3" />
                               </Button>
                             )}
-                            {run.status === "Computed" && isSuperAdmin && (
+                            {run.status === "Computed" && canApproveFinalize && (
                               <Button size="sm" onClick={() => handleApprove(run.id)} disabled={busy === run.id}>
                                 <CheckCircle2 className="w-3 h-3 mr-1" />Approve
                               </Button>
                             )}
-                            {run.status === "Approved" && isSuperAdmin && (
+                            {run.status === "Approved" && canApproveFinalize && (
                               <Button size="sm" variant="outline" onClick={() => handleFinalize(run.id)} disabled={busy === run.id}>
                                 <Lock className="w-3 h-3 mr-1" />Finalize
                               </Button>

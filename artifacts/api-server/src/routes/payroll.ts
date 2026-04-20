@@ -434,7 +434,7 @@ router.post("/payroll/locks/:year/:month/lock", requireHrmsUser, requireRole(...
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-router.post("/payroll/locks/:year/:month/unlock", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
+router.post("/payroll/locks/:year/:month/unlock", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
     const year = Number(req.params.year);
     const month = Number(req.params.month);
@@ -747,9 +747,13 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
       const grossEarnings = basic + hra + specialAllowance + travelAllowance + medicalAllowance +
         performanceBonus + shiftAllowance + nightDifferential + otherEarnings;
 
-      // LOP is captured by prorating earnings via the attendance factor (presentDays/workingDays),
-      // so we do NOT add a separate lopDeduction to avoid double-counting absence.
-      const lopDeduction = 0;
+      // LOP deduction = the salary amount withheld for absent days.
+      // Full monthly earnings at full factor (1) minus the prorated earnings gives the LOP amount.
+      // This makes the deduction explicit on the payslip rather than silently embedded in prorated figures.
+      const fullGross = workingDays > 0
+        ? components.filter(c => c.isEarning).reduce((s, c) => s + Number(c.amount), 0) + overtimePay
+        : 0;
+      const lopDeduction = Math.round((fullGross - grossEarnings) * 100) / 100;
       const { pfEmployee, pfEmployer } = computePF(basic);
       const { esiEmployee, esiEmployer } = computeESI(grossEarnings);
       const professionalTax = computeProfessionalTax(grossEarnings, month);
@@ -832,7 +836,7 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
+router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
     const runId = Number(req.params.id);
     const [run] = await db.select().from(payrollRunsTable).where(eq(payrollRunsTable.id, runId));
@@ -894,7 +898,7 @@ router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole("super_adm
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-router.post("/payroll/runs/:id/finalize", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
+router.post("/payroll/runs/:id/finalize", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
   try {
     const runId = Number(req.params.id);
     const [run] = await db.select().from(payrollRunsTable).where(eq(payrollRunsTable.id, runId));
@@ -1164,6 +1168,16 @@ interface PayslipData {
   taxRegime: string | null;
 }
 
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function generatePayslipHtml(data: PayslipData, monthName: string, year: number): string {
   const fmt = (n: string | number | null | undefined) => `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
   const e = data.earnings;
@@ -1206,11 +1220,11 @@ function generatePayslipHtml(data: PayslipData, monthName: string, year: number)
   <div class="badge">PAYSLIP</div>
 </div>
 <div class="emp-info">
-  <div class="field"><span class="label">Employee Name</span><span class="value">${data.employee.name}</span></div>
-  <div class="field"><span class="label">Employee Code</span><span class="value">${data.employee.code ?? "—"}</span></div>
-  <div class="field"><span class="label">Department</span><span class="value">${data.employee.department}</span></div>
-  <div class="field"><span class="label">Designation</span><span class="value">${data.employee.designation}</span></div>
-  <div class="field"><span class="label">Tax Regime</span><span class="value"><span class="regime-badge">${data.taxRegime ?? "New"}</span></span></div>
+  <div class="field"><span class="label">Employee Name</span><span class="value">${escapeHtml(data.employee.name)}</span></div>
+  <div class="field"><span class="label">Employee Code</span><span class="value">${escapeHtml(data.employee.code) || "—"}</span></div>
+  <div class="field"><span class="label">Department</span><span class="value">${escapeHtml(data.employee.department)}</span></div>
+  <div class="field"><span class="label">Designation</span><span class="value">${escapeHtml(data.employee.designation)}</span></div>
+  <div class="field"><span class="label">Tax Regime</span><span class="value"><span class="regime-badge">${escapeHtml(data.taxRegime) || "New"}</span></span></div>
 </div>
 <div class="attendance-bar">
   <div class="att-item"><div class="val">${a.workingDays}</div><div class="lbl">Working Days</div></div>

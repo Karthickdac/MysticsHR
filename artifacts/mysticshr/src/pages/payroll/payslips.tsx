@@ -136,6 +136,7 @@ export default function PayslipsPage() {
                 className="w-full rounded-lg border"
                 style={{ height: "520px" }}
                 title="Payslip"
+                sandbox="allow-same-origin"
               />
             ) : (
               <div className="text-center py-8 text-muted-foreground">Loading payslip...</div>
