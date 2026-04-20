@@ -407,21 +407,44 @@ router.post("/attendance/regularizations/:id/action", requireHrmsUser, requireRo
       .where(eq(attendanceRegularizationsTable.id, regId))
       .returning();
 
-    if (action === "Approved" && reg.attendanceRecordId) {
+    if (action === "Approved") {
       const signIn = reg.requestedSignIn;
       const signOut = reg.requestedSignOut;
       const totalMins = computeMinutesWorked(signIn, signOut, 0);
-      const template = await getActiveShiftTemplate(reg.employeeId, reg.attendanceDate);
+      const template = await getActiveShiftTemplate(reg.employeeId as number, reg.attendanceDate as string);
       const minWorkingMins = template?.minWorkingHoursMinutes ?? 480;
       const overtimeThreshold = template?.overtimeThresholdMinutes ?? 30;
       const overtimeMins = template
-        ? computeOvertimeMinutes(signOut, reg.attendanceDate, template.startTime, template.endTime, overtimeThreshold)
+        ? computeOvertimeMinutes(signOut, reg.attendanceDate as string, template.startTime, template.endTime, overtimeThreshold)
         : 0;
       const newStatus: AttendanceStatus = computeStatus(totalMins, minWorkingMins);
-      await db.update(attendanceRecordsTable)
-        .set({ signInTime: signIn, signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, isHrOverride: false, updatedAt: new Date() })
-        .where(eq(attendanceRecordsTable.id, reg.attendanceRecordId));
-      await upsertOvertimeRecord(reg.attendanceRecordId, reg.employeeId, reg.attendanceDate, overtimeMins, template?.shiftRatePerHour);
+
+      if (reg.attendanceRecordId) {
+        // Existing record: update with corrected times
+        await db.update(attendanceRecordsTable)
+          .set({ signInTime: signIn, signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, isHrOverride: false, updatedAt: new Date() })
+          .where(eq(attendanceRecordsTable.id, reg.attendanceRecordId));
+        await upsertOvertimeRecord(reg.attendanceRecordId as number, reg.employeeId as number, reg.attendanceDate as string, overtimeMins, template?.shiftRatePerHour);
+      } else {
+        // No existing record (missed punch) — create one from regularization data
+        const [newRecord] = await db.insert(attendanceRecordsTable).values({
+          employeeId: reg.employeeId as number,
+          attendanceDate: reg.attendanceDate as string,
+          signInTime: signIn,
+          signOutTime: signOut,
+          totalMinutesWorked: totalMins,
+          overtimeMinutes: overtimeMins,
+          breakDurationMinutes: 0,
+          status: newStatus,
+          isHrOverride: false,
+          notes: `Created via regularization approval (reg #${regId})`,
+        }).returning();
+        // Link the new record back to the regularization
+        await db.update(attendanceRegularizationsTable)
+          .set({ attendanceRecordId: newRecord.id })
+          .where(eq(attendanceRegularizationsTable.id, regId));
+        await upsertOvertimeRecord(newRecord.id as number, reg.employeeId as number, reg.attendanceDate as string, overtimeMins, template?.shiftRatePerHour);
+      }
     } else if (action === "Rejected" && reg.attendanceRecordId) {
       await db.update(attendanceRecordsTable)
         .set({ status: "Absent", updatedAt: new Date() })
