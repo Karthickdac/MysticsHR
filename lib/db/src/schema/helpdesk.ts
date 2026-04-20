@@ -54,5 +54,16 @@ export const ticketSlaLogsTable = pgTable("ticket_sla_logs", {
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── TICKET ASSIGNMENTS ───────────────────────────────────────────────────────
+export const ticketAssignmentsTable = pgTable("ticket_assignments", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").notNull().references(() => helpdeskTicketsTable.id),
+  assignedToUserId: integer("assigned_to_user_id").references(() => hrmsUsersTable.id),
+  assignedByUserId: integer("assigned_by_user_id").references(() => hrmsUsersTable.id),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  note: text("note"),
+});
+
 export type HelpdeskTicket = typeof helpdeskTicketsTable.$inferSelect;
 export type TicketComment = typeof ticketCommentsTable.$inferSelect;
+export type TicketAssignment = typeof ticketAssignmentsTable.$inferSelect;

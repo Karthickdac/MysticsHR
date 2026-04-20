@@ -5,6 +5,8 @@ import {
   helpdeskTicketsTable,
   ticketCommentsTable,
   ticketSlaLogsTable,
+  ticketAssignmentsTable,
+  userNotificationsTable,
   employeesTable,
   hrmsUsersTable,
 } from "@workspace/db/schema";
@@ -108,15 +110,34 @@ async function enrichTicket(ticketInput: typeof helpdeskTicketsTable.$inferSelec
   const isOpenStatus = !["Resolved", "Closed"].includes(ticket.status);
   const slaBreached = !!(ticket.slaDeadline && now > new Date(ticket.slaDeadline) && isOpenStatus);
 
-  // Lazy SLA escalation: if breach is newly detected and not yet logged, write escalation log
+  // Lazy SLA escalation: if breach is newly detected and not yet logged, write escalation log + notifications
   if (slaBreached && !ticket.slaEscalatedAt) {
     await db.update(helpdeskTicketsTable)
       .set({ slaBreached: true, slaEscalatedAt: now })
       .where(eq(helpdeskTicketsTable.id, ticket.id));
     await db.insert(ticketSlaLogsTable).values({
       ticketId: ticket.id,
-      event: `SLA BREACH ESCALATION: Ticket overdue. Assigned to user ${ticket.assignedToUserId ?? "unassigned"}. Manager and HR Head should be notified.`,
+      event: `SLA BREACH: Ticket #${ticket.id} "${ticket.subject}" is overdue. Assignee: user ${ticket.assignedToUserId ?? "unassigned"}.`,
     });
+
+    // Persist in-app notifications to HR managers and assignee
+    const hrUsers = await db.select({ id: hrmsUsersTable.id })
+      .from(hrmsUsersTable)
+      .where(inArray(hrmsUsersTable.role, ["hr_manager", "super_admin"] as any[]));
+    const recipients: number[] = hrUsers.map(u => u.id);
+    if (ticket.assignedToUserId && !recipients.includes(ticket.assignedToUserId)) {
+      recipients.push(ticket.assignedToUserId);
+    }
+    for (const recipientUserId of recipients) {
+      await db.insert(userNotificationsTable).values({
+        recipientUserId,
+        title: "SLA Breach Alert",
+        message: `Ticket #${ticket.id} "${ticket.subject}" has breached its SLA deadline. Immediate action required.`,
+        entityType: "helpdesk_ticket",
+        entityId: ticket.id,
+      }).catch(() => {}); // non-blocking
+    }
+
     ticket = { ...ticket, slaBreached: true, slaEscalatedAt: now };
   }
 
@@ -346,11 +367,7 @@ router.post("/helpdesk/sla-check", requireHrmsUser, requireRole(...MANAGER_ROLES
     const now = new Date();
     // Find all open tickets past their SLA deadline that haven't been escalated yet
     const overdueTickets = await db.select().from(helpdeskTicketsTable)
-      .where(
-        and(
-          eq(helpdeskTicketsTable.slaBreached, false),
-        )
-      );
+      .where(eq(helpdeskTicketsTable.slaBreached, false));
 
     const breachTargets = overdueTickets.filter(t =>
       t.slaDeadline &&
@@ -359,15 +376,37 @@ router.post("/helpdesk/sla-check", requireHrmsUser, requireRole(...MANAGER_ROLES
       !t.slaEscalatedAt
     );
 
+    // Collect HR managers and HR heads to notify
+    const hrUsers = await db.select({ id: hrmsUsersTable.id, role: hrmsUsersTable.role })
+      .from(hrmsUsersTable)
+      .where(inArray(hrmsUsersTable.role, ["hr_manager", "super_admin"] as any[]));
+
     let escalated = 0;
     for (const ticket of breachTargets) {
       await db.update(helpdeskTicketsTable)
         .set({ slaBreached: true, slaEscalatedAt: now })
         .where(eq(helpdeskTicketsTable.id, ticket.id));
+
       await db.insert(ticketSlaLogsTable).values({
         ticketId: ticket.id,
-        event: `SLA BREACH ESCALATION: Ticket "${ticket.subject}" is overdue. Assigned to user ${ticket.assignedToUserId ?? "unassigned"}. Manager and HR Head must take action.`,
+        event: `SLA BREACH: Ticket #${ticket.id} "${ticket.subject}" overdue. Assignee: user ${ticket.assignedToUserId ?? "unassigned"}.`,
       });
+
+      // Create in-app notifications for HR managers and ticket assignee
+      const recipients: number[] = hrUsers.map(u => u.id);
+      if (ticket.assignedToUserId && !recipients.includes(ticket.assignedToUserId)) {
+        recipients.push(ticket.assignedToUserId);
+      }
+      for (const recipientUserId of recipients) {
+        await db.insert(userNotificationsTable).values({
+          recipientUserId,
+          title: "SLA Breach Alert",
+          message: `Ticket #${ticket.id} "${ticket.subject}" has breached its SLA deadline. Immediate action required.`,
+          entityType: "helpdesk_ticket",
+          entityId: ticket.id,
+        });
+      }
+
       escalated++;
     }
 
@@ -418,6 +457,72 @@ router.get("/helpdesk/sla-report", requireHrmsUser, requireRole(...MANAGER_ROLES
       byPriority: Object.entries(priorityMap).map(([priority, v]) => ({ priority, ...v })),
       byCategory: Object.entries(categoryMap).map(([category, count]) => ({ category, count })),
     });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── TICKET ASSIGNMENTS ───────────────────────────────────────────────────────
+// List assignment history for a ticket
+router.get("/helpdesk/tickets/:id/assignments", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const ticketId = Number(req.params.id);
+    const u = req.hrmsUser!;
+    if (!(await checkTicketAccess(ticketId, u))) {
+      res.status(403).json({ error: "Access denied" }); return;
+    }
+    const rows = await db.select({
+      id: ticketAssignmentsTable.id,
+      ticketId: ticketAssignmentsTable.ticketId,
+      assignedToUserId: ticketAssignmentsTable.assignedToUserId,
+      assignedByUserId: ticketAssignmentsTable.assignedByUserId,
+      assignedAt: ticketAssignmentsTable.assignedAt,
+      note: ticketAssignmentsTable.note,
+      assigneeName: hrmsUsersTable.name,
+    }).from(ticketAssignmentsTable)
+      .leftJoin(hrmsUsersTable, eq(ticketAssignmentsTable.assignedToUserId, hrmsUsersTable.id))
+      .where(eq(ticketAssignmentsTable.ticketId, ticketId))
+      .orderBy(desc(ticketAssignmentsTable.assignedAt));
+    res.json(rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// Create a new ticket assignment (record assignment event)
+router.post("/helpdesk/tickets/:id/assignments", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const ticketId = Number(req.params.id);
+    const { assignedToUserId, note } = req.body;
+    if (!assignedToUserId) {
+      res.status(400).json({ error: "assignedToUserId is required" }); return;
+    }
+
+    // Verify ticket exists
+    const [ticket] = await db.select().from(helpdeskTicketsTable)
+      .where(eq(helpdeskTicketsTable.id, ticketId));
+    if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
+
+    // Update assignedToUserId on ticket
+    await db.update(helpdeskTicketsTable)
+      .set({ assignedToUserId, updatedAt: new Date() })
+      .where(eq(helpdeskTicketsTable.id, ticketId));
+
+    // Record in assignment history
+    const [assignment] = await db.insert(ticketAssignmentsTable).values({
+      ticketId,
+      assignedToUserId,
+      assignedByUserId: u.id,
+      note: note ?? null,
+    }).returning();
+
+    // Notify the newly assigned user
+    await db.insert(userNotificationsTable).values({
+      recipientUserId: assignedToUserId,
+      title: "Ticket Assigned to You",
+      message: `Ticket #${ticketId} "${ticket.subject}" has been assigned to you.`,
+      entityType: "helpdesk_ticket",
+      entityId: ticketId,
+    });
+
+    res.status(201).json(assignment);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

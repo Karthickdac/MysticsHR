@@ -23,3 +23,4 @@ export * from "./payroll";
 export * from "./performance";
 export * from "./helpdesk";
 export * from "./documents";
+export * from "./notifications";
