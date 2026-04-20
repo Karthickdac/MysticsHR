@@ -110,6 +110,35 @@ async function getActiveShiftTemplate(employeeId: number, date: string) {
   return template ?? null;
 }
 
+/** Upsert (or delete) an overtime_record row to stay consistent with the attendance record. */
+async function upsertOvertimeRecord(
+  attendanceRecordId: number,
+  employeeId: number,
+  attendanceDate: string,
+  overtimeMins: number,
+  ratePerHour: string | null | undefined,
+) {
+  if (overtimeMins > 0) {
+    const totalAmount = ratePerHour ? String(Number(ratePerHour) * overtimeMins / 60) : null;
+    const [existing] = await db
+      .select({ id: overtimeRecordsTable.id })
+      .from(overtimeRecordsTable)
+      .where(eq(overtimeRecordsTable.attendanceRecordId, attendanceRecordId));
+    if (existing) {
+      await db.update(overtimeRecordsTable)
+        .set({ overtimeMinutes: overtimeMins, totalAmount, updatedAt: new Date() })
+        .where(eq(overtimeRecordsTable.id, existing.id));
+    } else {
+      await db.insert(overtimeRecordsTable).values({
+        employeeId, attendanceDate, overtimeMinutes: overtimeMins,
+        ratePerHour: ratePerHour ?? null, totalAmount, attendanceRecordId,
+      });
+    }
+  } else {
+    await db.delete(overtimeRecordsTable).where(eq(overtimeRecordsTable.attendanceRecordId, attendanceRecordId));
+  }
+}
+
 // --- ATTENDANCE RECORDS ---
 
 router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
@@ -208,19 +237,8 @@ router.post("/attendance", requireHrmsUser, requireRole(...HR_ROLES), async (req
       }).returning();
     }
 
-    if (overtimeMins > 0 && record) {
-      const [existOt] = await db.select({ id: overtimeRecordsTable.id }).from(overtimeRecordsTable)
-        .where(eq(overtimeRecordsTable.attendanceRecordId, record.id));
-      if (!existOt) {
-        await db.insert(overtimeRecordsTable).values({
-          employeeId: body.employeeId,
-          attendanceDate: body.attendanceDate,
-          overtimeMinutes: overtimeMins,
-          ratePerHour: template?.shiftRatePerHour ?? null,
-          totalAmount: template?.shiftRatePerHour ? String(Number(template.shiftRatePerHour) * overtimeMins / 60) : null,
-          attendanceRecordId: record.id,
-        });
-      }
+    if (record) {
+      await upsertOvertimeRecord(record.id, body.employeeId, body.attendanceDate, overtimeMins, template?.shiftRatePerHour);
     }
 
     await logAudit({ user: req.hrmsUser, action: existing ? "UPDATE" : "CREATE", module: "Attendance", recordId: record?.id ?? 0, newValue: `${body.employeeId}:${body.attendanceDate}:${computedStatus}`, ipAddress: req.ip });
@@ -403,6 +421,7 @@ router.post("/attendance/regularizations/:id/action", requireHrmsUser, requireRo
       await db.update(attendanceRecordsTable)
         .set({ signInTime: signIn, signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, isHrOverride: false, updatedAt: new Date() })
         .where(eq(attendanceRecordsTable.id, reg.attendanceRecordId));
+      await upsertOvertimeRecord(reg.attendanceRecordId, reg.employeeId, reg.attendanceDate, overtimeMins, template?.shiftRatePerHour);
     } else if (action === "Rejected" && reg.attendanceRecordId) {
       await db.update(attendanceRecordsTable)
         .set({ status: "Absent", updatedAt: new Date() })
@@ -486,6 +505,9 @@ router.patch("/attendance/:id", requireHrmsUser, requireRole(...HR_ROLES), async
       })
       .where(eq(attendanceRecordsTable.id, id))
       .returning();
+    if (updated) {
+      await upsertOvertimeRecord(updated.id, existing.employeeId, existing.attendanceDate, overtimeMins, template?.shiftRatePerHour);
+    }
     await logAudit({ user: req.hrmsUser, action: "HR_OVERRIDE", module: "Attendance", recordId: id, newValue: JSON.stringify(body), ipAddress: req.ip });
     res.json(updated);
   } catch (err) {

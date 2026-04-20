@@ -405,13 +405,28 @@ router.post("/shift-swaps/:id/hod-action", requireHrmsUser, requireRole("super_a
   }
 });
 
+/** Find the active shift template for an employee on a given date (YYYY-MM-DD) */
+async function getActiveTemplateForDate(employeeId: number, date: string): Promise<number | null> {
+  const [row] = await db
+    .select({ shiftTemplateId: shiftAssignmentsTable.shiftTemplateId })
+    .from(shiftAssignmentsTable)
+    .where(and(
+      eq(shiftAssignmentsTable.employeeId, employeeId),
+      lte(shiftAssignmentsTable.effectiveFrom, date),
+      or(isNull(shiftAssignmentsTable.effectiveTo), gte(shiftAssignmentsTable.effectiveTo, date)),
+    ))
+    .orderBy(shiftAssignmentsTable.effectiveFrom)
+    .limit(1);
+  return row?.shiftTemplateId ?? null;
+}
+
 router.post("/shift-swaps/:id/hr-action", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const { action, remarks } = req.body as { action: "Approved" | "Rejected"; remarks?: string };
     const swapId = Number(req.params.id);
 
     // State machine: HR action is only permitted after HOD has approved
-    const [swap] = await db.select({ hodStatus: shiftSwapsTable.hodStatus }).from(shiftSwapsTable).where(eq(shiftSwapsTable.id, swapId));
+    const [swap] = await db.select().from(shiftSwapsTable).where(eq(shiftSwapsTable.id, swapId));
     if (!swap) { res.status(404).json({ error: "Not found" }); return; }
     if (swap.hodStatus !== "Approved") {
       res.status(422).json({ error: "HR action is not permitted until HOD has approved this swap request" });
@@ -423,6 +438,24 @@ router.post("/shift-swaps/:id/hr-action", requireHrmsUser, requireRole(...HR_ROL
       .where(eq(shiftSwapsTable.id, swapId))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+
+    // Apply the actual schedule swap when HR approves
+    if (action === "Approved") {
+      const swapDate = swap.swapDate;
+      const [requesterTplId, swapWithTplId] = await Promise.all([
+        getActiveTemplateForDate(swap.requesterEmployeeId, swapDate),
+        getActiveTemplateForDate(swap.swapWithEmployeeId, swapDate),
+      ]);
+      // Create one-day assignments exchanging each other's shift template for that date
+      if (requesterTplId && swapWithTplId) {
+        await db.insert(shiftAssignmentsTable).values([
+          { employeeId: swap.requesterEmployeeId, shiftTemplateId: swapWithTplId, effectiveFrom: swapDate, effectiveTo: swapDate, assignedById: req.hrmsUser.id },
+          { employeeId: swap.swapWithEmployeeId, shiftTemplateId: requesterTplId, effectiveFrom: swapDate, effectiveTo: swapDate, assignedById: req.hrmsUser.id },
+        ]);
+      }
+      await logAudit({ user: req.hrmsUser, action: "SWAP_APPLIED", module: "ShiftSwaps", recordId: updated.id, newValue: `Swap applied for ${swapDate}: emp ${swap.requesterEmployeeId} ↔ emp ${swap.swapWithEmployeeId}`, ipAddress: req.ip });
+    }
+
     await logAudit({ user: req.hrmsUser, action: `HR_${action.toUpperCase()}`, module: "ShiftSwaps", recordId: updated.id, newValue: action, ipAddress: req.ip });
     res.json(updated);
   } catch (err) {

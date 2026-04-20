@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 type CalEntry = GetShiftsCalendarQueryResult[number];
 
@@ -24,19 +24,49 @@ function monthLabel(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
 }
 
+/** Get Monday of the week containing `d` */
+function getMondayOf(d: Date): Date {
+  const copy = new Date(d);
+  const dow = copy.getDay(); // 0=Sun, 1=Mon, ...
+  const diff = dow === 0 ? -6 : 1 - dow;
+  copy.setDate(copy.getDate() + diff);
+  return copy;
+}
+
+/** Format a Date as YYYY-MM-DD */
+function toISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function ShiftCalendarPage() {
   const today = new Date();
+  const [view, setView] = useState<"month" | "week">("month");
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
+  const [weekStart, setWeekStart] = useState<Date>(getMondayOf(today));
   const [selectedEmpId, setSelectedEmpId] = useState<number | undefined>(undefined);
 
+  // Determine the month string to query
   const monthStr = `${year}-${String(month).padStart(2, "0")}`;
-  const { data: entries = [], isLoading } = useGetShiftsCalendar({ month: monthStr, employeeId: selectedEmpId });
+  const weekMonthStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}`;
+  const queryMonth = view === "month" ? monthStr : weekMonthStr;
+
+  const { data: entries = [], isLoading } = useGetShiftsCalendar({ month: queryMonth, employeeId: selectedEmpId });
   const { data: _empResponse } = useListEmployees({});
   const employees = _empResponse?.data ?? [];
 
+  // Compute display columns
   const daysInMonth = new Date(year, month, 0).getDate();
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = i + 1;
+    return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  });
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return toISO(d);
+  });
+  const displayDates = view === "month" ? monthDays : weekDays;
 
   // Group by employee
   const byEmployee = new Map<number, { name: string; code: string; days: Map<string, CalEntry> }>();
@@ -47,18 +77,34 @@ export default function ShiftCalendarPage() {
     byEmployee.get(e.employeeId)!.days.set(e.date, e);
   }
 
-  function prevMonth() {
-    if (month === 1) { setMonth(12); setYear(y => y - 1); } else { setMonth(m => m - 1); }
+  function prevPeriod() {
+    if (view === "month") {
+      if (month === 1) { setMonth(12); setYear(y => y - 1); } else { setMonth(m => m - 1); }
+    } else {
+      setWeekStart(ws => { const d = new Date(ws); d.setDate(d.getDate() - 7); return d; });
+    }
   }
-  function nextMonth() {
-    if (month === 12) { setMonth(1); setYear(y => y + 1); } else { setMonth(m => m + 1); }
+  function nextPeriod() {
+    if (view === "month") {
+      if (month === 12) { setMonth(1); setYear(y => y + 1); } else { setMonth(m => m + 1); }
+    } else {
+      setWeekStart(ws => { const d = new Date(ws); d.setDate(d.getDate() + 7); return d; });
+    }
   }
+
+  const periodLabel = view === "month"
+    ? monthLabel(year, month)
+    : `${toISO(weekStart)} – ${toISO(new Date(weekStart.getTime() + 6 * 86400000))}`;
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold">Shift Calendar</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <ToggleGroup type="single" value={view} onValueChange={(v) => { if (v) setView(v as "month" | "week"); }}>
+            <ToggleGroupItem value="month">Month</ToggleGroupItem>
+            <ToggleGroupItem value="week">Week</ToggleGroupItem>
+          </ToggleGroup>
           <Select value={selectedEmpId?.toString() ?? "all"} onValueChange={v => setSelectedEmpId(v === "all" ? undefined : Number(v))}>
             <SelectTrigger className="w-52"><SelectValue placeholder="All Employees" /></SelectTrigger>
             <SelectContent>
@@ -69,9 +115,9 @@ export default function ShiftCalendarPage() {
             </SelectContent>
           </Select>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="w-4 h-4" /></Button>
-            <span className="font-medium w-44 text-center">{monthLabel(year, month)}</span>
-            <Button variant="ghost" size="icon" onClick={nextMonth}><ChevronRight className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={prevPeriod}><ChevronLeft className="w-4 h-4" /></Button>
+            <span className="font-medium w-52 text-center">{periodLabel}</span>
+            <Button variant="ghost" size="icon" onClick={nextPeriod}><ChevronRight className="w-4 h-4" /></Button>
           </div>
         </div>
       </div>
@@ -84,10 +130,16 @@ export default function ShiftCalendarPage() {
             <thead>
               <tr className="bg-muted">
                 <th className="border px-2 py-1 text-left w-36 sticky left-0 bg-muted z-10">Employee</th>
-                {days.map(d => {
-                  const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-                  const dow = new Date(dateStr).toLocaleDateString("default", { weekday: "short" });
-                  return <th key={d} className="border px-1 py-1 text-center min-w-[32px]"><div>{d}</div><div className="text-muted-foreground">{dow}</div></th>;
+                {displayDates.map(dateStr => {
+                  const d = new Date(dateStr);
+                  const dow = d.toLocaleDateString("default", { weekday: "short" });
+                  const dayNum = d.getDate();
+                  return (
+                    <th key={dateStr} className={`border px-1 py-1 text-center ${view === "week" ? "min-w-[120px]" : "min-w-[32px]"}`}>
+                      <div>{dayNum}</div>
+                      <div className="text-muted-foreground">{dow}</div>
+                    </th>
+                  );
                 })}
               </tr>
             </thead>
@@ -98,11 +150,10 @@ export default function ShiftCalendarPage() {
                     <div className="font-medium">{empData.name}</div>
                     <div className="text-muted-foreground">{empData.code}</div>
                   </td>
-                  {days.map(d => {
-                    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  {displayDates.map(dateStr => {
                     const entry = empData.days.get(dateStr);
                     return (
-                      <td key={d} className="border px-1 py-1 text-center align-top">
+                      <td key={dateStr} className={`border px-1 py-1 text-center align-top ${view === "week" ? "p-2" : ""}`}>
                         {entry ? (
                           <div className="space-y-0.5">
                             {entry.shiftName && (
@@ -113,7 +164,7 @@ export default function ShiftCalendarPage() {
                             )}
                             {entry.attendanceStatus && (
                               <span className={`text-xs px-1 rounded ${STATUS_COLORS[entry.attendanceStatus] ?? ""}`}>
-                                {entry.attendanceStatus.split(" ")[0]}
+                                {view === "week" ? entry.attendanceStatus : entry.attendanceStatus.split(" ")[0]}
                               </span>
                             )}
                           </div>

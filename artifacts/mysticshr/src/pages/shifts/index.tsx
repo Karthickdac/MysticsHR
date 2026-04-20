@@ -5,6 +5,7 @@ import {
   usePatchShiftsTemplatesId,
   useDeleteShiftsTemplatesId,
   useGetShiftSwaps,
+  usePostShiftSwaps,
   usePostShiftSwapsIdHodAction,
   usePostShiftSwapsIdHrAction,
   useListEmployees,
@@ -148,8 +149,12 @@ export default function ShiftsPage() {
   const deleteTmpl = useDeleteShiftsTemplatesId();
   const hodAction = usePostShiftSwapsIdHodAction();
   const hrAction = usePostShiftSwapsIdHrAction();
+  const createSwap = usePostShiftSwaps();
 
   const [showTmplForm, setShowTmplForm] = useState(false);
+  const [showSwapForm, setShowSwapForm] = useState(false);
+  const [swapForm, setSwapForm] = useState({ swapWithEmployeeId: 0, swapDate: "", reason: "" });
+  const [swapFormError, setSwapFormError] = useState("");
   const [editingTmpl, setEditingTmpl] = useState<ShiftTemplate | null>(null);
   const [tmplError, setTmplError] = useState("");
   const [swapAction, setSwapAction] = useState<{ id: number; type: "hod" | "hr" } | null>(null);
@@ -188,6 +193,23 @@ export default function ShiftsPage() {
     if (!confirm("Delete this shift template?")) return;
     await deleteTmpl.mutateAsync({ id });
     await qc.invalidateQueries({ queryKey: getGetShiftsTemplatesQueryKey() });
+  }
+
+  async function handleSubmitSwap() {
+    setSwapFormError("");
+    if (!swapForm.swapWithEmployeeId || !swapForm.swapDate || !swapForm.reason) {
+      setSwapFormError("Swap partner, date, and reason are required");
+      return;
+    }
+    try {
+      await createSwap.mutateAsync({ data: { swapWithEmployeeId: swapForm.swapWithEmployeeId, swapDate: swapForm.swapDate, reason: swapForm.reason } });
+      await qc.invalidateQueries({ queryKey: getGetShiftSwapsQueryKey({}) });
+      setShowSwapForm(false);
+      setSwapForm({ swapWithEmployeeId: 0, swapDate: "", reason: "" });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setSwapFormError(err?.message ?? "Failed to submit swap request");
+    }
   }
 
   async function handleSwapAction(action: "Approved" | "Rejected") {
@@ -232,9 +254,9 @@ export default function ShiftsPage() {
         </Link>
       </div>
 
-      <Tabs defaultValue="templates">
+      <Tabs defaultValue={role === "employee" ? "swaps" : "templates"}>
         <TabsList>
-          <TabsTrigger value="templates">Shift Templates</TabsTrigger>
+          {role !== "employee" && <TabsTrigger value="templates">Shift Templates</TabsTrigger>}
           {canManage && <TabsTrigger value="assignments">Assign Shifts</TabsTrigger>}
           <TabsTrigger value="swaps">Swap Requests</TabsTrigger>
         </TabsList>
@@ -351,6 +373,11 @@ export default function ShiftsPage() {
 
         {/* SWAPS TAB */}
         <TabsContent value="swaps" className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={() => { setSwapForm({ swapWithEmployeeId: 0, swapDate: "", reason: "" }); setSwapFormError(""); setShowSwapForm(true); }}>
+              <Plus className="w-4 h-4 mr-2" />Request Swap
+            </Button>
+          </div>
           {swapLoading ? <p className="text-muted-foreground">Loading...</p> : (
             <div className="space-y-3">
               {swaps.map((s: ShiftSwap) => (
@@ -398,6 +425,41 @@ export default function ShiftsPage() {
             saving={createTmpl.isPending || patchTmpl.isPending}
             error={tmplError}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Swap Request Submission Dialog (employee self-service) */}
+      <Dialog open={showSwapForm} onOpenChange={setShowSwapForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Shift Swap</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Swap With Employee *</Label>
+              <Select value={swapForm.swapWithEmployeeId ? swapForm.swapWithEmployeeId.toString() : ""} onValueChange={v => setSwapForm(f => ({ ...f, swapWithEmployeeId: Number(v) }))}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e: Employee) => (
+                    <SelectItem key={e.id} value={e.id.toString()}>{e.firstName} {e.lastName} ({e.employeeId})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Swap Date *</Label>
+              <Input type="date" value={swapForm.swapDate} onChange={e => setSwapForm(f => ({ ...f, swapDate: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Reason *</Label>
+              <Textarea rows={3} value={swapForm.reason} onChange={e => setSwapForm(f => ({ ...f, reason: e.target.value }))} placeholder="Why do you need to swap?" />
+            </div>
+            {swapFormError && <p className="text-destructive text-sm">{swapFormError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSwapForm(false)}>Cancel</Button>
+            <Button onClick={handleSubmitSwap} disabled={createSwap.isPending}>Submit Request</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
