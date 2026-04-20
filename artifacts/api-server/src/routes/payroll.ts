@@ -537,7 +537,7 @@ router.get("/payroll/runs", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES)
       runAt: payrollRunsTable.runAt,
       approvedAt: payrollRunsTable.approvedAt,
       createdAt: payrollRunsTable.createdAt,
-      initiatorName: sql<string>`u1.first_name || ' ' || u1.last_name`,
+      initiatorName: sql<string>`u1.name`,
     }).from(payrollRunsTable)
       .leftJoin(sql`hrms_users u1`, sql`u1.id = ${payrollRunsTable.initiatedById}`)
       .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth));
@@ -654,10 +654,10 @@ router.post("/payroll/runs/:id/compute", requireHrmsUser, requireRole(...PAYROLL
         and(eq(attendanceRecordsTable.employeeId, emp.id), gte(attendanceRecordsTable.attendanceDate, periodStart), lte(attendanceRecordsTable.attendanceDate, periodEnd))
       );
 
-      const presentStatuses = ["Present", "On Leave", "On Permission", "Work From Home", "Late", "Half Day"];
+      const presentStatuses = ["Present", "On Leave", "On Permission", "Work From Home", "Late", "Half-Day"];
       const presentDays = attendanceRows.filter(a => presentStatuses.includes(a.status ?? "")).length +
-        attendanceRows.filter(a => a.status === "Half Day").length * 0.5 -
-        attendanceRows.filter(a => a.status === "Half Day").length;
+        attendanceRows.filter(a => a.status === "Half-Day").length * 0.5 -
+        attendanceRows.filter(a => a.status === "Half-Day").length;
 
       const absences = attendanceRows.filter(a => a.status === "Absent").length;
       const lopDays = absences;

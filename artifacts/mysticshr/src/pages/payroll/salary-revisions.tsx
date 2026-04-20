@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   useListSalaryRevisions, useCreateSalaryRevision, useActionSalaryRevision,
   useListSalaryStructures, getListSalaryRevisionsQueryKey,
+  type SalaryRevision,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
@@ -40,7 +41,7 @@ export default function SalaryRevisionsPage() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("_all");
   const [showCreate, setShowCreate] = useState(false);
-  const [actionRevision, setActionRevision] = useState<any | null>(null);
+  const [actionRevision, setActionRevision] = useState<SalaryRevision | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject">("approve");
   const [error, setError] = useState<string | null>(null);
 
