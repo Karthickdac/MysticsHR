@@ -2383,6 +2383,25 @@ export interface AddTicketCommentBody {
   isInternal?: boolean;
 }
 
+export interface TicketAssignment {
+  id: number;
+  ticketId: number;
+  /** @nullable */
+  assignedToUserId?: number | null;
+  /** @nullable */
+  assignedByUserId?: number | null;
+  assignedAt: string;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  assigneeName?: string | null;
+}
+
+export interface CreateTicketAssignmentBody {
+  assignedToUserId: number;
+  note?: string;
+}
+
 export type HelpdeskSlaReportByPriorityItem = {
   priority: string;
   count: number;

@@ -4120,6 +4120,48 @@ paths:
               schema:
                 $ref: "#/components/schemas/TicketComment"
 
+  /helpdesk/tickets/{id}/assignments:
+    get:
+      operationId: listTicketAssignments
+      tags: [helpdesk]
+      summary: List assignment history for a ticket
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of ticket assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TicketAssignment"
+    post:
+      operationId: createTicketAssignment
+      tags: [helpdesk]
+      summary: Assign a ticket to a user (HR only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketAssignmentBody"
+      responses:
+        "201":
+          description: Assignment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketAssignment"
+
   /helpdesk/sla-report:
     get:
       operationId: getHelpdeskSlaReport
@@ -6794,6 +6836,25 @@ components:
       properties:
         message: { type: string }
         isInternal: { type: boolean }
+
+    TicketAssignment:
+      type: object
+      properties:
+        id: { type: integer }
+        ticketId: { type: integer }
+        assignedToUserId: { type: ['integer', 'null'] }
+        assignedByUserId: { type: ['integer', 'null'] }
+        assignedAt: { type: string, format: date-time }
+        note: { type: ['string', 'null'] }
+        assigneeName: { type: ['string', 'null'] }
+      required: [id, ticketId, assignedAt]
+
+    CreateTicketAssignmentBody:
+      type: object
+      required: [assignedToUserId]
+      properties:
+        assignedToUserId: { type: integer }
+        note: { type: string }
 
     HelpdeskSlaReport:
       type: object

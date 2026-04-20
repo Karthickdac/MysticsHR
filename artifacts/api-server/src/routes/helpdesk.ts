@@ -10,7 +10,7 @@ import {
   employeesTable,
   hrmsUsersTable,
 } from "@workspace/db/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, or } from "drizzle-orm";
 
 const router = Router();
 
@@ -120,10 +120,14 @@ async function enrichTicket(ticketInput: typeof helpdeskTicketsTable.$inferSelec
       event: `SLA BREACH: Ticket #${ticket.id} "${ticket.subject}" is overdue. Assignee: user ${ticket.assignedToUserId ?? "unassigned"}.`,
     });
 
-    // Persist in-app notifications to HR managers and assignee
+    // Persist in-app notifications to HR managers, HOD (dept managers), and assignee
     const hrUsers = await db.select({ id: hrmsUsersTable.id })
       .from(hrmsUsersTable)
-      .where(inArray(hrmsUsersTable.role, ["hr_manager", "super_admin"] as any[]));
+      .where(or(
+        eq(hrmsUsersTable.role, "hr_manager"),
+        eq(hrmsUsersTable.role, "super_admin"),
+        eq(hrmsUsersTable.role, "hod"),
+      ));
     const recipients: number[] = hrUsers.map(u => u.id);
     if (ticket.assignedToUserId && !recipients.includes(ticket.assignedToUserId)) {
       recipients.push(ticket.assignedToUserId);
@@ -376,10 +380,14 @@ router.post("/helpdesk/sla-check", requireHrmsUser, requireRole(...MANAGER_ROLES
       !t.slaEscalatedAt
     );
 
-    // Collect HR managers and HR heads to notify
+    // Collect HR managers, HR heads, and HOD (department managers) to notify
     const hrUsers = await db.select({ id: hrmsUsersTable.id, role: hrmsUsersTable.role })
       .from(hrmsUsersTable)
-      .where(inArray(hrmsUsersTable.role, ["hr_manager", "super_admin"] as any[]));
+      .where(or(
+        eq(hrmsUsersTable.role, "hr_manager"),
+        eq(hrmsUsersTable.role, "super_admin"),
+        eq(hrmsUsersTable.role, "hod"),
+      ));
 
     let escalated = 0;
     for (const ticket of breachTargets) {

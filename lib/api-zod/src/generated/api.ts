@@ -4931,6 +4931,38 @@ export const AddTicketCommentBody = zod.object({
 });
 
 /**
+ * @summary List assignment history for a ticket
+ */
+export const ListTicketAssignmentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListTicketAssignmentsResponseItem = zod.object({
+  id: zod.number(),
+  ticketId: zod.number(),
+  assignedToUserId: zod.number().nullish(),
+  assignedByUserId: zod.number().nullish(),
+  assignedAt: zod.coerce.date(),
+  note: zod.string().nullish(),
+  assigneeName: zod.string().nullish(),
+});
+export const ListTicketAssignmentsResponse = zod.array(
+  ListTicketAssignmentsResponseItem,
+);
+
+/**
+ * @summary Assign a ticket to a user (HR only)
+ */
+export const CreateTicketAssignmentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateTicketAssignmentBody = zod.object({
+  assignedToUserId: zod.number(),
+  note: zod.string().optional(),
+});
+
+/**
  * @summary SLA breach and resolution report
  */
 export const GetHelpdeskSlaReportResponse = zod.object({

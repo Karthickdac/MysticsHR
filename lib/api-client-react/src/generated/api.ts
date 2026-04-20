@@ -68,6 +68,7 @@ import type {
   CreateShiftSwapBody,
   CreateShiftTemplateBody,
   CreateTaxDeclarationBody,
+  CreateTicketAssignmentBody,
   CreateUserBody,
   DashboardKpis,
   Department,
@@ -203,6 +204,7 @@ import type {
   SubmitPermissionBody,
   SubmitSelfAppraisalBody,
   TaxDeclaration,
+  TicketAssignment,
   TicketComment,
   UpdateCandidateBody,
   UpdateDepartmentBody,
@@ -18792,6 +18794,182 @@ export const useAddTicketComment = <
   TContext
 > => {
   return useMutation(getAddTicketCommentMutationOptions(options));
+};
+
+/**
+ * @summary List assignment history for a ticket
+ */
+export const getListTicketAssignmentsUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}/assignments`;
+};
+
+export const listTicketAssignments = async (
+  id: number,
+  options?: RequestInit,
+): Promise<TicketAssignment[]> => {
+  return customFetch<TicketAssignment[]>(getListTicketAssignmentsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTicketAssignmentsQueryKey = (id: number) => {
+  return [`/api/helpdesk/tickets/${id}/assignments`] as const;
+};
+
+export const getListTicketAssignmentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTicketAssignments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTicketAssignments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListTicketAssignmentsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTicketAssignments>>
+  > = ({ signal }) => listTicketAssignments(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTicketAssignments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTicketAssignmentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTicketAssignments>>
+>;
+export type ListTicketAssignmentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List assignment history for a ticket
+ */
+
+export function useListTicketAssignments<
+  TData = Awaited<ReturnType<typeof listTicketAssignments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTicketAssignments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTicketAssignmentsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Assign a ticket to a user (HR only)
+ */
+export const getCreateTicketAssignmentUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}/assignments`;
+};
+
+export const createTicketAssignment = async (
+  id: number,
+  createTicketAssignmentBody: CreateTicketAssignmentBody,
+  options?: RequestInit,
+): Promise<TicketAssignment> => {
+  return customFetch<TicketAssignment>(getCreateTicketAssignmentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createTicketAssignmentBody),
+  });
+};
+
+export const getCreateTicketAssignmentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTicketAssignment>>,
+    TError,
+    { id: number; data: BodyType<CreateTicketAssignmentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createTicketAssignment>>,
+  TError,
+  { id: number; data: BodyType<CreateTicketAssignmentBody> },
+  TContext
+> => {
+  const mutationKey = ["createTicketAssignment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createTicketAssignment>>,
+    { id: number; data: BodyType<CreateTicketAssignmentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return createTicketAssignment(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateTicketAssignmentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createTicketAssignment>>
+>;
+export type CreateTicketAssignmentMutationBody =
+  BodyType<CreateTicketAssignmentBody>;
+export type CreateTicketAssignmentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Assign a ticket to a user (HR only)
+ */
+export const useCreateTicketAssignment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTicketAssignment>>,
+    TError,
+    { id: number; data: BodyType<CreateTicketAssignmentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createTicketAssignment>>,
+  TError,
+  { id: number; data: BodyType<CreateTicketAssignmentBody> },
+  TContext
+> => {
+  return useMutation(getCreateTicketAssignmentMutationOptions(options));
 };
 
 /**
