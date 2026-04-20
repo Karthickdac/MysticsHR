@@ -25,3 +25,7 @@ export * from "./helpdesk";
 export * from "./documents";
 export * from "./notifications";
 export * from "./exit";
+export * from "./notification_logs";
+export * from "./notification_templates";
+export * from "./system_settings";
+export * from "./approval_chain_configs";

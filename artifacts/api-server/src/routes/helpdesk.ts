@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
+import { dispatchNotification } from "../lib/notification-service";
 import { db } from "../lib/db";
 import {
   helpdeskTicketsTable,
@@ -240,6 +241,22 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
       });
     }
 
+    // Notify assignee about new ticket
+    if (assignedToUserId) {
+      const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, assignedToUserId));
+      if (assignee?.email) {
+        dispatchNotification({
+          eventType: "helpdesk_ticket_raised", module: "helpdesk",
+          recipientEmail: assignee.email, recipientName: assignee.name ?? undefined,
+          variables: {
+            ticketId: String(ticket.id), subject, slaDeadline: slaDeadline.toISOString(),
+            recipientName: assignee.name ?? "Team Member",
+          },
+          entityType: "helpdesk_ticket", entityId: ticket.id,
+        }).catch(() => {});
+      }
+    }
     res.status(201).json(await enrichTicket(ticket));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

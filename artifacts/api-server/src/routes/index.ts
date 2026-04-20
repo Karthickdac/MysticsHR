@@ -22,6 +22,8 @@ import helpdeskRouter from "./helpdesk";
 import documentsRouter from "./documents";
 import exitRouter from "./exit";
 import reportsRouter from "./reports";
+import notificationsRouter from "./notifications";
+import systemConfigRouter from "./system-config";
 
 const router: IRouter = Router();
 
@@ -47,6 +49,8 @@ router.use(helpdeskRouter);
 router.use(documentsRouter);
 router.use(exitRouter);
 router.use(reportsRouter);
+router.use(notificationsRouter);
+router.use(systemConfigRouter);
 router.use(auditLogsRouter);
 
 export default router;

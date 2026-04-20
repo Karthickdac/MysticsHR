@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
+import { dispatchNotification } from "../lib/notification-service";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { checkPayrollLock } from "../lib/payroll-lock";
@@ -545,6 +546,23 @@ router.post("/leave/applications", requireHrmsUser, requireRole(...ALL_ROLES), a
     });
 
     await logAudit({ user: req.hrmsUser, action: "SUBMIT_LEAVE", module: "Leave", recordId: app.id, newValue: `${leaveType.code} ${fromDate}~${toDate}`, ipAddress: req.ip });
+    // Notify HOD/HR about new leave application
+    const empInfo = await db.select({ name: employeesTable.firstName, lastName: employeesTable.lastName })
+      .from(employeesTable).where(eq(employeesTable.id, app.employeeId)).then(r => r[0]);
+    const [hodUser] = await db.select({ email: hrmsUsersTable.email }).from(hrmsUsersTable)
+      .where(eq(hrmsUsersTable.role, "hod")).limit(1);
+    if (hodUser?.email) {
+      dispatchNotification({
+        eventType: "leave_submitted", module: "leave",
+        recipientEmail: hodUser.email,
+        variables: {
+          employeeName: empInfo ? `${empInfo.name} ${empInfo.lastName}` : "An employee",
+          fromDate: String(fromDate), toDate: String(toDate),
+          days: String(totalDays), leaveType: leaveType.name,
+        },
+        entityType: "leave_application", entityId: app.id,
+      }).catch(() => {});
+    }
     res.status(201).json(app);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -669,6 +687,23 @@ router.post("/leave/applications/:id/hr-action", requireHrmsUser, requireRole(..
     });
 
     await logAudit({ user: req.hrmsUser, action: `HR_${action.toUpperCase()}_LEAVE`, module: "Leave", recordId: appId, newValue: action, ipAddress: req.ip });
+    // Notify employee about leave decision
+    const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+      .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, app.employeeId));
+    if (empUser?.email) {
+      dispatchNotification({
+        eventType: action === "Approved" ? "leave_approved" : "leave_rejected",
+        module: "leave",
+        recipientEmail: empUser.email,
+        recipientName: empUser.name ?? undefined,
+        variables: {
+          fromDate: String(app.fromDate), toDate: String(app.toDate),
+          leaveType: String(app.leaveTypeId), reason: remarks ?? "",
+          recipientName: empUser.name ?? "Team Member",
+        },
+        entityType: "leave_application", entityId: appId,
+      }).catch(() => {});
+    }
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

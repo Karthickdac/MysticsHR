@@ -431,6 +431,18 @@ router.post("/payroll/locks/:year/:month/lock", requireHrmsUser, requireRole(...
       [lock] = await db.insert(payrollLocksTable).values({ year, month, isLocked: true, lockedById: req.hrmsUser!.id, lockedAt: new Date() }).returning();
     }
     await logAudit({ user: req.hrmsUser, action: "PAYROLL_LOCK", module: "Payroll", recordId: lock.id, newValue: `${year}-${month}`, ipAddress: req.ip });
+    // Notify HR managers about payroll lock
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const periodLabel = `${monthNames[(month - 1) % 12]} ${year}`;
+    import("../lib/notification-service").then(({ dispatchNotification }) => {
+      dispatchNotification({
+        eventType: "payroll_locked", module: "payroll",
+        recipientEmail: req.hrmsUser!.email,
+        recipientName: req.hrmsUser!.name,
+        variables: { period: periodLabel, recipientName: req.hrmsUser!.name },
+        entityType: "payroll_lock", entityId: lock.id,
+      }).catch(() => {});
+    });
     res.json(lock);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

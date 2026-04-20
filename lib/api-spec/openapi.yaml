@@ -8,6 +8,10 @@ servers:
   - url: /api
     description: Base API path
 tags:
+  - name: notifications
+    description: Notification templates, logs, and channel configuration
+  - name: system-config
+    description: System configuration — org profile, statutory rates, approval chains, RBAC
   - name: performance
     description: Performance management — cycles, goals, appraisals, calibration, outcomes
   - name: ess
@@ -5020,6 +5024,292 @@ paths:
                   pfTotal: { type: number }
                   esiTotal: { type: number }
 
+  # ─── Notification Templates ────────────────────────────────────────────────────
+
+  /notification-templates:
+    get:
+      operationId: listNotificationTemplates
+      tags: [notifications]
+      summary: List all notification templates
+      responses:
+        '200':
+          description: List of notification templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationTemplate'
+    post:
+      operationId: createNotificationTemplate
+      tags: [notifications]
+      summary: Create a notification template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNotificationTemplateBody'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplate'
+
+  /notification-templates/{id}:
+    put:
+      operationId: updateNotificationTemplate
+      tags: [notifications]
+      summary: Update a notification template
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNotificationTemplateBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplate'
+    delete:
+      operationId: deleteNotificationTemplate
+      tags: [notifications]
+      summary: Delete a notification template
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '204':
+          description: Deleted
+
+  # ─── Notification Logs ─────────────────────────────────────────────────────────
+
+  /notification-logs:
+    get:
+      operationId: listNotificationLogs
+      tags: [notifications]
+      summary: List notification logs with optional filters
+      parameters:
+        - in: query
+          name: channel
+          schema: { type: string }
+        - in: query
+          name: module
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: string }
+        - in: query
+          name: offset
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated notification logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificationLog'
+                  total: { type: integer }
+                required: [logs, total]
+
+  # ─── SMTP / WhatsApp Test ──────────────────────────────────────────────────────
+
+  /notifications/test-smtp:
+    post:
+      operationId: testSmtpConfig
+      tags: [notifications]
+      summary: Test SMTP configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                host: { type: string }
+                port: { type: string }
+                secure: { type: boolean }
+                username: { type: string }
+                password: { type: string }
+                from: { type: string }
+                testTo: { type: string }
+      responses:
+        '200':
+          description: SMTP test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /notifications/test-whatsapp:
+    post:
+      operationId: testWhatsAppConfig
+      tags: [notifications]
+      summary: Test WhatsApp Business API configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone_number_id, access_token, testTo]
+              properties:
+                phone_number_id: { type: string }
+                access_token: { type: string }
+                testTo: { type: string }
+      responses:
+        '200':
+          description: WhatsApp test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  # ─── System Settings ─────────────────────────────────────────────────────────
+
+  /system-settings/{category}:
+    get:
+      operationId: getSystemSettings
+      tags: [system-config]
+      summary: Get all settings for a category
+      parameters:
+        - in: path
+          name: category
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Settings as key-value map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      operationId: updateSystemSettings
+      tags: [system-config]
+      summary: Upsert settings for a category
+      parameters:
+        - in: path
+          name: category
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  # ─── Approval Chains ───────────────────────────────────────────────────────────
+
+  /approval-chains:
+    get:
+      operationId: listApprovalChains
+      tags: [system-config]
+      summary: List all approval chain configurations
+      responses:
+        '200':
+          description: Approval chains
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApprovalChainConfig'
+    post:
+      operationId: createApprovalChain
+      tags: [system-config]
+      summary: Create an approval chain step
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApprovalChainBody'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalChainConfig'
+
+  /approval-chains/{id}:
+    put:
+      operationId: updateApprovalChain
+      tags: [system-config]
+      summary: Update an approval chain step
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApprovalChainBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalChainConfig'
+    delete:
+      operationId: deleteApprovalChain
+      tags: [system-config]
+      summary: Delete an approval chain step
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '204':
+          description: Deleted
+
   # ──────────────────────────────────────────────────────────────────────────────
 
 components:
@@ -7895,3 +8185,86 @@ components:
         reportType: { type: string }
         selectedFields: { type: array, items: { type: string } }
         filters: { type: object }
+
+    NotificationLog:
+      type: object
+      properties:
+        id: { type: integer }
+        channel: { type: string }
+        eventType: { type: string }
+        module: { type: string }
+        recipientEmail: { type: ['string', 'null'] }
+        recipientPhone: { type: ['string', 'null'] }
+        recipientName: { type: ['string', 'null'] }
+        subject: { type: ['string', 'null'] }
+        body: { type: ['string', 'null'] }
+        status: { type: string }
+        errorMessage: { type: ['string', 'null'] }
+        entityType: { type: ['string', 'null'] }
+        entityId: { type: ['integer', 'null'] }
+        metadata: { type: ['object', 'null'] }
+        sentAt: { type: string, format: date-time }
+      required: [id, channel, eventType, module, status, sentAt]
+
+    NotificationTemplate:
+      type: object
+      properties:
+        id: { type: integer }
+        eventType: { type: string }
+        channel: { type: string }
+        emailSubject: { type: ['string', 'null'] }
+        emailBody: { type: ['string', 'null'] }
+        whatsappTemplate: { type: ['string', 'null'] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, eventType, channel, isActive, createdAt, updatedAt]
+
+    CreateNotificationTemplateBody:
+      type: object
+      required: [eventType]
+      properties:
+        eventType: { type: string }
+        channel: { type: string, enum: [email, whatsapp, both] }
+        emailSubject: { type: string }
+        emailBody: { type: string }
+        whatsappTemplate: { type: string }
+        isActive: { type: boolean }
+
+    UpdateNotificationTemplateBody:
+      type: object
+      properties:
+        channel: { type: string, enum: [email, whatsapp, both] }
+        emailSubject: { type: string }
+        emailBody: { type: string }
+        whatsappTemplate: { type: string }
+        isActive: { type: boolean }
+
+    ApprovalChainConfig:
+      type: object
+      properties:
+        id: { type: integer }
+        transactionType: { type: string }
+        step: { type: integer }
+        approverRole: { type: string }
+        approverLabel: { type: string }
+        isActive: { type: boolean }
+        escalationAfterHours: { type: ['integer', 'null'] }
+        escalateTo: { type: ['string', 'null'] }
+        conditions: { type: ['object', 'null'] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, transactionType, step, approverRole, approverLabel, isActive, createdAt, updatedAt]
+
+    CreateApprovalChainBody:
+      type: object
+      required: [transactionType, approverRole, approverLabel]
+      properties:
+        transactionType: { type: string }
+        step: { type: integer }
+        approverRole: { type: string }
+        approverLabel: { type: string }
+        isActive: { type: boolean }
+        escalationAfterHours: { type: integer }
+        escalateTo: { type: string }
+        conditions: { type: object }

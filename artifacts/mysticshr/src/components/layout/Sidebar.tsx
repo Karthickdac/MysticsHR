@@ -24,6 +24,7 @@ import {
   FileBadge,
   TrendingDown,
   BarChart3,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
     { name: "Designations", href: "/designations", icon: Briefcase, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Users", href: "/users", icon: ShieldCheck, roles: ["super_admin", "hr_manager"] },
     { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["super_admin", "hr_manager"] },
+    { name: "Communications", href: "/communications", icon: Bell, roles: ["super_admin", "hr_manager"] },
     { name: "Settings", href: "/settings", icon: Settings, roles: ["super_admin", "hr_manager"] },
   ];
 

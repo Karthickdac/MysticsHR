@@ -53,15 +53,10 @@ import ExitPage from "@/pages/exit/index";
 import ExitDetailPage from "@/pages/exit/detail";
 import AnalyticsDashboard from "@/pages/analytics/index";
 import ReportsPage from "@/pages/reports/index";
+import CommunicationsPage from "@/pages/communications/index";
+import SystemConfigPage from "@/pages/system-config/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
-
-const Settings = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold">Settings</h1>
-    <p className="text-muted-foreground mt-2">System settings coming soon.</p>
-  </div>
-);
 
 const NewEmployee = () => (
   <div className="p-6">
@@ -638,10 +633,18 @@ function ClerkProviderWithRoutes() {
             </ProtectedRoute>
           </Route>
 
+          <Route path="/communications">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager"]}>
+                <CommunicationsPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
           <Route path="/settings">
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager"]}>
-                <Settings />
+                <SystemConfigPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>

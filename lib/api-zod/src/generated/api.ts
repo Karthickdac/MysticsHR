@@ -6076,3 +6076,232 @@ export const GetStatutoryComplianceReportResponse = zod.object({
   pfTotal: zod.number().optional(),
   esiTotal: zod.number().optional(),
 });
+
+/**
+ * @summary List all notification templates
+ */
+export const ListNotificationTemplatesResponseItem = zod.object({
+  id: zod.number(),
+  eventType: zod.string(),
+  channel: zod.string(),
+  emailSubject: zod.string().nullish(),
+  emailBody: zod.string().nullish(),
+  whatsappTemplate: zod.string().nullish(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListNotificationTemplatesResponse = zod.array(
+  ListNotificationTemplatesResponseItem,
+);
+
+/**
+ * @summary Create a notification template
+ */
+export const CreateNotificationTemplateBody = zod.object({
+  eventType: zod.string(),
+  channel: zod.enum(["email", "whatsapp", "both"]).optional(),
+  emailSubject: zod.string().optional(),
+  emailBody: zod.string().optional(),
+  whatsappTemplate: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update a notification template
+ */
+export const UpdateNotificationTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateNotificationTemplateBody = zod.object({
+  channel: zod.enum(["email", "whatsapp", "both"]).optional(),
+  emailSubject: zod.string().optional(),
+  emailBody: zod.string().optional(),
+  whatsappTemplate: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateNotificationTemplateResponse = zod.object({
+  id: zod.number(),
+  eventType: zod.string(),
+  channel: zod.string(),
+  emailSubject: zod.string().nullish(),
+  emailBody: zod.string().nullish(),
+  whatsappTemplate: zod.string().nullish(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a notification template
+ */
+export const DeleteNotificationTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List notification logs with optional filters
+ */
+export const ListNotificationLogsQueryParams = zod.object({
+  channel: zod.coerce.string().optional(),
+  module: zod.coerce.string().optional(),
+  status: zod.coerce.string().optional(),
+  search: zod.coerce.string().optional(),
+  limit: zod.coerce.string().optional(),
+  offset: zod.coerce.string().optional(),
+});
+
+export const ListNotificationLogsResponse = zod.object({
+  logs: zod.array(
+    zod.object({
+      id: zod.number(),
+      channel: zod.string(),
+      eventType: zod.string(),
+      module: zod.string(),
+      recipientEmail: zod.string().nullish(),
+      recipientPhone: zod.string().nullish(),
+      recipientName: zod.string().nullish(),
+      subject: zod.string().nullish(),
+      body: zod.string().nullish(),
+      status: zod.string(),
+      errorMessage: zod.string().nullish(),
+      entityType: zod.string().nullish(),
+      entityId: zod.number().nullish(),
+      metadata: zod.object({}).passthrough().nullish(),
+      sentAt: zod.coerce.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Test SMTP configuration
+ */
+export const TestSmtpConfigBody = zod.object({
+  host: zod.string().optional(),
+  port: zod.string().optional(),
+  secure: zod.boolean().optional(),
+  username: zod.string().optional(),
+  password: zod.string().optional(),
+  from: zod.string().optional(),
+  testTo: zod.string().optional(),
+});
+
+export const TestSmtpConfigResponse = zod.object({
+  success: zod.boolean().optional(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Test WhatsApp Business API configuration
+ */
+export const TestWhatsAppConfigBody = zod.object({
+  phone_number_id: zod.string(),
+  access_token: zod.string(),
+  testTo: zod.string(),
+});
+
+export const TestWhatsAppConfigResponse = zod.object({
+  success: zod.boolean().optional(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Get all settings for a category
+ */
+export const GetSystemSettingsParams = zod.object({
+  category: zod.coerce.string(),
+});
+
+export const GetSystemSettingsResponse = zod.record(
+  zod.string(),
+  zod.unknown(),
+);
+
+/**
+ * @summary Upsert settings for a category
+ */
+export const UpdateSystemSettingsParams = zod.object({
+  category: zod.coerce.string(),
+});
+
+export const UpdateSystemSettingsBody = zod.record(zod.string(), zod.unknown());
+
+export const UpdateSystemSettingsResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary List all approval chain configurations
+ */
+export const ListApprovalChainsResponseItem = zod.object({
+  id: zod.number(),
+  transactionType: zod.string(),
+  step: zod.number(),
+  approverRole: zod.string(),
+  approverLabel: zod.string(),
+  isActive: zod.boolean(),
+  escalationAfterHours: zod.number().nullish(),
+  escalateTo: zod.string().nullish(),
+  conditions: zod.object({}).passthrough().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListApprovalChainsResponse = zod.array(
+  ListApprovalChainsResponseItem,
+);
+
+/**
+ * @summary Create an approval chain step
+ */
+export const CreateApprovalChainBody = zod.object({
+  transactionType: zod.string(),
+  step: zod.number().optional(),
+  approverRole: zod.string(),
+  approverLabel: zod.string(),
+  isActive: zod.boolean().optional(),
+  escalationAfterHours: zod.number().optional(),
+  escalateTo: zod.string().optional(),
+  conditions: zod.object({}).passthrough().optional(),
+});
+
+/**
+ * @summary Update an approval chain step
+ */
+export const UpdateApprovalChainParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateApprovalChainBody = zod.object({
+  transactionType: zod.string(),
+  step: zod.number().optional(),
+  approverRole: zod.string(),
+  approverLabel: zod.string(),
+  isActive: zod.boolean().optional(),
+  escalationAfterHours: zod.number().optional(),
+  escalateTo: zod.string().optional(),
+  conditions: zod.object({}).passthrough().optional(),
+});
+
+export const UpdateApprovalChainResponse = zod.object({
+  id: zod.number(),
+  transactionType: zod.string(),
+  step: zod.number(),
+  approverRole: zod.string(),
+  approverLabel: zod.string(),
+  isActive: zod.boolean(),
+  escalationAfterHours: zod.number().nullish(),
+  escalateTo: zod.string().nullish(),
+  conditions: zod.object({}).passthrough().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an approval chain step
+ */
+export const DeleteApprovalChainParams = zod.object({
+  id: zod.coerce.number(),
+});

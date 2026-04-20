@@ -2823,6 +2823,123 @@ export interface RunCustomReportBody {
   filters?: RunCustomReportBodyFilters;
 }
 
+/**
+ * @nullable
+ */
+export type NotificationLogMetadata = { [key: string]: unknown } | null;
+
+export interface NotificationLog {
+  id: number;
+  channel: string;
+  eventType: string;
+  module: string;
+  /** @nullable */
+  recipientEmail?: string | null;
+  /** @nullable */
+  recipientPhone?: string | null;
+  /** @nullable */
+  recipientName?: string | null;
+  /** @nullable */
+  subject?: string | null;
+  /** @nullable */
+  body?: string | null;
+  status: string;
+  /** @nullable */
+  errorMessage?: string | null;
+  /** @nullable */
+  entityType?: string | null;
+  /** @nullable */
+  entityId?: number | null;
+  /** @nullable */
+  metadata?: NotificationLogMetadata;
+  sentAt: string;
+}
+
+export interface NotificationTemplate {
+  id: number;
+  eventType: string;
+  channel: string;
+  /** @nullable */
+  emailSubject?: string | null;
+  /** @nullable */
+  emailBody?: string | null;
+  /** @nullable */
+  whatsappTemplate?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateNotificationTemplateBodyChannel =
+  (typeof CreateNotificationTemplateBodyChannel)[keyof typeof CreateNotificationTemplateBodyChannel];
+
+export const CreateNotificationTemplateBodyChannel = {
+  email: "email",
+  whatsapp: "whatsapp",
+  both: "both",
+} as const;
+
+export interface CreateNotificationTemplateBody {
+  eventType: string;
+  channel?: CreateNotificationTemplateBodyChannel;
+  emailSubject?: string;
+  emailBody?: string;
+  whatsappTemplate?: string;
+  isActive?: boolean;
+}
+
+export type UpdateNotificationTemplateBodyChannel =
+  (typeof UpdateNotificationTemplateBodyChannel)[keyof typeof UpdateNotificationTemplateBodyChannel];
+
+export const UpdateNotificationTemplateBodyChannel = {
+  email: "email",
+  whatsapp: "whatsapp",
+  both: "both",
+} as const;
+
+export interface UpdateNotificationTemplateBody {
+  channel?: UpdateNotificationTemplateBodyChannel;
+  emailSubject?: string;
+  emailBody?: string;
+  whatsappTemplate?: string;
+  isActive?: boolean;
+}
+
+/**
+ * @nullable
+ */
+export type ApprovalChainConfigConditions = { [key: string]: unknown } | null;
+
+export interface ApprovalChainConfig {
+  id: number;
+  transactionType: string;
+  step: number;
+  approverRole: string;
+  approverLabel: string;
+  isActive: boolean;
+  /** @nullable */
+  escalationAfterHours?: number | null;
+  /** @nullable */
+  escalateTo?: string | null;
+  /** @nullable */
+  conditions?: ApprovalChainConfigConditions;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateApprovalChainBodyConditions = { [key: string]: unknown };
+
+export interface CreateApprovalChainBody {
+  transactionType: string;
+  step?: number;
+  approverRole: string;
+  approverLabel: string;
+  isActive?: boolean;
+  escalationAfterHours?: number;
+  escalateTo?: string;
+  conditions?: CreateApprovalChainBodyConditions;
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -3537,4 +3654,52 @@ export type GetStatutoryComplianceReport200 = {
   total?: number;
   pfTotal?: number;
   esiTotal?: number;
+};
+
+export type ListNotificationLogsParams = {
+  channel?: string;
+  module?: string;
+  status?: string;
+  search?: string;
+  limit?: string;
+  offset?: string;
+};
+
+export type ListNotificationLogs200 = {
+  logs: NotificationLog[];
+  total: number;
+};
+
+export type TestSmtpConfigBody = {
+  host?: string;
+  port?: string;
+  secure?: boolean;
+  username?: string;
+  password?: string;
+  from?: string;
+  testTo?: string;
+};
+
+export type TestSmtpConfig200 = {
+  success?: boolean;
+  message?: string;
+};
+
+export type TestWhatsAppConfigBody = {
+  phone_number_id: string;
+  access_token: string;
+  testTo: string;
+};
+
+export type TestWhatsAppConfig200 = {
+  success?: boolean;
+  message?: string;
+};
+
+export type GetSystemSettings200 = { [key: string]: unknown };
+
+export type UpdateSystemSettingsBody = { [key: string]: unknown };
+
+export type UpdateSystemSettings200 = {
+  success?: boolean;
 };
