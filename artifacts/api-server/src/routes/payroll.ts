@@ -435,7 +435,7 @@ router.post("/payroll/locks/:year/:month/lock", requireHrmsUser, requireRole(...
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-router.post("/payroll/locks/:year/:month/unlock", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
+router.post("/payroll/locks/:year/:month/unlock", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
   try {
     const year = Number(req.params.year);
     const month = Number(req.params.month);

@@ -221,10 +221,21 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                 ? "Payroll is locked. Salary edits, attendance changes, and leave balance adjustments are blocked."
                 : "Payroll is open. Initiating a new run will auto-lock the period."}
             </p>
+            {isCurrentlyLocked && !isSuperAdmin && (
+              <p className="text-xs text-amber-700 mt-1">Only a Super Admin can manually unlock. Lock is released automatically upon finalization.</p>
+            )}
           </div>
-          <Button variant={isCurrentlyLocked ? "outline" : "secondary"} size="sm" onClick={handleToggleLock} disabled={lockPayroll.isPending || unlockPayroll.isPending}>
-            {isCurrentlyLocked ? <><Unlock className="w-4 h-4 mr-1" />Unlock</> : <><Lock className="w-4 h-4 mr-1" />Lock</>}
-          </Button>
+          {/* Lock: any admin; Unlock: Super Admin only (per policy — use finalize to release) */}
+          {!isCurrentlyLocked && (
+            <Button variant="secondary" size="sm" onClick={handleToggleLock} disabled={lockPayroll.isPending}>
+              <Lock className="w-4 h-4 mr-1" />Lock
+            </Button>
+          )}
+          {isCurrentlyLocked && isSuperAdmin && (
+            <Button variant="outline" size="sm" onClick={handleToggleLock} disabled={unlockPayroll.isPending}>
+              <Unlock className="w-4 h-4 mr-1" />Unlock
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -263,7 +274,7 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                     <th className="text-right py-2 pr-3 font-medium text-muted-foreground">Gross</th>
                     <th className="text-right py-2 pr-3 font-medium text-muted-foreground">Deductions</th>
                     <th className="text-right py-2 pr-3 font-medium text-muted-foreground">Net Pay</th>
-                    {isSuperAdmin && <th className="text-center py-2 font-medium text-muted-foreground">Actions</th>}
+                    <th className="text-center py-2 font-medium text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,38 +293,36 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                       <td className="py-3 pr-3 text-right">{fmt(run.totalGross)}</td>
                       <td className="py-3 pr-3 text-right text-red-600">{fmt(run.totalDeductions)}</td>
                       <td className="py-3 pr-3 text-right font-semibold text-green-700">{fmt(run.totalNet)}</td>
-                      {isSuperAdmin && (
-                        <td className="py-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {run.status === "Draft" && (
-                              <Button size="sm" variant="outline" onClick={() => handleCompute(run.id)} disabled={busy === run.id}>
-                                {busy === run.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                                <span className="ml-1">Compute</span>
-                              </Button>
-                            )}
-                            {run.status === "Computed" && (
-                              <Button size="sm" variant="outline" onClick={() => handleCompute(run.id)} disabled={busy === run.id} title="Recompute">
-                                <RefreshCw className="w-3 h-3" />
-                              </Button>
-                            )}
-                            {run.status === "Computed" && (
-                              <Button size="sm" onClick={() => handleApprove(run.id)} disabled={busy === run.id}>
-                                <CheckCircle2 className="w-3 h-3 mr-1" />Approve
-                              </Button>
-                            )}
-                            {run.status === "Approved" && (
-                              <Button size="sm" variant="outline" onClick={() => handleFinalize(run.id)} disabled={busy === run.id}>
-                                <Lock className="w-3 h-3 mr-1" />Finalize
-                              </Button>
-                            )}
-                            <Link href={`/payroll/runs/${run.id}`}>
-                              <Button size="sm" variant="ghost" title="View Records">
-                                <ChevronRight className="w-3 h-3" />
-                              </Button>
-                            </Link>
-                          </div>
-                        </td>
-                      )}
+                      <td className="py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {run.status === "Draft" && (
+                            <Button size="sm" variant="outline" onClick={() => handleCompute(run.id)} disabled={busy === run.id}>
+                              {busy === run.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                              <span className="ml-1">Compute</span>
+                            </Button>
+                          )}
+                          {run.status === "Computed" && (
+                            <Button size="sm" variant="outline" onClick={() => handleCompute(run.id)} disabled={busy === run.id} title="Recompute">
+                              <RefreshCw className="w-3 h-3" />
+                            </Button>
+                          )}
+                          {run.status === "Computed" && (
+                            <Button size="sm" onClick={() => handleApprove(run.id)} disabled={busy === run.id}>
+                              <CheckCircle2 className="w-3 h-3 mr-1" />Approve
+                            </Button>
+                          )}
+                          {run.status === "Approved" && (
+                            <Button size="sm" variant="outline" onClick={() => handleFinalize(run.id)} disabled={busy === run.id}>
+                              <Lock className="w-3 h-3 mr-1" />Finalize
+                            </Button>
+                          )}
+                          <Link href={`/payroll/runs/${run.id}`}>
+                            <Button size="sm" variant="ghost" title="View Records">
+                              <ChevronRight className="w-3 h-3" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
