@@ -6309,32 +6309,68 @@ export const DeleteApprovalChainParams = zod.object({
 /**
  * @summary Get RBAC permission matrix (all roles × modules × actions)
  */
-export const GetRolePermissionsResponse = zod.record(
-  zod.string(),
-  zod
-    .record(zod.string(), zod.record(zod.string(), zod.boolean()))
-    .describe(
-      "Permissions for a single role — map of module keys to allowed actions",
+export const GetRolePermissionsResponse = zod
+  .record(
+    zod.string(),
+    zod.record(
+      zod.string(),
+      zod.array(
+        zod.enum([
+          "super_admin",
+          "hr_manager",
+          "hr_executive",
+          "hod",
+          "payroll_admin",
+          "employee",
+        ]),
+      ),
     ),
-);
+  )
+  .describe(
+    "RBAC permission matrix — module → action → array of roles that may perform it",
+  );
 
 /**
  * @summary Update RBAC permission matrix
  */
-export const UpdateRolePermissionsBody = zod.record(
-  zod.string(),
-  zod
-    .record(zod.string(), zod.record(zod.string(), zod.boolean()))
-    .describe(
-      "Permissions for a single role — map of module keys to allowed actions",
+export const UpdateRolePermissionsBody = zod
+  .record(
+    zod.string(),
+    zod.record(
+      zod.string(),
+      zod.array(
+        zod.enum([
+          "super_admin",
+          "hr_manager",
+          "hr_executive",
+          "hod",
+          "payroll_admin",
+          "employee",
+        ]),
+      ),
     ),
-);
+  )
+  .describe(
+    "RBAC permission matrix — module → action → array of roles that may perform it",
+  );
 
-export const UpdateRolePermissionsResponse = zod.record(
-  zod.string(),
-  zod
-    .record(zod.string(), zod.record(zod.string(), zod.boolean()))
-    .describe(
-      "Permissions for a single role — map of module keys to allowed actions",
+export const UpdateRolePermissionsResponse = zod
+  .record(
+    zod.string(),
+    zod.record(
+      zod.string(),
+      zod.array(
+        zod.enum([
+          "super_admin",
+          "hr_manager",
+          "hr_executive",
+          "hod",
+          "payroll_admin",
+          "employee",
+        ]),
+      ),
     ),
-);
+  )
+  .describe(
+    "RBAC permission matrix — module → action → array of roles that may perform it",
+  );

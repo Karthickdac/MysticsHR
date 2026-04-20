@@ -12,6 +12,8 @@ import {
   useUpdateRolePermissions,
   getGetRolePermissionsQueryKey,
   type ApprovalChainConfig,
+  type RolePermissions,
+  type RolePermissionsItem,
 } from "@workspace/api-client-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -579,16 +581,15 @@ function PayrollSettingsTab() {
 
 // ─── RBAC Permissions Tab ─────────────────────────────────────────────────────
 
-const ALL_ROLES = ["super_admin","hr_manager","hr_executive","hod","payroll_admin","employee"] as const;
-type HrmsRole = typeof ALL_ROLES[number];
+const ALL_ROLES: RolePermissionsItem[] = ["super_admin","hr_manager","hr_executive","hod","payroll_admin","employee"];
 
 function RolePermissionsTab() {
   const queryClient = useQueryClient();
   const { data: serverMatrix, isLoading } = useGetRolePermissions();
-  const [matrix, setMatrix] = useState<Record<string, Record<string, HrmsRole[]>>>({});
+  const [matrix, setMatrix] = useState<RolePermissions>({});
 
   useEffect(() => {
-    if (serverMatrix) setMatrix(serverMatrix as Record<string, Record<string, HrmsRole[]>>);
+    if (serverMatrix) setMatrix(serverMatrix);
   }, [serverMatrix]);
 
   const updateMutation = useUpdateRolePermissions({
@@ -601,10 +602,10 @@ function RolePermissionsTab() {
     },
   });
 
-  function toggleRole(module: string, action: string, role: HrmsRole) {
+  function toggleRole(module: string, action: string, role: RolePermissionsItem) {
     setMatrix(prev => {
-      const current = prev[module]?.[action] ?? [];
-      const next = current.includes(role)
+      const current: RolePermissionsItem[] = prev[module]?.[action] ?? [];
+      const next: RolePermissionsItem[] = current.includes(role)
         ? current.filter(r => r !== role)
         : [...current, role];
       return { ...prev, [module]: { ...prev[module], [action]: next } };
@@ -612,7 +613,7 @@ function RolePermissionsTab() {
   }
 
   function save() {
-    updateMutation.mutate({ data: matrix as Record<string, Record<string, boolean>> });
+    updateMutation.mutate({ data: matrix });
   }
 
   if (isLoading) return <div className="text-sm text-muted-foreground p-4">Loading permissions...</div>;

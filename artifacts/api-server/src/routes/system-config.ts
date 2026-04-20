@@ -154,14 +154,32 @@ router.get("/role-permissions", requireHrmsUser, requireRole(...HR_ROLES), async
 });
 
 router.put("/role-permissions", requireHrmsUser, requireRole(...SUPER_ADMIN), async (req, res) => {
+  const VALID_ROLES = new Set(["super_admin","hr_manager","hr_executive","hod","payroll_admin","employee"]);
   try {
-    const matrix = req.body as Record<string, Record<string, string[]>>;
-    const allRoles = ["super_admin","hr_manager","hr_executive","hod","payroll_admin","employee"] as const;
+    const body = req.body;
+    // Validate payload structure: must be an object of objects of string arrays
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      res.status(400).json({ error: "Request body must be an object (module → action → roles[])" });
+      return;
+    }
+    for (const [module, actions] of Object.entries(body as Record<string, unknown>)) {
+      if (typeof actions !== "object" || actions === null || Array.isArray(actions)) {
+        res.status(400).json({ error: `Module "${module}" must map to an object of action → roles[]` });
+        return;
+      }
+      for (const [action, roles] of Object.entries(actions as Record<string, unknown>)) {
+        if (!Array.isArray(roles) || !roles.every(r => typeof r === "string" && VALID_ROLES.has(r))) {
+          res.status(400).json({ error: `"${module}.${action}" must be an array of valid role names` });
+          return;
+        }
+      }
+    }
+    // Persist to system_settings (category = role_permissions, key = module.action)
+    const matrix = body as Record<string, Record<string, string[]>>;
     for (const [module, actions] of Object.entries(matrix)) {
       for (const [action, roles] of Object.entries(actions)) {
-        const validRoles = (roles as string[]).filter(r => (allRoles as readonly string[]).includes(r));
         const key = `${module}.${action}`;
-        const jsonValue = validRoles as unknown as (Record<string, unknown> | string | number | boolean | null);
+        const jsonValue = roles as unknown as (Record<string, unknown> | string | number | boolean | null);
         const existing = await db.select({ id: systemSettingsTable.id }).from(systemSettingsTable)
           .where(and(eq(systemSettingsTable.category, "role_permissions"), eq(systemSettingsTable.key, key)));
         if (existing.length) {
@@ -173,7 +191,7 @@ router.put("/role-permissions", requireHrmsUser, requireRole(...SUPER_ADMIN), as
         }
       }
     }
-    res.json({ success: true });
+    res.json(matrix);
   } catch {
     res.status(500).json({ error: "Failed to save role permissions" });
   }

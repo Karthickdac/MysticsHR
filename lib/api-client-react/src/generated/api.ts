@@ -138,7 +138,6 @@ import type {
   GetPtReportParams,
   GetRecruitmentPipelineReport200,
   GetRecruitmentPipelineReportParams,
-  GetRolePermissions200,
   GetShiftSwapsParams,
   GetShiftsCalendarParams,
   GetShiftsTemplatesParams,
@@ -231,6 +230,7 @@ import type {
   RejectRequisitionBody,
   ReportSchedule,
   Role,
+  RolePermissions,
   RunCustomReport200,
   RunCustomReportBody,
   RunHelpdeskSlaCheck200,
@@ -277,8 +277,6 @@ import type {
   UpdatePreOnboardingDocumentBody,
   UpdatePreOnboardingRecordBody,
   UpdateRequisitionBody,
-  UpdateRolePermissions200,
-  UpdateRolePermissionsBody,
   UpdateSalaryStructureBody,
   UpdateSystemSettings200,
   UpdateSystemSettingsBody,
@@ -24069,8 +24067,8 @@ export const getGetRolePermissionsUrl = () => {
 
 export const getRolePermissions = async (
   options?: RequestInit,
-): Promise<GetRolePermissions200> => {
-  return customFetch<GetRolePermissions200>(getGetRolePermissionsUrl(), {
+): Promise<RolePermissions> => {
+  return customFetch<RolePermissions>(getGetRolePermissionsUrl(), {
     ...options,
     method: "GET",
   });
@@ -24143,14 +24141,14 @@ export const getUpdateRolePermissionsUrl = () => {
 };
 
 export const updateRolePermissions = async (
-  updateRolePermissionsBody: UpdateRolePermissionsBody,
+  rolePermissions: RolePermissions,
   options?: RequestInit,
-): Promise<UpdateRolePermissions200> => {
-  return customFetch<UpdateRolePermissions200>(getUpdateRolePermissionsUrl(), {
+): Promise<RolePermissions> => {
+  return customFetch<RolePermissions>(getUpdateRolePermissionsUrl(), {
     ...options,
     method: "PUT",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(updateRolePermissionsBody),
+    body: JSON.stringify(rolePermissions),
   });
 };
 
@@ -24161,14 +24159,14 @@ export const getUpdateRolePermissionsMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateRolePermissions>>,
     TError,
-    { data: BodyType<UpdateRolePermissionsBody> },
+    { data: BodyType<RolePermissions> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateRolePermissions>>,
   TError,
-  { data: BodyType<UpdateRolePermissionsBody> },
+  { data: BodyType<RolePermissions> },
   TContext
 > => {
   const mutationKey = ["updateRolePermissions"];
@@ -24182,7 +24180,7 @@ export const getUpdateRolePermissionsMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateRolePermissions>>,
-    { data: BodyType<UpdateRolePermissionsBody> }
+    { data: BodyType<RolePermissions> }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -24195,8 +24193,7 @@ export const getUpdateRolePermissionsMutationOptions = <
 export type UpdateRolePermissionsMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateRolePermissions>>
 >;
-export type UpdateRolePermissionsMutationBody =
-  BodyType<UpdateRolePermissionsBody>;
+export type UpdateRolePermissionsMutationBody = BodyType<RolePermissions>;
 export type UpdateRolePermissionsMutationError = ErrorType<void>;
 
 /**
@@ -24209,14 +24206,14 @@ export const useUpdateRolePermissions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateRolePermissions>>,
     TError,
-    { data: BodyType<UpdateRolePermissionsBody> },
+    { data: BodyType<RolePermissions> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updateRolePermissions>>,
   TError,
-  { data: BodyType<UpdateRolePermissionsBody> },
+  { data: BodyType<RolePermissions> },
   TContext
 > => {
   return useMutation(getUpdateRolePermissionsMutationOptions(options));

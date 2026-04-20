@@ -2940,11 +2940,23 @@ export interface CreateApprovalChainBody {
   conditions?: CreateApprovalChainBodyConditions;
 }
 
+export type RolePermissionsItem =
+  (typeof RolePermissionsItem)[keyof typeof RolePermissionsItem];
+
+export const RolePermissionsItem = {
+  super_admin: "super_admin",
+  hr_manager: "hr_manager",
+  hr_executive: "hr_executive",
+  hod: "hod",
+  payroll_admin: "payroll_admin",
+  employee: "employee",
+} as const;
+
 /**
- * Permissions for a single role — map of module keys to allowed actions
+ * RBAC permission matrix — module → action → array of roles that may perform it
  */
 export interface RolePermissions {
-  [key: string]: { [key: string]: boolean };
+  [key: string]: { [key: string]: RolePermissionsItem[] };
 }
 
 export type GetDashboardRecentActivityParams = {
@@ -3710,9 +3722,3 @@ export type UpdateSystemSettingsBody = { [key: string]: unknown };
 export type UpdateSystemSettings200 = {
   success?: boolean;
 };
-
-export type GetRolePermissions200 = { [key: string]: RolePermissions };
-
-export type UpdateRolePermissionsBody = { [key: string]: RolePermissions };
-
-export type UpdateRolePermissions200 = { [key: string]: RolePermissions };
