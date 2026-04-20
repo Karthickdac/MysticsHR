@@ -550,6 +550,18 @@ router.post("/payroll/salary-revisions", requireHrmsUser, requireRole(...HR_ROLE
 router.post("/payroll/salary-revisions/:id/action", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
   try {
     const { action, approvalRemarks } = req.body as { action: "approve" | "reject"; approvalRemarks?: string };
+
+    // Fetch the revision before mutation so we can read effectiveDate for lock check
+    const [existing] = await db.select().from(salaryRevisionsTable).where(eq(salaryRevisionsTable.id, Number(req.params.id)));
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
+    // Salary revision approval mutates salary structures — enforce payroll lock for effective month
+    if (action === "approve" && existing.effectiveDate) {
+      const d = new Date(existing.effectiveDate as string);
+      const lockErr = await checkPayrollLock(req.hrmsUser!.id, "edit_salary", d.getFullYear(), d.getMonth() + 1, req.hrmsUser!.email ?? undefined);
+      if (lockErr) { res.status(423).json({ error: lockErr }); return; }
+    }
+
     const [revision] = await db.update(salaryRevisionsTable).set({
       status: action === "approve" ? "Approved" : "Rejected",
       approvedById: req.hrmsUser!.id,

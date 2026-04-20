@@ -379,6 +379,13 @@ router.post("/attendance/regularizations", requireHrmsUser, requireRole(...ALL_R
     const empId = userRow?.employeeId ?? null;
     if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
 
+    // Enforce payroll lock for the period of the attendance date being regularized
+    if (body.attendanceDate) {
+      const d = new Date(body.attendanceDate);
+      const lockErr = await checkPayrollLock(req.hrmsUser.id, "edit_attendance", d.getFullYear(), d.getMonth() + 1, req.hrmsUser.email ?? undefined);
+      if (lockErr) { res.status(423).json({ error: lockErr }); return; }
+    }
+
     const [attRecord] = await db.select({ id: attendanceRecordsTable.id }).from(attendanceRecordsTable)
       .where(and(eq(attendanceRecordsTable.employeeId, empId), eq(attendanceRecordsTable.attendanceDate, body.attendanceDate)));
 
@@ -415,6 +422,13 @@ router.post("/attendance/regularizations/:id/action", requireHrmsUser, requireRo
     if (reg.status !== "Pending") {
       res.status(422).json({ error: "This regularization request has already been processed and cannot be re-actioned" });
       return;
+    }
+
+    // Enforce payroll lock for the period of the attendance date being modified (Approved action mutates records)
+    if (action === "Approved" && reg.attendanceDate) {
+      const d = new Date(reg.attendanceDate as string);
+      const lockErr = await checkPayrollLock(req.hrmsUser.id, "edit_attendance", d.getFullYear(), d.getMonth() + 1, req.hrmsUser.email ?? undefined);
+      if (lockErr) { res.status(423).json({ error: lockErr }); return; }
     }
 
     // HOD scope authorization: a HOD can only action requests from their own department
