@@ -173,7 +173,7 @@ export default function AnalyticsDashboard() {
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Bar dataKey="headcount" radius={[4, 4, 0, 0]}>
-                    {byDept.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {byDept.map((_: unknown, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -200,9 +200,9 @@ export default function AnalyticsDashboard() {
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
-                    {byDept.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {byDept.map((_: unknown, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: any) => [`${v} employees`]} />
+                  <Tooltip formatter={(v: number | string) => [`${v} employees`]} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>

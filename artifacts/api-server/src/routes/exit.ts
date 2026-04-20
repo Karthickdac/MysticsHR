@@ -44,7 +44,7 @@ function computeNoticePeriodDays(joinDate: string | null, employmentType?: strin
   // If the employee record carries an explicit contractual notice period, honour it
   if (noticePeriodDays != null && noticePeriodDays > 0) return noticePeriodDays;
   // Employment-type contractual defaults
-  if (employmentType === "Contract" || employmentType === "Internship") return 15;
+  if (employmentType === "Contract" || employmentType === "Intern") return 15;
   if (employmentType === "Probation") return 0;
   // Tenure-based fallback (permanent/regular employees)
   if (!joinDate) return 30;

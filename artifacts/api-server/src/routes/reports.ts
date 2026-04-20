@@ -792,33 +792,15 @@ router.get("/reports/:type/export", requireHrmsUser, requireRole(...MANAGER_ROLE
     const rows: Record<string, unknown>[] = body.data ?? body.rows ?? [];
 
     if (format === "pdf") {
-      // Return print-ready HTML with MysticsHR letterhead — the client can print-to-PDF
       const headers = rows.length > 0 ? Object.keys(rows[0]).filter(k => k !== "id") : [];
-      const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-      const title = type.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) + " Report";
-      const tableHtml = `
-        <thead><tr>${headers.map(h => `<th>${escHtml(h.replace(/([A-Z])/g, " $1").trim())}</th>`).join("")}</tr></thead>
-        <tbody>${rows.map(r => `<tr>${headers.map(h => `<td>${escHtml(r[h])}</td>`).join("")}</tr>`).join("")}</tbody>`;
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title><style>
-        body{font-family:Arial,sans-serif;font-size:11px;margin:20px}
-        .letterhead{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1e3a5f;padding-bottom:8px;margin-bottom:16px}
-        .company{font-size:20px;font-weight:bold;color:#1e3a5f}
-        .subtitle{font-size:11px;color:#666}
-        h2{color:#1e3a5f;margin:0 0 8px}
-        .meta{font-size:10px;color:#888;margin-bottom:12px}
-        table{border-collapse:collapse;width:100%;font-size:10px}
-        th{background:#1e3a5f;color:#fff;padding:5px 8px;text-align:left}
-        td{padding:4px 8px;border-bottom:1px solid #ddd}
-        tr:nth-child(even){background:#f5f7fb}
-        @media print{@page{margin:1cm}}</style></head><body>
-        <div class="letterhead"><div><div class="company">Automystics Technologies</div>
-        <div class="subtitle">Internal HR Management System · MysticsHR</div></div></div>
-        <h2>${escHtml(title)}</h2>
-        <div class="meta">Generated on ${escHtml(date)} · ${rows.length} record(s)</div>
-        <table>${tableHtml}</table></body></html>`;
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Content-Disposition", `inline; filename="${type}-report.html"`);
-      res.send(html);
+      const title = type.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) + " Report";
+      const subtitle = `Generated on ${new Date().toLocaleDateString("en-IN")} · ${rows.length} record(s)`;
+      const tableRows = rows.map(r => headers.map(h => r[h] as string | number | null | undefined));
+      const { generateTablePdf } = await import("../lib/pdf");
+      const pdfBuffer = await generateTablePdf({ title, subtitle, headers, rows: tableRows });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${type}-report.pdf"`);
+      res.send(pdfBuffer);
       return;
     }
 

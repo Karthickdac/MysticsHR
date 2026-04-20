@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@clerk/express": "^2.1.5",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
@@ -20,6 +22,8 @@
     "exceljs": "^4.4.0",
     "express": "^5",
     "http-proxy-middleware": "^3.0.5",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.5",
     "pdf-lib": "^1.17.1",
     "pino": "^9",
     "pino-http": "^10",
