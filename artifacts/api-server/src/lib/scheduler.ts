@@ -643,7 +643,7 @@ async function processConfiguredEscalations() {
 
       if (config.transactionType === "payroll") {
         // Payroll runs awaiting finalization (Computed or Approved but not yet Locked)
-        const pendingRuns = await db.select({ id: payrollRunsTable.id, month: payrollRunsTable.month, year: payrollRunsTable.year })
+        const pendingRuns = await db.select({ id: payrollRunsTable.id, periodMonth: payrollRunsTable.periodMonth, periodYear: payrollRunsTable.periodYear })
           .from(payrollRunsTable)
           .where(and(
             inArray(payrollRunsTable.status, ["Computed", "Approved"]),
@@ -653,13 +653,15 @@ async function processConfiguredEscalations() {
 
         for (const user of recipientUsers) {
           if (!user.email) continue;
-          const periodStr = pendingRuns.map(r => `${r.month}/${r.year}`).join(", ");
+          const periodStr = pendingRuns.map(r => `${r.periodMonth}/${r.periodYear}`).join(", ");
           await dispatchNotification({
             eventType: "payroll_locked", module: "payroll",
             recipientEmail: user.email, recipientName: user.name,
             recipientEmployeeDbId: user.employeeId,
             variables: {
-              period: periodStr, month: String(pendingRuns[0]?.month ?? ""), year: String(pendingRuns[0]?.year ?? ""),
+              period: periodStr,
+              month: String(pendingRuns[0]?.periodMonth ?? ""),
+              year: String(pendingRuns[0]?.periodYear ?? ""),
               recipientName: user.name,
             },
           }).catch(() => {});

@@ -72,9 +72,29 @@ router.get("/approval-chains", requireHrmsUser, requireRole(...HR_ROLES), async 
   }
 });
 
+const VALID_ROLES = ["super_admin", "hr_manager", "hod", "payroll_admin", "employee", "auditor"] as const;
+const VALID_TRANSACTION_TYPES = ["leave", "helpdesk", "exit", "payroll", "recruitment", "onboarding"] as const;
+
+function validateApprovalChainBody(body: Record<string, unknown>): string | null {
+  const { approverRole, escalateTo, transactionType } = body;
+  if (approverRole && !VALID_ROLES.includes(approverRole as never)) {
+    return `Invalid approverRole "${approverRole}". Must be one of: ${VALID_ROLES.join(", ")}`;
+  }
+  if (escalateTo && !VALID_ROLES.includes(escalateTo as never)) {
+    return `Invalid escalateTo "${escalateTo}". Must be one of: ${VALID_ROLES.join(", ")}`;
+  }
+  if (transactionType && !VALID_TRANSACTION_TYPES.includes(transactionType as never)) {
+    return `Invalid transactionType "${transactionType}". Must be one of: ${VALID_TRANSACTION_TYPES.join(", ")}`;
+  }
+  return null;
+}
+
 router.post("/approval-chains", requireHrmsUser, requireRole(...SUPER_ADMIN), async (req, res) => {
   try {
+    const validationError = validateApprovalChainBody(req.body as Record<string, unknown>);
+    if (validationError) { res.status(400).json({ error: validationError }); return; }
     const { transactionType, step, approverRole, approverLabel, isActive, escalationAfterHours, escalateTo, conditions } = req.body;
+    if (!transactionType || !approverRole || !approverLabel) { res.status(400).json({ error: "transactionType, approverRole, and approverLabel are required" }); return; }
     const [created] = await db.insert(approvalChainConfigsTable).values({
       transactionType, step: step ?? 1, approverRole, approverLabel,
       isActive: isActive ?? true, escalationAfterHours, escalateTo, conditions,
@@ -88,6 +108,8 @@ router.post("/approval-chains", requireHrmsUser, requireRole(...SUPER_ADMIN), as
 router.put("/approval-chains/:id", requireHrmsUser, requireRole(...SUPER_ADMIN), async (req, res): Promise<void> => {
   try {
     const id = parseInt(req.params.id as string);
+    const validationError = validateApprovalChainBody(req.body as Record<string, unknown>);
+    if (validationError) { res.status(400).json({ error: validationError }); return; }
     const { step, approverRole, approverLabel, isActive, escalationAfterHours, escalateTo, conditions } = req.body;
     const [updated] = await db.update(approvalChainConfigsTable)
       .set({ step, approverRole, approverLabel, isActive, escalationAfterHours, escalateTo, conditions, updatedAt: new Date() })
