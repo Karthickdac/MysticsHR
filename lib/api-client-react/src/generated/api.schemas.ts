@@ -927,7 +927,7 @@ export type BulkImportResultErrorsItem = {
 
 export interface BulkImportResult {
   imported: number;
-  failed: number;
+  skipped: number;
   errors: BulkImportResultErrorsItem[];
 }
 
@@ -1019,18 +1019,6 @@ export interface CreateInductionSessionBody {
   durationMinutes?: number | null;
   /** @nullable */
   notes?: string | null;
-}
-
-export interface IdCardData {
-  employeeId: string;
-  employeeName: string;
-  designation: string;
-  department: string;
-  /** @nullable */
-  avatarUrl?: string | null;
-  qrCodeData: string;
-  idCardUrl: string;
-  generatedAt: string;
 }
 
 export interface AuditLogListResponse {

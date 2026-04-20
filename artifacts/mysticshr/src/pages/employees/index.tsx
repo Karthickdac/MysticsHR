@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Link } from "wouter";
-import { useListEmployees, useListDepartments, usePostEmployeesBulkImport } from "@workspace/api-client-react";
+import { useListEmployees, useListDepartments, usePostEmployeesBulkImport, type BulkImportResult, type PostEmployeesBulkImportBodyRowsItem } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,12 +38,6 @@ const CSV_TEMPLATE = [
 
 const PAGE_SIZE = 12;
 
-type ImportResult = {
-  imported: number;
-  skipped: number;
-  errors: Array<{ row: number; error: string }>;
-};
-
 export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -53,7 +47,7 @@ export default function EmployeesPage() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -98,17 +92,17 @@ export default function EmployeesPage() {
     const text = await importFile.text();
     const lines = text.trim().split(/\r?\n/);
     const headers = lines[0].split(",").map(h => h.trim());
-    const rows = lines.slice(1).map((line) => {
+    const rows: PostEmployeesBulkImportBodyRowsItem[] = lines.slice(1).map((line) => {
       const vals = line.split(",").map(v => v.trim());
-      return headers.reduce<Record<string, string>>((acc, h, i) => {
+      return headers.reduce<PostEmployeesBulkImportBodyRowsItem>((acc, h, i) => {
         acc[h] = vals[i] ?? "";
         return acc;
       }, {});
     });
 
     try {
-      const result = await bulkImport.mutateAsync({ data: { rows: rows as never[] } });
-      setImportResult(result as unknown as ImportResult);
+      const result = await bulkImport.mutateAsync({ data: { rows } });
+      setImportResult(result);
       queryClient.invalidateQueries({ queryKey: ["listEmployees"] });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Import failed";

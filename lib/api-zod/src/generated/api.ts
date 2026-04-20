@@ -399,7 +399,7 @@ export const PostEmployeesBulkImportBody = zod.object({
 
 export const PostEmployeesBulkImportResponse = zod.object({
   imported: zod.number(),
-  failed: zod.number(),
+  skipped: zod.number(),
   errors: zod.array(
     zod.object({
       row: zod.number(),
@@ -1118,21 +1118,10 @@ export const DeleteInductionSessionsIdParams = zod.object({
 });
 
 /**
- * @summary Generate and download employee ID card PDF
+ * @summary Generate and download employee ID card as PDF
  */
-export const GetEmployeesIdIdCardParams = zod.object({
+export const DownloadEmployeeIdCardParams = zod.object({
   id: zod.coerce.number(),
-});
-
-export const GetEmployeesIdIdCardResponse = zod.object({
-  employeeId: zod.string(),
-  employeeName: zod.string(),
-  designation: zod.string(),
-  department: zod.string(),
-  avatarUrl: zod.string().nullish(),
-  qrCodeData: zod.string(),
-  idCardUrl: zod.string(),
-  generatedAt: zod.coerce.date(),
 });
 
 /**

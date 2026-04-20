@@ -3162,7 +3162,7 @@ components:
       type: object
       properties:
         imported: { type: integer }
-        failed: { type: integer }
+        skipped: { type: integer }
         errors:
           type: array
           items:
@@ -3171,7 +3171,7 @@ components:
               row: { type: integer }
               error: { type: string }
             required: [row, error]
-      required: [imported, failed, errors]
+      required: [imported, skipped, errors]
 
     OnboardingChecklist:
       type: object
@@ -3254,19 +3254,6 @@ components:
         durationMinutes: { type: ["integer", "null"] }
         notes: { type: ["string", "null"] }
       required: [sessionDate, trainerName]
-
-    IdCardData:
-      type: object
-      properties:
-        employeeId: { type: string }
-        employeeName: { type: string }
-        designation: { type: string }
-        department: { type: string }
-        avatarUrl: { type: ["string", "null"] }
-        qrCodeData: { type: string }
-        idCardUrl: { type: string }
-        generatedAt: { type: string, format: date-time }
-      required: [employeeId, employeeName, designation, department, qrCodeData, idCardUrl, generatedAt]
 
     AuditLogListResponse:
       type: object

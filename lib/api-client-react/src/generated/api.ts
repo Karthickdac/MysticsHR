@@ -51,7 +51,6 @@ import type {
   HeadcountByDepartment,
   HealthStatus,
   HrmsUser,
-  IdCardData,
   InductionSession,
   InterviewFeedback,
   InterviewRound,
@@ -4601,34 +4600,34 @@ export const useDeleteInductionSessionsId = <
 };
 
 /**
- * @summary Generate and download employee ID card PDF
+ * @summary Generate and download employee ID card as PDF
  */
-export const getGetEmployeesIdIdCardUrl = (id: number) => {
+export const getDownloadEmployeeIdCardUrl = (id: number) => {
   return `/api/employees/${id}/id-card`;
 };
 
-export const getEmployeesIdIdCard = async (
+export const downloadEmployeeIdCard = async (
   id: number,
   options?: RequestInit,
-): Promise<IdCardData> => {
-  return customFetch<IdCardData>(getGetEmployeesIdIdCardUrl(id), {
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadEmployeeIdCardUrl(id), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetEmployeesIdIdCardQueryKey = (id: number) => {
+export const getDownloadEmployeeIdCardQueryKey = (id: number) => {
   return [`/api/employees/${id}/id-card`] as const;
 };
 
-export const getGetEmployeesIdIdCardQueryOptions = <
-  TData = Awaited<ReturnType<typeof getEmployeesIdIdCard>>,
+export const getDownloadEmployeeIdCardQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadEmployeeIdCard>>,
   TError = ErrorType<void>,
 >(
   id: number,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getEmployeesIdIdCard>>,
+      Awaited<ReturnType<typeof downloadEmployeeIdCard>>,
       TError,
       TData
     >;
@@ -4638,11 +4637,11 @@ export const getGetEmployeesIdIdCardQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getGetEmployeesIdIdCardQueryKey(id);
+    queryOptions?.queryKey ?? getDownloadEmployeeIdCardQueryKey(id);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getEmployeesIdIdCard>>
-  > = ({ signal }) => getEmployeesIdIdCard(id, { signal, ...requestOptions });
+    Awaited<ReturnType<typeof downloadEmployeeIdCard>>
+  > = ({ signal }) => downloadEmployeeIdCard(id, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -4650,36 +4649,36 @@ export const getGetEmployeesIdIdCardQueryOptions = <
     enabled: !!id,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof getEmployeesIdIdCard>>,
+    Awaited<ReturnType<typeof downloadEmployeeIdCard>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type GetEmployeesIdIdCardQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getEmployeesIdIdCard>>
+export type DownloadEmployeeIdCardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadEmployeeIdCard>>
 >;
-export type GetEmployeesIdIdCardQueryError = ErrorType<void>;
+export type DownloadEmployeeIdCardQueryError = ErrorType<void>;
 
 /**
- * @summary Generate and download employee ID card PDF
+ * @summary Generate and download employee ID card as PDF
  */
 
-export function useGetEmployeesIdIdCard<
-  TData = Awaited<ReturnType<typeof getEmployeesIdIdCard>>,
+export function useDownloadEmployeeIdCard<
+  TData = Awaited<ReturnType<typeof downloadEmployeeIdCard>>,
   TError = ErrorType<void>,
 >(
   id: number,
   options?: {
     query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getEmployeesIdIdCard>>,
+      Awaited<ReturnType<typeof downloadEmployeeIdCard>>,
       TError,
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetEmployeesIdIdCardQueryOptions(id, options);
+  const queryOptions = getDownloadEmployeeIdCardQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
