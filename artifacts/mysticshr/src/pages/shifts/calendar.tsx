@@ -46,12 +46,20 @@ export default function ShiftCalendarPage() {
   const [weekStart, setWeekStart] = useState<Date>(getMondayOf(today));
   const [selectedEmpId, setSelectedEmpId] = useState<number | undefined>(undefined);
 
-  // Determine the month string to query
+  // Determine the month string(s) to query
   const monthStr = `${year}-${String(month).padStart(2, "0")}`;
-  const weekMonthStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}`;
-  const queryMonth = view === "month" ? monthStr : weekMonthStr;
+  const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
+  const weekStartMonth = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}`;
+  const weekEndMonth = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, "0")}`;
+  const weekSpansTwoMonths = weekStartMonth !== weekEndMonth;
 
-  const { data: entries = [], isLoading } = useGetShiftsCalendar({ month: queryMonth, employeeId: selectedEmpId });
+  // Query the first month (or the only month in month-view)
+  const { data: entries1 = [], isLoading: l1 } = useGetShiftsCalendar({ month: view === "month" ? monthStr : weekStartMonth, employeeId: selectedEmpId });
+  // Query the adjacent month when a week spans two months; otherwise repeat the same month (result ignored)
+  const adjacentMonth = weekSpansTwoMonths ? weekEndMonth : weekStartMonth;
+  const { data: entries2 = [], isLoading: l2 } = useGetShiftsCalendar({ month: adjacentMonth, employeeId: selectedEmpId });
+  const entries = view === "week" && weekSpansTwoMonths ? [...entries1, ...entries2] : entries1;
+  const isLoading = l1 || l2;
   const { data: _empResponse } = useListEmployees({});
   const employees = _empResponse?.data ?? [];
 

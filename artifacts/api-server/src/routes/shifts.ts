@@ -10,7 +10,7 @@ import {
   employeesTable,
   hrmsUsersTable,
 } from "@workspace/db/schema";
-import { eq, and, isNull, gte, lte, or, SQL } from "drizzle-orm";
+import { eq, and, isNull, gte, lte, or, SQL, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -405,7 +405,8 @@ router.post("/shift-swaps/:id/hod-action", requireHrmsUser, requireRole("super_a
   }
 });
 
-/** Find the active shift template for an employee on a given date (YYYY-MM-DD) */
+/** Find the active shift template ID for an employee on a given date (YYYY-MM-DD).
+ *  Uses desc(effectiveFrom) so the most-recently-started assignment wins when multiple overlap. */
 async function getActiveTemplateForDate(employeeId: number, date: string): Promise<number | null> {
   const [row] = await db
     .select({ shiftTemplateId: shiftAssignmentsTable.shiftTemplateId })
@@ -415,9 +416,9 @@ async function getActiveTemplateForDate(employeeId: number, date: string): Promi
       lte(shiftAssignmentsTable.effectiveFrom, date),
       or(isNull(shiftAssignmentsTable.effectiveTo), gte(shiftAssignmentsTable.effectiveTo, date)),
     ))
-    .orderBy(shiftAssignmentsTable.effectiveFrom)
+    .orderBy(desc(shiftAssignmentsTable.effectiveFrom))
     .limit(1);
-  return row?.shiftTemplateId ?? null;
+  return (row?.shiftTemplateId as number | undefined) ?? null;
 }
 
 router.post("/shift-swaps/:id/hr-action", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
@@ -433,29 +434,36 @@ router.post("/shift-swaps/:id/hr-action", requireHrmsUser, requireRole(...HR_ROL
       return;
     }
 
-    const [updated] = await db.update(shiftSwapsTable)
-      .set({ hrStatus: action, hrRemarks: remarks ?? null, hrActionedById: req.hrmsUser.id, hrActionedAt: new Date(), updatedAt: new Date() })
-      .where(eq(shiftSwapsTable.id, swapId))
-      .returning();
-    if (!updated) { res.status(404).json({ error: "Not found" }); return; }
-
-    // Apply the actual schedule swap when HR approves
+    // Resolve templates before entering the transaction (read-only, no locking needed)
+    let requesterTplId: number | null = null;
+    let swapWithTplId: number | null = null;
     if (action === "Approved") {
-      const swapDate = swap.swapDate;
-      const [requesterTplId, swapWithTplId] = await Promise.all([
-        getActiveTemplateForDate(swap.requesterEmployeeId, swapDate),
-        getActiveTemplateForDate(swap.swapWithEmployeeId, swapDate),
+      [requesterTplId, swapWithTplId] = await Promise.all([
+        getActiveTemplateForDate(swap.requesterEmployeeId, swap.swapDate),
+        getActiveTemplateForDate(swap.swapWithEmployeeId, swap.swapDate),
       ]);
-      // Create one-day assignments exchanging each other's shift template for that date
-      if (requesterTplId && swapWithTplId) {
-        await db.insert(shiftAssignmentsTable).values([
-          { employeeId: swap.requesterEmployeeId, shiftTemplateId: swapWithTplId, effectiveFrom: swapDate, effectiveTo: swapDate, assignedById: req.hrmsUser.id },
-          { employeeId: swap.swapWithEmployeeId, shiftTemplateId: requesterTplId, effectiveFrom: swapDate, effectiveTo: swapDate, assignedById: req.hrmsUser.id },
-        ]);
-      }
-      await logAudit({ user: req.hrmsUser, action: "SWAP_APPLIED", module: "ShiftSwaps", recordId: updated.id, newValue: `Swap applied for ${swapDate}: emp ${swap.requesterEmployeeId} ↔ emp ${swap.swapWithEmployeeId}`, ipAddress: req.ip });
     }
 
+    // Atomic: update swap status + insert schedule assignments in one transaction
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx.update(shiftSwapsTable)
+        .set({ hrStatus: action, hrRemarks: remarks ?? null, hrActionedById: req.hrmsUser.id, hrActionedAt: new Date(), updatedAt: new Date() })
+        .where(eq(shiftSwapsTable.id, swapId))
+        .returning();
+      if (!row) throw new Error("Swap not found during transaction");
+
+      if (action === "Approved" && requesterTplId && swapWithTplId) {
+        await tx.insert(shiftAssignmentsTable).values([
+          { employeeId: swap.requesterEmployeeId, shiftTemplateId: swapWithTplId, effectiveFrom: swap.swapDate, effectiveTo: swap.swapDate, assignedById: req.hrmsUser.id },
+          { employeeId: swap.swapWithEmployeeId, shiftTemplateId: requesterTplId, effectiveFrom: swap.swapDate, effectiveTo: swap.swapDate, assignedById: req.hrmsUser.id },
+        ]);
+      }
+      return row;
+    });
+
+    if (action === "Approved") {
+      await logAudit({ user: req.hrmsUser, action: "SWAP_APPLIED", module: "ShiftSwaps", recordId: updated.id, newValue: `Swap applied for ${swap.swapDate}: emp ${swap.requesterEmployeeId} ↔ emp ${swap.swapWithEmployeeId}`, ipAddress: req.ip });
+    }
     await logAudit({ user: req.hrmsUser, action: `HR_${action.toUpperCase()}`, module: "ShiftSwaps", recordId: updated.id, newValue: action, ipAddress: req.ip });
     res.json(updated);
   } catch (err) {
