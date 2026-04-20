@@ -33,7 +33,15 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+const allowedOrigin = process.env.ALLOWED_ORIGIN;
+app.use(
+  cors({
+    credentials: true,
+    origin: allowedOrigin
+      ? allowedOrigin.split(",").map((o) => o.trim())
+      : true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

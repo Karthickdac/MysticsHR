@@ -24,6 +24,7 @@ export async function logAudit(params: {
       newValue: params.newValue ?? null,
       ipAddress: params.ipAddress ?? null,
     });
-  } catch {
+  } catch (err) {
+    console.warn("[audit] Failed to write audit log entry:", err);
   }
 }
