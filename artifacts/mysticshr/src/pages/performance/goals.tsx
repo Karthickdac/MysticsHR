@@ -155,6 +155,7 @@ function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: (
   const qc = useQueryClient();
   const create = useCreatePerformanceGoal();
   const { data: employeeResponse } = useListEmployees({ status: "Active", limit: 200, offset: 0 });
+  const { data: cycles = [] } = useListPerformanceCycles({});
   const [form, setForm] = useState({
     cycleId: cycleId ? String(cycleId) : "",
     employeeId: "",
@@ -167,6 +168,7 @@ function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: (
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.cycleId) return;
     create.mutate({
       data: {
         cycleId: Number(form.cycleId),
@@ -196,6 +198,21 @@ function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: (
           <DialogTitle>Assign KRA/KPI Goal</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label>Performance Cycle *</Label>
+            <Select value={form.cycleId} onValueChange={v => setForm(f => ({ ...f, cycleId: v }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select cycle" />
+              </SelectTrigger>
+              <SelectContent>
+                {cycles.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Employee *</Label>
@@ -237,7 +254,7 @@ function AssignGoalModal({ open, onClose, cycleId }: { open: boolean; onClose: (
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={create.isPending || !form.employeeId || !form.title}>
+            <Button type="submit" disabled={create.isPending || !form.cycleId || !form.employeeId || !form.title}>
               {create.isPending ? "Assigning..." : "Assign Goal"}
             </Button>
           </DialogFooter>

@@ -253,26 +253,49 @@ router.delete("/performance/goals/:id", requireHrmsUser, requireRole(...HR_ROLES
 
 // ─── GOAL PROGRESS ────────────────────────────────────────────────────────────
 
-router.get("/performance/goals/:id/progress", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+// Helper: resolve the allowed employee IDs for a given user on a performance endpoint.
+// Returns a resolved employee ID (for employee role), an array of direct-report IDs (for HOD),
+// or null meaning unrestricted (for HR roles).
+// Throws a 403-ready object when access should be denied.
+async function resolveProgressScope(
+  u: { id: number; role: string },
+  goalEmployeeId: number
+): Promise<{ allowed: boolean }> {
+  const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
+  if (isHrRole) return { allowed: true };
+
+  const [linkedEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+    .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+    .where(eq(hrmsUsersTable.id, u.id));
+
+  if (!linkedEmp) return { allowed: false };
+
+  if (u.role === "employee") {
+    return { allowed: linkedEmp.id === goalEmployeeId };
+  }
+
+  if (u.role === "hod") {
+    // HOD can only access progress for their direct reports' goals
+    const [targetEmp] = await db.select({ managerId: employeesTable.managerId }).from(employeesTable)
+      .where(eq(employeesTable.id, goalEmployeeId));
+    return { allowed: !!(targetEmp && targetEmp.managerId === linkedEmp.id) };
+  }
+
+  // payroll_admin and any other non-performance roles: deny
+  return { allowed: false };
+}
+
+router.get("/performance/goals/:id/progress", requireHrmsUser, requireRole(...MANAGER_ROLES, "employee"), async (req, res) => {
   try {
     const u = req.hrmsUser!;
     const goalId = Number(req.params.id);
 
-    // Verify goal exists
     const [goal] = await db.select({ id: performanceGoalsTable.id, employeeId: performanceGoalsTable.employeeId })
       .from(performanceGoalsTable).where(eq(performanceGoalsTable.id, goalId));
     if (!goal) { res.status(404).json({ error: "Goal not found" }); return; }
 
-    // Employees can only see progress for their own goals
-    if (u.role === "employee") {
-      const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
-        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
-        .where(eq(hrmsUsersTable.id, u.id));
-      if (!emp || emp.id !== goal.employeeId) {
-        res.status(403).json({ error: "Access denied" });
-        return;
-      }
-    }
+    const { allowed } = await resolveProgressScope(u, goal.employeeId);
+    if (!allowed) { res.status(403).json({ error: "Access denied" }); return; }
 
     const rows = await db.select().from(goalProgressTable)
       .where(eq(goalProgressTable.goalId, goalId))
@@ -281,7 +304,7 @@ router.get("/performance/goals/:id/progress", requireHrmsUser, requireRole(...AL
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-router.post("/performance/goals/:id/progress", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+router.post("/performance/goals/:id/progress", requireHrmsUser, requireRole(...MANAGER_ROLES, "employee"), async (req, res) => {
   try {
     const u = req.hrmsUser!;
     const goalId = Number(req.params.id);
@@ -291,21 +314,12 @@ router.post("/performance/goals/:id/progress", requireHrmsUser, requireRole(...A
       return;
     }
 
-    // Verify goal exists
     const [goal] = await db.select({ id: performanceGoalsTable.id, employeeId: performanceGoalsTable.employeeId })
       .from(performanceGoalsTable).where(eq(performanceGoalsTable.id, goalId));
     if (!goal) { res.status(404).json({ error: "Goal not found" }); return; }
 
-    // Employees can only update progress for their own goals
-    if (u.role === "employee") {
-      const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
-        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
-        .where(eq(hrmsUsersTable.id, u.id));
-      if (!emp || emp.id !== goal.employeeId) {
-        res.status(403).json({ error: "Access denied" });
-        return;
-      }
-    }
+    const { allowed } = await resolveProgressScope(u, goal.employeeId);
+    if (!allowed) { res.status(403).json({ error: "Access denied" }); return; }
 
     const [row] = await db.insert(goalProgressTable).values({
       goalId,
