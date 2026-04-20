@@ -1072,6 +1072,11 @@ export type PostEmployeesIdOnboardingChecklistBody = {
   notes?: string | null;
 };
 
+export type PostEmployeesIdOnboardingChecklistWelcomeEmail200 = {
+  welcomeEmailSentAt: string;
+  message: string;
+};
+
 export type PatchOnboardingChecklistsIdBody = {
   /** @nullable */
   joiningDate?: string | null;

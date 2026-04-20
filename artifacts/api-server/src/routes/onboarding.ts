@@ -164,9 +164,20 @@ async function getChecklistWithTasks(checklistId: number) {
   return { checklist, tasks };
 }
 
-router.get("/employees/:id/onboarding-checklist", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+router.get("/employees/:id/onboarding-checklist", requireHrmsUser, requireRole(...HR_READ_ROLES, "employee"), async (req, res) => {
   try {
     const employeeId = parseInt(String(req.params.id), 10);
+    if (req.hrmsUser?.role === "employee") {
+      const [hrmsUser] = await db
+        .select({ employeeId: hrmsUsersTable.employeeId })
+        .from(hrmsUsersTable)
+        .where(eq(hrmsUsersTable.id, req.hrmsUser.id))
+        .limit(1);
+      if (!hrmsUser?.employeeId || hrmsUser.employeeId !== employeeId) {
+        res.status(403).json({ error: "Access denied. You can only view your own onboarding checklist." });
+        return;
+      }
+    }
     const [cl] = await db
       .select({ id: onboardingChecklistsTable.id })
       .from(onboardingChecklistsTable)
@@ -184,9 +195,25 @@ router.get("/employees/:id/onboarding-checklist", requireHrmsUser, requireRole(.
   }
 });
 
-router.get("/onboarding/checklists/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+router.get("/onboarding/checklists/:id", requireHrmsUser, requireRole(...HR_READ_ROLES, "employee"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
+    if (req.hrmsUser?.role === "employee") {
+      const [hrmsUser] = await db
+        .select({ employeeId: hrmsUsersTable.employeeId })
+        .from(hrmsUsersTable)
+        .where(eq(hrmsUsersTable.id, req.hrmsUser.id))
+        .limit(1);
+      const [cl] = await db
+        .select({ employeeId: onboardingChecklistsTable.employeeId })
+        .from(onboardingChecklistsTable)
+        .where(eq(onboardingChecklistsTable.id, id))
+        .limit(1);
+      if (!hrmsUser?.employeeId || !cl || cl.employeeId !== hrmsUser.employeeId) {
+        res.status(403).json({ error: "Access denied. You can only view your own onboarding checklist." });
+        return;
+      }
+    }
     const detail = await getChecklistWithTasks(id);
     if (!detail) {
       res.status(404).json({ error: "Checklist not found" });

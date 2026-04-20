@@ -70,6 +70,7 @@ import type {
   PatchOnboardingChecklistsIdBody,
   PostEmployeesBulkImportBody,
   PostEmployeesIdOnboardingChecklistBody,
+  PostEmployeesIdOnboardingChecklistWelcomeEmail200,
   PostOnboardingTasksIdCompleteBody,
   PreOnboardingDocument,
   PreOnboardingRecord,
@@ -3518,6 +3519,101 @@ export function useGetEmployeesIdOnboardingChecklist<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Trigger welcome email for employee onboarding
+ */
+export const getPostEmployeesIdOnboardingChecklistWelcomeEmailUrl = (
+  id: number,
+) => {
+  return `/api/employees/${id}/onboarding-checklist/welcome-email`;
+};
+
+export const postEmployeesIdOnboardingChecklistWelcomeEmail = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PostEmployeesIdOnboardingChecklistWelcomeEmail200> => {
+  return customFetch<PostEmployeesIdOnboardingChecklistWelcomeEmail200>(
+    getPostEmployeesIdOnboardingChecklistWelcomeEmailUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getPostEmployeesIdOnboardingChecklistWelcomeEmailMutationOptions =
+  <TError = ErrorType<void>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof postEmployeesIdOnboardingChecklistWelcomeEmail>
+      >,
+      TError,
+      { id: number },
+      TContext
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdOnboardingChecklistWelcomeEmail>>,
+    TError,
+    { id: number },
+    TContext
+  > => {
+    const mutationKey = ["postEmployeesIdOnboardingChecklistWelcomeEmail"];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        "mutationKey" in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof postEmployeesIdOnboardingChecklistWelcomeEmail>
+      >,
+      { id: number }
+    > = (props) => {
+      const { id } = props ?? {};
+
+      return postEmployeesIdOnboardingChecklistWelcomeEmail(id, requestOptions);
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type PostEmployeesIdOnboardingChecklistWelcomeEmailMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof postEmployeesIdOnboardingChecklistWelcomeEmail>>
+  >;
+
+export type PostEmployeesIdOnboardingChecklistWelcomeEmailMutationError =
+  ErrorType<void>;
+
+/**
+ * @summary Trigger welcome email for employee onboarding
+ */
+export const usePostEmployeesIdOnboardingChecklistWelcomeEmail = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdOnboardingChecklistWelcomeEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postEmployeesIdOnboardingChecklistWelcomeEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(
+    getPostEmployeesIdOnboardingChecklistWelcomeEmailMutationOptions(options),
+  );
+};
 
 /**
  * @summary Get checklist by ID

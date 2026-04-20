@@ -40,24 +40,27 @@ const TASK_CATEGORY_COLORS: Record<string, string> = {
 
 function TaskCard({
   task,
-  canEdit,
+  canManage,
+  isEmployee,
   onComplete,
   onUncomplete,
   onDelete,
 }: {
   task: OnboardingTask;
-  canEdit: boolean;
+  canManage: boolean;
+  isEmployee: boolean;
   onComplete: (id: number) => void;
   onUncomplete: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
   const isDone = !!task.completedAt;
+  const canComplete = canManage || (isEmployee && task.assigneeRole === "employee");
   return (
     <div className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${isDone ? "border-green-200 bg-green-50" : "border-border bg-background"}`}>
       <button
         onClick={() => isDone ? onUncomplete(task.id) : onComplete(task.id)}
         className="mt-0.5 flex-shrink-0"
-        disabled={!canEdit}
+        disabled={!canComplete}
       >
         {isDone
           ? <CheckCircle2 className="w-5 h-5 text-green-500" />
@@ -72,7 +75,7 @@ function TaskCard({
           {isDone && task.completedAt && <span className="text-xs text-green-600">· Completed {format(new Date(task.completedAt), "dd MMM yyyy")}</span>}
         </div>
       </div>
-      {canEdit && (
+      {canManage && (
         <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive flex-shrink-0" onClick={() => onDelete(task.id)}>
           <Trash2 className="w-3.5 h-3.5" />
         </Button>
@@ -86,7 +89,8 @@ export default function OnboardingDetailPage() {
   const checklistId = parseInt(id, 10);
   const qc = useQueryClient();
   const { role } = useCurrentHrmsUser();
-  const canEdit = hasRole(role, ["super_admin", "hr_manager", "hr_executive", "hod"]);
+  const canManage = hasRole(role, ["super_admin", "hr_manager", "hr_executive", "hod"]);
+  const isEmployee = role === "employee";
 
   const { data: detail, isLoading } = useGetOnboardingChecklistsId(checklistId);
   const complete = usePostOnboardingTasksIdComplete({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetOnboardingChecklistsIdQueryKey(checklistId) }) } });
@@ -193,7 +197,7 @@ export default function OnboardingDetailPage() {
 
         <TabsContent value="tasks" className="space-y-4">
           <div className="flex justify-end">
-            {canEdit && (
+            {canManage && (
               <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="w-3.5 h-3.5 mr-1" />Add Task</Button>
             )}
           </div>
@@ -217,7 +221,8 @@ export default function OnboardingDetailPage() {
                     <TaskCard
                       key={t.id}
                       task={t}
-                      canEdit={canEdit}
+                      canManage={canManage}
+                      isEmployee={isEmployee}
                       onComplete={(tid) => complete.mutate({ id: tid, data: {} })}
                       onUncomplete={(tid) => uncomplete.mutate({ id: tid })}
                       onDelete={(tid) => deleteTask.mutate({ id: tid })}
@@ -255,7 +260,7 @@ export default function OnboardingDetailPage() {
 
         <TabsContent value="induction" className="space-y-4">
           <div className="flex justify-end">
-            {canEdit && (
+            {canManage && (
               <Button size="sm" onClick={() => setSessionOpen(true)}><Plus className="w-3.5 h-3.5 mr-1" />Record Session</Button>
             )}
           </div>
@@ -280,7 +285,7 @@ export default function OnboardingDetailPage() {
                         {s.topics && <p className="text-sm mt-1">{s.topics}</p>}
                         {s.notes && <p className="text-xs text-muted-foreground mt-1">{s.notes}</p>}
                       </div>
-                      {canEdit && (
+                      {canManage && (
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteSession.mutate({ id: s.id })}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>

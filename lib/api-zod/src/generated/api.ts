@@ -849,6 +849,19 @@ export const GetEmployeesIdOnboardingChecklistResponse = zod.object({
 });
 
 /**
+ * @summary Trigger welcome email for employee onboarding
+ */
+export const PostEmployeesIdOnboardingChecklistWelcomeEmailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdOnboardingChecklistWelcomeEmailResponse =
+  zod.object({
+    welcomeEmailSentAt: zod.coerce.date(),
+    message: zod.string(),
+  });
+
+/**
  * @summary Get checklist by ID
  */
 export const GetOnboardingChecklistsIdParams = zod.object({

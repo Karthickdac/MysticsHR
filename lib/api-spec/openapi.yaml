@@ -727,6 +727,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/OnboardingChecklistDetail"
 
+  /employees/{id}/onboarding-checklist/welcome-email:
+    post:
+      summary: Trigger welcome email for employee onboarding
+      tags: [Onboarding]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Welcome email trigger recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [welcomeEmailSentAt, message]
+                properties:
+                  welcomeEmailSentAt:
+                    type: string
+                    format: date-time
+                  message:
+                    type: string
+        "404":
+          description: Checklist not found for this employee
+
   /onboarding/checklists/{id}:
     get:
       summary: Get checklist by ID

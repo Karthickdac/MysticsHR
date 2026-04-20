@@ -215,12 +215,27 @@ router.patch("/employee-education/:id", requireHrmsUser, requireRole(...HR_ROLES
   try {
     const id = parseInt(String(req.params.id), 10);
     const { degree, institution, fieldOfStudy, startYear, endYear, grade } = req.body;
+    const [existing] = await db.select().from(employeeEducationTable).where(eq(employeeEducationTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
     const [row] = await db
       .update(employeeEducationTable)
       .set({ degree, institution, fieldOfStudy, startYear, endYear, grade, updatedAt: new Date() })
       .where(eq(employeeEducationTable.id, id))
       .returning();
-    if (!row) { res.status(404).json({ error: "Not found" }); return; }
+    const changedById = req.hrmsUser?.id ?? null;
+    const eduFields: Array<{ key: keyof typeof existing; val: unknown }> = [
+      { key: "degree", val: degree },
+      { key: "institution", val: institution },
+      { key: "fieldOfStudy", val: fieldOfStudy },
+      { key: "startYear", val: startYear },
+      { key: "endYear", val: endYear },
+      { key: "grade", val: grade },
+    ];
+    for (const { key, val } of eduFields) {
+      const oldVal = String(existing[key] ?? "");
+      const newVal = String(val ?? "");
+      await recordHistory(existing.employeeId, "EmployeeEducation", key, oldVal === "null" ? null : oldVal, newVal === "null" ? null : newVal, changedById);
+    }
     await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "EmployeeEducation", recordId: id, ipAddress: req.ip });
     res.json(row);
   } catch (err) {
@@ -280,12 +295,28 @@ router.patch("/employee-work-experience/:id", requireHrmsUser, requireRole(...HR
   try {
     const id = parseInt(String(req.params.id), 10);
     const { company, designation, location, startDate, endDate, description, ctcDrawn } = req.body;
+    const [existing] = await db.select().from(employeeWorkExperienceTable).where(eq(employeeWorkExperienceTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
     const [row] = await db
       .update(employeeWorkExperienceTable)
       .set({ company, designation, location, startDate, endDate, description, ctcDrawn, updatedAt: new Date() })
       .where(eq(employeeWorkExperienceTable.id, id))
       .returning();
-    if (!row) { res.status(404).json({ error: "Not found" }); return; }
+    const changedById = req.hrmsUser?.id ?? null;
+    const weFields: Array<{ key: keyof typeof existing; val: unknown }> = [
+      { key: "company", val: company },
+      { key: "designation", val: designation },
+      { key: "location", val: location },
+      { key: "startDate", val: startDate },
+      { key: "endDate", val: endDate },
+      { key: "description", val: description },
+      { key: "ctcDrawn", val: ctcDrawn },
+    ];
+    for (const { key, val } of weFields) {
+      const oldVal = String(existing[key] ?? "");
+      const newVal = String(val ?? "");
+      await recordHistory(existing.employeeId, "EmployeeWorkExp", key, oldVal === "null" ? null : oldVal, newVal === "null" ? null : newVal, changedById);
+    }
     await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "EmployeeWorkExp", recordId: id, ipAddress: req.ip });
     res.json(row);
   } catch (err) {
@@ -355,12 +386,28 @@ router.patch("/emp-documents/:id", requireHrmsUser, requireRole(...HR_ROLES), as
   try {
     const id = parseInt(String(req.params.id), 10);
     const { documentType, documentName, fileUrl, issueDate, expiryDate, alertDays, notes } = req.body;
+    const [existing] = await db.select().from(employeeDocumentsTable).where(eq(employeeDocumentsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
     const [row] = await db
       .update(employeeDocumentsTable)
       .set({ documentType, documentName, fileUrl, issueDate, expiryDate, alertDays, notes, updatedAt: new Date() })
       .where(eq(employeeDocumentsTable.id, id))
       .returning();
-    if (!row) { res.status(404).json({ error: "Not found" }); return; }
+    const changedById = req.hrmsUser?.id ?? null;
+    const docFields: Array<{ key: keyof typeof existing; val: unknown }> = [
+      { key: "documentType", val: documentType },
+      { key: "documentName", val: documentName },
+      { key: "fileUrl", val: fileUrl },
+      { key: "issueDate", val: issueDate },
+      { key: "expiryDate", val: expiryDate },
+      { key: "alertDays", val: alertDays },
+      { key: "notes", val: notes },
+    ];
+    for (const { key, val } of docFields) {
+      const oldVal = String(existing[key] ?? "");
+      const newVal = String(val ?? "");
+      await recordHistory(existing.employeeId, "EmployeeDocuments", key, oldVal === "null" ? null : oldVal, newVal === "null" ? null : newVal, changedById);
+    }
     await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "EmployeeDocuments", recordId: id, ipAddress: req.ip });
     res.json(row);
   } catch (err) {
