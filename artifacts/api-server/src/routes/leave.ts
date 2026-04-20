@@ -39,10 +39,17 @@ function computeWorkingDays(from: string, to: string, isHalfDay: boolean): numbe
   return days;
 }
 
-async function getEmployeeForUser(userId: number): Promise<{ id: number; departmentId: number | null } | null> {
+async function getEmployeeForUser(userId: number): Promise<{
+  id: number; departmentId: number | null; employmentType: string | null; gender: string | null;
+} | null> {
   const [user] = await db.select({ employeeId: hrmsUsersTable.employeeId }).from(hrmsUsersTable).where(eq(hrmsUsersTable.id, userId));
   if (!user?.employeeId) return null;
-  const [emp] = await db.select({ id: employeesTable.id, departmentId: employeesTable.departmentId }).from(employeesTable).where(eq(employeesTable.id, user.employeeId));
+  const [emp] = await db.select({
+    id: employeesTable.id,
+    departmentId: employeesTable.departmentId,
+    employmentType: employeesTable.employmentType,
+    gender: employeesTable.gender,
+  }).from(employeesTable).where(eq(employeesTable.id, user.employeeId));
   return emp ?? null;
 }
 
@@ -333,6 +340,37 @@ router.post("/leave/applications", requireHrmsUser, requireRole(...ALL_ROLES), a
         return;
       }
     }
+
+    // ── Policy enforcement ──────────────────────────────────────────────────────
+    // Half-day eligibility
+    if (isHalfDay && !leaveType.allowHalfDay) {
+      res.status(422).json({ error: "This leave type does not allow half-day requests" }); return;
+    }
+
+    // Employment type applicability
+    if (leaveType.applicableEmploymentTypes && leaveType.applicableEmploymentTypes.length > 0 && emp.employmentType) {
+      if (!leaveType.applicableEmploymentTypes.includes(emp.employmentType)) {
+        res.status(422).json({ error: `This leave type is not applicable for your employment type (${emp.employmentType})` }); return;
+      }
+    }
+
+    // Compute total days for min/max checks
+    const totalDaysForPolicy = computeWorkingDays(fromDate, toDate, isHalfDay ?? false);
+
+    // Min consecutive days
+    const minDays = leaveType.minConsecutiveDays ? parseFloat(leaveType.minConsecutiveDays as string) : 0.5;
+    if (totalDaysForPolicy < minDays) {
+      res.status(422).json({ error: `This leave type requires a minimum of ${minDays} day(s) per request` }); return;
+    }
+
+    // Max consecutive days
+    if (leaveType.maxConsecutiveDays) {
+      const maxDays = parseFloat(leaveType.maxConsecutiveDays as string);
+      if (totalDaysForPolicy > maxDays) {
+        res.status(422).json({ error: `This leave type allows a maximum of ${maxDays} consecutive day(s) per request` }); return;
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────────
 
     // Check overlapping applications
     const overlapping = await db.select().from(leaveApplicationsTable).where(
@@ -743,6 +781,70 @@ router.post("/leave/balances/initialize", requireHrmsUser, requireRole(...HR_ROL
     }
     await logAudit({ user: req.hrmsUser, action: "INITIALIZE_LEAVE_BALANCES", module: "Leave", newValue: `Year ${year}, Count ${count}`, ipAddress: req.ip });
     res.json({ count });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/leave/balances/accrue", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const { year, month, employeeId } = req.body as { year: number; month: number; employeeId?: number };
+
+    if (!year || !month || month < 1 || month > 12) {
+      res.status(400).json({ error: "Valid year and month (1–12) are required" }); return;
+    }
+
+    const leaveTypes = await db.select().from(leaveTypesTable).where(
+      and(eq(leaveTypesTable.isActive, true), sql`${leaveTypesTable.annualQuota} > 0`)
+    );
+    const emps = await db.select({ id: employeesTable.id }).from(employeesTable)
+      .where(and(isNull(employeesTable.deletedAt), employeeId ? eq(employeesTable.id, employeeId) : undefined));
+
+    let accrued = 0;
+    let skipped = 0;
+
+    for (const emp of emps) {
+      for (const lt of leaveTypes) {
+        // Check if already accrued this month
+        const already = await db.select({ id: leaveAccrualHistoryTable.id }).from(leaveAccrualHistoryTable).where(
+          and(
+            eq(leaveAccrualHistoryTable.employeeId, emp.id),
+            eq(leaveAccrualHistoryTable.leaveTypeId, lt.id),
+            eq(leaveAccrualHistoryTable.year, year),
+            eq(leaveAccrualHistoryTable.month, month),
+            sql`${leaveAccrualHistoryTable.accrualType} = 'Monthly Accrual'`,
+          )
+        );
+        if (already.length > 0) { skipped++; continue; }
+
+        const monthlyDays = (parseFloat(lt.annualQuota as string) / 12).toFixed(1);
+
+        await db.transaction(async (tx) => {
+          const [bal] = await tx.select().from(leaveBalancesTable).where(
+            and(eq(leaveBalancesTable.employeeId, emp.id), eq(leaveBalancesTable.leaveTypeId, lt.id), eq(leaveBalancesTable.year, year))
+          );
+          if (bal) {
+            await tx.update(leaveBalancesTable)
+              .set({ allocated: sql`${leaveBalancesTable.allocated} + ${monthlyDays}`, updatedAt: new Date() })
+              .where(eq(leaveBalancesTable.id, bal.id));
+          } else {
+            await tx.insert(leaveBalancesTable).values({
+              employeeId: emp.id, leaveTypeId: lt.id, year,
+              allocated: monthlyDays, used: "0", pending: "0", carryForward: "0",
+            });
+          }
+          await tx.insert(leaveAccrualHistoryTable).values({
+            employeeId: emp.id, leaveTypeId: lt.id, year, month,
+            accrualType: "Monthly Accrual",
+            days: monthlyDays,
+            notes: `Monthly accrual ${year}-${String(month).padStart(2, "0")} (${monthlyDays} of ${lt.annualQuota} annual)`,
+            processedById: req.hrmsUser.id,
+          });
+        });
+        accrued++;
+      }
+    }
+
+    await logAudit({ user: req.hrmsUser, action: "ACCRUE_LEAVE", module: "Leave", newValue: `${year}-${month}: accrued=${accrued}, skipped=${skipped}`, ipAddress: req.ip });
+    res.json({ accrued, skipped, message: `Processed ${accrued} accrual(s), skipped ${skipped} already-run accrual(s)` });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

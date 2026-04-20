@@ -1882,6 +1882,22 @@ export type InitializeLeaveBalances200 = {
   count: number;
 };
 
+export type AccrueLeaveBalancesBody = {
+  year: number;
+  /**
+   * @minimum 1
+   * @maximum 12
+   */
+  month: number;
+  employeeId?: number;
+};
+
+export type AccrueLeaveBalances200 = {
+  accrued: number;
+  skipped: number;
+  message: string;
+};
+
 export type GetLeaveCalendarParams = {
   /**
    * YYYY-MM

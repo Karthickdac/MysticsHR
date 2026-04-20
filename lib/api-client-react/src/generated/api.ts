@@ -18,6 +18,8 @@ import type {
 
 import type {
   AcceptOfferResponse,
+  AccrueLeaveBalances200,
+  AccrueLeaveBalancesBody,
   ActivityItem,
   ApproveRequisitionBody,
   AttendanceMonthlySummary,
@@ -11848,6 +11850,92 @@ export const useInitializeLeaveBalances = <
   TContext
 > => {
   return useMutation(getInitializeLeaveBalancesMutationOptions(options));
+};
+
+/**
+ * @summary Run periodic (monthly) leave accrual for all or one employee
+ */
+export const getAccrueLeaveBalancesUrl = () => {
+  return `/api/leave/balances/accrue`;
+};
+
+export const accrueLeaveBalances = async (
+  accrueLeaveBalancesBody: AccrueLeaveBalancesBody,
+  options?: RequestInit,
+): Promise<AccrueLeaveBalances200> => {
+  return customFetch<AccrueLeaveBalances200>(getAccrueLeaveBalancesUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(accrueLeaveBalancesBody),
+  });
+};
+
+export const getAccrueLeaveBalancesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof accrueLeaveBalances>>,
+    TError,
+    { data: BodyType<AccrueLeaveBalancesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof accrueLeaveBalances>>,
+  TError,
+  { data: BodyType<AccrueLeaveBalancesBody> },
+  TContext
+> => {
+  const mutationKey = ["accrueLeaveBalances"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof accrueLeaveBalances>>,
+    { data: BodyType<AccrueLeaveBalancesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return accrueLeaveBalances(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AccrueLeaveBalancesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof accrueLeaveBalances>>
+>;
+export type AccrueLeaveBalancesMutationBody = BodyType<AccrueLeaveBalancesBody>;
+export type AccrueLeaveBalancesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Run periodic (monthly) leave accrual for all or one employee
+ */
+export const useAccrueLeaveBalances = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof accrueLeaveBalances>>,
+    TError,
+    { data: BodyType<AccrueLeaveBalancesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof accrueLeaveBalances>>,
+  TError,
+  { data: BodyType<AccrueLeaveBalancesBody> },
+  TContext
+> => {
+  return useMutation(getAccrueLeaveBalancesMutationOptions(options));
 };
 
 /**

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   useListPermissions,
+  useListEmployees,
   useSubmitPermission,
   useActionPermission,
   useCancelPermission,
@@ -8,6 +9,7 @@ import {
   useOverridePermissionLimit,
   getListPermissionsQueryKey,
   getGetPermissionRegisterQueryKey,
+  getListEmployeesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -68,9 +70,21 @@ export default function PermissionsPage() {
   const [showOverride, setShowOverride] = useState(false);
   const [showAction, setShowAction] = useState<{ id: number; action: "Approved" | "Rejected" } | null>(null);
   const [actionRemarks, setActionRemarks] = useState("");
+  const [overrideEmployeeId, setOverrideEmployeeId] = useState<string>("");
 
   const [form, setForm] = useState({ permissionDate: "", startTime: "", endTime: "", reason: "" });
   const [overrideForm, setOverrideForm] = useState({ newLimitMinutes: "480", justification: "" });
+
+  // For HR: fetch employees list and target employee's register
+  const empParams = { status: "Active" };
+  const { data: employeesResp } = useListEmployees(empParams, { query: { enabled: isHr, queryKey: getListEmployeesQueryKey(empParams) } });
+  const allEmployees = employeesResp?.data ?? [];
+  const selectedEmpId = overrideEmployeeId ? Number(overrideEmployeeId) : undefined;
+  const targetRegParams = { employeeId: selectedEmpId, month };
+  const { data: targetRegister } = useGetPermissionRegister(
+    targetRegParams,
+    { query: { enabled: isHr && !!selectedEmpId, queryKey: getGetPermissionRegisterQueryKey(targetRegParams) } }
+  );
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: getListPermissionsQueryKey({ month }) });
@@ -115,17 +129,22 @@ export default function PermissionsPage() {
 
   async function handleOverride() {
     if (!overrideForm.justification.trim()) return;
+    const empId = selectedEmpId ?? register?.employeeId;
+    if (!empId) { alert("Please select an employee to override"); return; }
     try {
       await overrideMutation.mutateAsync({
         data: {
-          employeeId: register?.employeeId ?? 0,
+          employeeId: empId,
           year: y, month: m,
           newLimitMinutes: Number(overrideForm.newLimitMinutes),
           justification: overrideForm.justification,
         },
       });
       invalidate();
+      qc.invalidateQueries({ queryKey: getGetPermissionRegisterQueryKey({ employeeId: empId, month }) });
       setShowOverride(false);
+      setOverrideEmployeeId("");
+      setOverrideForm({ newLimitMinutes: "480", justification: "" });
     } catch { alert("Failed to override limit"); }
   }
 
@@ -306,15 +325,35 @@ export default function PermissionsPage() {
       </Dialog>
 
       {/* Override Limit Dialog */}
-      <Dialog open={showOverride} onOpenChange={setShowOverride}>
+      <Dialog open={showOverride} onOpenChange={(o) => { if (!o) { setShowOverride(false); setOverrideEmployeeId(""); setOverrideForm({ newLimitMinutes: "480", justification: "" }); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Override Permission Limit</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-500">Override the monthly permission limit for this employee for {monthName}.</p>
+            <p className="text-sm text-gray-500">Override the monthly permission limit for an employee for {monthName}.</p>
             <div>
-              <Label>New Limit (minutes)</Label>
+              <Label>Employee *</Label>
+              <Select value={overrideEmployeeId} onValueChange={setOverrideEmployeeId}>
+                <SelectTrigger><SelectValue placeholder="Select employee..." /></SelectTrigger>
+                <SelectContent>
+                  {allEmployees.map(emp => (
+                    <SelectItem key={emp.id} value={String(emp.id)}>
+                      {emp.firstName} {emp.lastName} {emp.employeeId ? `(${emp.employeeId})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedEmpId && targetRegister && (
+              <div className="text-xs bg-blue-50 rounded p-2 space-y-0.5">
+                <div>Current limit: <strong>{fmtMins(targetRegister.limitMinutes)}</strong></div>
+                <div>Used: <strong>{fmtMins(targetRegister.usedMinutes)}</strong></div>
+                <div>Remaining: <strong>{fmtMins(targetRegister.remainingMinutes ?? targetRegister.limitMinutes - targetRegister.usedMinutes)}</strong></div>
+              </div>
+            )}
+            <div>
+              <Label>New Limit (minutes) *</Label>
               <Input type="number" min="0" value={overrideForm.newLimitMinutes} onChange={e => setOverrideForm(f => ({ ...f, newLimitMinutes: e.target.value }))} />
-              <p className="text-xs text-gray-400 mt-1">Current: {fmtMins(limitMins)}</p>
+              <p className="text-xs text-gray-400 mt-1">e.g. 480 = 8 hours</p>
             </div>
             <div>
               <Label>Justification *</Label>
@@ -322,8 +361,8 @@ export default function PermissionsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowOverride(false)}>Cancel</Button>
-            <Button onClick={handleOverride} disabled={!overrideForm.justification.trim() || overrideMutation.isPending}>
+            <Button variant="outline" onClick={() => { setShowOverride(false); setOverrideEmployeeId(""); setOverrideForm({ newLimitMinutes: "480", justification: "" }); }}>Close</Button>
+            <Button onClick={handleOverride} disabled={!overrideForm.justification.trim() || !overrideEmployeeId || overrideMutation.isPending}>
               {overrideMutation.isPending ? "Saving..." : "Apply Override"}
             </Button>
           </DialogFooter>

@@ -3248,6 +3248,23 @@ export const InitializeLeaveBalancesResponse = zod.object({
 });
 
 /**
+ * @summary Run periodic (monthly) leave accrual for all or one employee
+ */
+export const accrueLeaveBalancesBodyMonthMax = 12;
+
+export const AccrueLeaveBalancesBody = zod.object({
+  year: zod.number(),
+  month: zod.number().min(1).max(accrueLeaveBalancesBodyMonthMax),
+  employeeId: zod.number().optional(),
+});
+
+export const AccrueLeaveBalancesResponse = zod.object({
+  accrued: zod.number(),
+  skipped: zod.number(),
+  message: zod.string(),
+});
+
+/**
  * @summary Get team leave calendar
  */
 export const GetLeaveCalendarQueryParams = zod.object({

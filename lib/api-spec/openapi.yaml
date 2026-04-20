@@ -2566,6 +2566,35 @@ paths:
                   count: { type: integer }
                 required: [count]
 
+  /leave/balances/accrue:
+    post:
+      operationId: accrueLeaveBalances
+      tags: [Leave]
+      summary: Run periodic (monthly) leave accrual for all or one employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                year: { type: integer }
+                month: { type: integer, minimum: 1, maximum: 12 }
+                employeeId: { type: integer }
+              required: [year, month]
+      responses:
+        "200":
+          description: Accrual result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accrued: { type: integer }
+                  skipped: { type: integer }
+                  message: { type: string }
+                required: [accrued, skipped, message]
+
   /leave/calendar:
     get:
       operationId: getLeaveCalendar
