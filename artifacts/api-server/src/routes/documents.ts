@@ -226,7 +226,7 @@ router.get("/documents/issued", requireHrmsUser, requireRole(...ALL_ROLES), asyn
       fieldValues: issuedDocumentsTable.fieldValues,
       firstName: employeesTable.firstName,
       lastName: employeesTable.lastName,
-      employeeCode: employeesTable.employeeCode,
+      employeeCode: employeesTable.employeeId,
       generatedByName: hrmsUsersTable.name,
     }).from(issuedDocumentsTable)
       .leftJoin(employeesTable, eq(issuedDocumentsTable.employeeId, employeesTable.id))
@@ -269,9 +269,8 @@ router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), as
       id: employeesTable.id,
       firstName: employeesTable.firstName,
       lastName: employeesTable.lastName,
-      employeeCode: employeesTable.employeeCode,
+      employeeCode: employeesTable.employeeId,
       dateOfJoining: employeesTable.dateOfJoining,
-      lastWorkingDay: employeesTable.lastWorkingDay,
     }).from(employeesTable).where(eq(employeesTable.id, employeeId));
     if (!emp) { res.status(404).json({ error: "Employee not found" }); return; }
 
@@ -280,7 +279,6 @@ router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), as
       employeeName: `${emp.firstName} ${emp.lastName}`,
       employeeCode: emp.employeeCode ?? "",
       dateOfJoining: emp.dateOfJoining ?? "",
-      lastWorkingDay: emp.lastWorkingDay ?? "",
       currentDate: new Date().toLocaleDateString("en-IN"),
       ...fieldValues,
     };
@@ -379,16 +377,16 @@ router.post("/employees/:id/fnf-approve", requireHrmsUser, requireRole(...HR_ROL
     }).from(employeesTable).where(eq(employeesTable.id, employeeId));
     if (!emp) { res.status(404).json({ error: "Employee not found" }); return; }
 
-    // Find an active relieving_letter template; fall back to any available template
+    // Find an active Relieving Letter template
     const [template] = await db.select().from(documentTemplatesTable)
       .where(
         and(
-          eq(documentTemplatesTable.documentType, "relieving_letter"),
+          eq(documentTemplatesTable.documentType, "Relieving Letter"),
           eq(documentTemplatesTable.isActive, true),
         )
       ).limit(1);
 
-    const documentType = "relieving_letter";
+    const documentType = "Relieving Letter" as const;
     const autoFields: Record<string, string> = {
       employeeName: `${emp.firstName} ${emp.lastName}`,
       employeeCode: emp.employeeCode ?? "",

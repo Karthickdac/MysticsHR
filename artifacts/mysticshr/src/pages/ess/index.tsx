@@ -381,9 +381,9 @@ export default function EssPortalPage() {
                           Issued: {doc.generatedAt ? new Date(doc.generatedAt).toLocaleDateString() : "—"}
                         </p>
                       </div>
-                      <Link href={`/api/documents/issued/${doc.id}/download`}>
+                      <a href={`/api/documents/issued/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
                         <Button variant="outline" size="sm" className="ml-3">Download</Button>
-                      </Link>
+                      </a>
                     </div>
                   ))}
                 </div>
