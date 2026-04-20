@@ -16,24 +16,12 @@ import {
 import { eq, sql, desc } from "drizzle-orm";
 import QRCode from "qrcode";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { DEFAULT_ONBOARDING_TASKS } from "../lib/onboarding-utils";
 
 const router = Router();
 
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
 const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
-
-const DEFAULT_TASKS = [
-  { title: "Collect and verify original documents", category: "HR" as const, assigneeRole: "hr_executive" },
-  { title: "Issue employee ID card", category: "HR" as const, assigneeRole: "hr_manager" },
-  { title: "Complete payroll enrollment", category: "HR" as const, assigneeRole: "hr_executive" },
-  { title: "Set up company email account", category: "IT" as const, assigneeRole: "hr_executive" },
-  { title: "Provision laptop and access credentials", category: "IT" as const, assigneeRole: "hr_executive" },
-  { title: "Set up workstation and software tools", category: "IT" as const, assigneeRole: "hr_executive" },
-  { title: "Introduce to the team and workspace", category: "Department" as const, assigneeRole: "hod" },
-  { title: "Handover project briefings and SOPs", category: "Department" as const, assigneeRole: "hod" },
-  { title: "Complete HR onboarding paperwork", category: "Employee" as const, assigneeRole: "employee" },
-  { title: "Attend company induction session", category: "Employee" as const, assigneeRole: "employee" },
-];
 
 async function recomputeChecklist(checklistId: number) {
   const tasks = await db
@@ -110,7 +98,7 @@ router.post(
         .returning();
 
       const taskDueDate = joiningDate ?? null;
-      for (const t of DEFAULT_TASKS) {
+      for (const t of DEFAULT_ONBOARDING_TASKS) {
         await db.insert(onboardingTasksTable).values({
           checklistId: checklist.id,
           title: t.title,
@@ -121,6 +109,37 @@ router.post(
       }
       await logAudit({ user: req.hrmsUser, action: "CREATE", module: "OnboardingChecklist", recordId: checklist.id, ipAddress: req.ip });
       res.status(201).json(checklist);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+router.post(
+  "/employees/:id/onboarding-checklist/welcome-email",
+  requireHrmsUser,
+  requireRole(...HR_ROLES),
+  async (req, res) => {
+    try {
+      const employeeId = parseInt(String(req.params.id), 10);
+      const [checklist] = await db
+        .select({ id: onboardingChecklistsTable.id, welcomeEmailSentAt: onboardingChecklistsTable.welcomeEmailSentAt })
+        .from(onboardingChecklistsTable)
+        .where(eq(onboardingChecklistsTable.employeeId, employeeId))
+        .limit(1);
+      if (!checklist) {
+        res.status(404).json({ error: "Onboarding checklist not found for this employee" });
+        return;
+      }
+      const sentAt = new Date();
+      const [updated] = await db
+        .update(onboardingChecklistsTable)
+        .set({ welcomeEmailSentAt: sentAt, updatedAt: sentAt })
+        .where(eq(onboardingChecklistsTable.id, checklist.id))
+        .returning();
+      await logAudit({ user: req.hrmsUser, action: "SEND_WELCOME_EMAIL", module: "OnboardingChecklist", recordId: checklist.id, ipAddress: req.ip });
+      res.json({ welcomeEmailSentAt: updated.welcomeEmailSentAt, message: "Welcome email trigger recorded" });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Internal server error" });

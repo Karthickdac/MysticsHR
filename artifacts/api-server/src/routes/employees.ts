@@ -4,6 +4,7 @@ import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { employeesTable, departmentsTable, designationsTable } from "@workspace/db/schema";
 import { eq, isNull, and, sql, desc } from "drizzle-orm";
+import { autoCreateOnboardingChecklist } from "../lib/onboarding-utils";
 
 const router = Router();
 
@@ -106,6 +107,15 @@ router.post(
         .returning();
 
       await logAudit({ user: req.hrmsUser, action: "CREATE", module: "Employees", recordId: emp.id, ipAddress: req.ip });
+
+      if (dateOfJoining) {
+        try {
+          await autoCreateOnboardingChecklist(emp.id, dateOfJoining);
+        } catch (e) {
+          console.error("Auto-checklist creation failed (non-fatal):", e);
+        }
+      }
+
       res.status(201).json(emp);
     } catch (err: unknown) {
       const e = err as { code?: string };
@@ -170,6 +180,15 @@ router.patch(
         return;
       }
       await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "Employees", recordId: id, ipAddress: req.ip });
+
+      if (dateOfJoining) {
+        try {
+          await autoCreateOnboardingChecklist(id, dateOfJoining);
+        } catch (e) {
+          console.error("Auto-checklist creation on update failed (non-fatal):", e);
+        }
+      }
+
       res.json(emp);
     } catch (err: unknown) {
       const e = err as { code?: string };
