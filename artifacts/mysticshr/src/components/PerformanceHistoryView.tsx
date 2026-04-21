@@ -99,7 +99,7 @@ function PerformanceTrendTooltip({
       )}
       {p.peerAverage !== null && (() => {
         const diff = p.finalScore - p.peerAverage;
-        const isOutlier = Math.abs(diff) >= OUTLIER_THRESHOLD;
+        const isOutlier = Math.abs(diff) > OUTLIER_THRESHOLD;
         if (!isOutlier) return null;
         const sign = diff >= 0 ? "+" : "−";
         const cls = diff >= 0 ? "text-emerald-600" : "text-red-600";
@@ -201,7 +201,7 @@ function PerformanceTrendChart({
                     return <g key={`final-empty-${index ?? 0}`} />;
                   }
                   const peer = payload.peerAverage;
-                  const isOutlier = showComparison && peer !== null && Math.abs(payload.finalScore - peer) >= OUTLIER_THRESHOLD;
+                  const isOutlier = showComparison && peer !== null && Math.abs(payload.finalScore - peer) > OUTLIER_THRESHOLD;
                   if (!isOutlier) {
                     return <circle key={`final-${payload.cycleId}`} cx={cx} cy={cy} r={4} fill="hsl(var(--primary))" />;
                   }
@@ -529,7 +529,7 @@ export default function PerformanceHistoryView({
         // Build the outlier list from the same trendData the chart uses so
         // the summary card and the amber dots can never disagree.
         const outliers = trendData
-          .filter(d => d.peerAverage !== null && Math.abs(d.finalScore - d.peerAverage) >= OUTLIER_THRESHOLD)
+          .filter(d => d.peerAverage !== null && Math.abs(d.finalScore - d.peerAverage) > OUTLIER_THRESHOLD)
           .map(d => ({ ...d, diff: d.finalScore - (d.peerAverage as number) }))
           .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
         if (outliers.length === 0) return null;
@@ -539,7 +539,7 @@ export default function PerformanceHistoryView({
               <CardTitle className="text-sm flex items-center gap-2 text-amber-900">
                 <AlertTriangle className="w-4 h-4" /> Outlier cycles
                 <span className="text-xs font-normal text-amber-800/80">
-                  Diverge from {comparisonLabel.toLowerCase()} by ≥ {OUTLIER_THRESHOLD.toFixed(1)}
+                  Diverge from {comparisonLabel.toLowerCase()} by more than {OUTLIER_THRESHOLD.toFixed(1)}
                 </span>
               </CardTitle>
             </CardHeader>
