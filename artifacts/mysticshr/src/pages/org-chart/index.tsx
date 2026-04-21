@@ -98,8 +98,21 @@ function NodeCard({
 }) {
   const hasChildren = node.children.length > 0;
   const fullName = `${node.firstName} ${node.lastName}`;
+  const cardClick = (e: React.MouseEvent) => {
+    if (!hasChildren) return;
+    // Don't toggle when clicking the name link or the explicit button.
+    const target = e.target as HTMLElement;
+    if (target.closest("a, button")) return;
+    onToggle();
+  };
   return (
-    <Card className="w-64 border-2 hover:border-primary/40 transition-colors shadow-sm">
+    <Card
+      className={
+        "w-64 border-2 hover:border-primary/40 transition-colors shadow-sm" +
+        (hasChildren ? " cursor-pointer" : "")
+      }
+      onClick={cardClick}
+    >
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
           <Avatar className="w-12 h-12 shrink-0">
