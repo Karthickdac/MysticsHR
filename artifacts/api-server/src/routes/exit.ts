@@ -859,6 +859,7 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
 
     // If both HR and Finance have approved, move exit request to FnF Approved and auto-generate documents
     const fullyApproved = !!(updated.hrApprovedAt && updated.financeApprovedAt);
+    let documentsIssuedCount = 0;
     if (fullyApproved) {
       const [exitReq] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, exitRequestId));
 
@@ -908,6 +909,7 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
                 fieldValues: autoFields,
                 fileContent: pdfBuffer.toString("base64"),
               });
+              documentsIssuedCount++;
             } catch (docErr) {
               console.error(`[FnF] Failed to issue ${docType} for employee ${exitReq.employeeId}:`, docErr);
             }
@@ -937,6 +939,7 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
               variables: {
                 recipientName: empUser.name,
                 totalPayable: String(updated.totalPayable ?? ""),
+                documentsIssued: documentsIssuedCount > 0 ? "true" : "",
               },
               entityType: "exit_request", entityId: exitRequestId,
             });
