@@ -3484,6 +3484,64 @@ paths:
                 items:
                   $ref: "#/components/schemas/PayrollRecord"
 
+  /payroll/analytics:
+    get:
+      operationId: getPayrollAnalytics
+      tags: [payroll]
+      summary: Aggregated payroll analytics (trend, department breakdown, statutory totals)
+      responses:
+        "200":
+          description: Analytics payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  financialYear: { type: string }
+                  latestPeriodLabel:
+                    type: string
+                    nullable: true
+                  monthlyTrend:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        year: { type: integer }
+                        month: { type: integer }
+                        label: { type: string }
+                        totalGross: { type: number }
+                        totalDeductions: { type: number }
+                        totalNet: { type: number }
+                        employees: { type: integer }
+                  departmentBreakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        departmentId:
+                          type: integer
+                          nullable: true
+                        departmentName: { type: string }
+                        totalGross: { type: number }
+                        totalNet: { type: number }
+                        employees: { type: integer }
+                  statutoryDeductions:
+                    type: object
+                    properties:
+                      pfEmployee: { type: number }
+                      pfEmployer: { type: number }
+                      esiEmployee: { type: number }
+                      esiEmployer: { type: number }
+                      professionalTax: { type: number }
+                      tds: { type: number }
+                  ytdTotals:
+                    type: object
+                    properties:
+                      totalGross: { type: number }
+                      totalDeductions: { type: number }
+                      totalNet: { type: number }
+                      runs: { type: integer }
+
   /payroll/payslips:
     get:
       operationId: listPayslips

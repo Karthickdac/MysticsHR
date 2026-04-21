@@ -4324,6 +4324,56 @@ export const GetPayrollRunRecordsResponse = zod.array(
 );
 
 /**
+ * @summary Aggregated payroll analytics (trend, department breakdown, statutory totals)
+ */
+export const GetPayrollAnalyticsResponse = zod.object({
+  financialYear: zod.string().optional(),
+  latestPeriodLabel: zod.string().nullish(),
+  monthlyTrend: zod
+    .array(
+      zod.object({
+        year: zod.number().optional(),
+        month: zod.number().optional(),
+        label: zod.string().optional(),
+        totalGross: zod.number().optional(),
+        totalDeductions: zod.number().optional(),
+        totalNet: zod.number().optional(),
+        employees: zod.number().optional(),
+      }),
+    )
+    .optional(),
+  departmentBreakdown: zod
+    .array(
+      zod.object({
+        departmentId: zod.number().nullish(),
+        departmentName: zod.string().optional(),
+        totalGross: zod.number().optional(),
+        totalNet: zod.number().optional(),
+        employees: zod.number().optional(),
+      }),
+    )
+    .optional(),
+  statutoryDeductions: zod
+    .object({
+      pfEmployee: zod.number().optional(),
+      pfEmployer: zod.number().optional(),
+      esiEmployee: zod.number().optional(),
+      esiEmployer: zod.number().optional(),
+      professionalTax: zod.number().optional(),
+      tds: zod.number().optional(),
+    })
+    .optional(),
+  ytdTotals: zod
+    .object({
+      totalGross: zod.number().optional(),
+      totalDeductions: zod.number().optional(),
+      totalNet: zod.number().optional(),
+      runs: zod.number().optional(),
+    })
+    .optional(),
+});
+
+/**
  * @summary List payslips (employee sees own, HR sees all)
  */
 export const ListPayslipsQueryParams = zod.object({

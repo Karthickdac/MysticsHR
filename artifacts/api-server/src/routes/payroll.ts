@@ -1189,6 +1189,142 @@ router.get("/payroll/payslips/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── PAYROLL ANALYTICS ───────────────────────────────────────────────────────
+// Aggregated analytics for the payroll dashboard:
+//   - Last-12-months payroll cost trend (gross/net/employees per month)
+//   - Department-wise cost breakdown for the most recent finalized period
+//   - Statutory contribution totals (PF/ESI/PT/TDS) for the current FY
+//   - YTD totals (gross / deductions / net / employees)
+// Sources finalized/approved runs only ("Approved" or "Locked") so the figures
+// reflect committed payroll, not draft or in-progress computations.
+router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_ROLES), async (req, res) => {
+  try {
+    const now = new Date();
+    const thisYear = now.getFullYear();
+    const thisMonth = now.getMonth() + 1;
+
+    // Last 12 months window (inclusive of current month)
+    const fromDate = new Date(thisYear, thisMonth - 12, 1);
+    const fromYear = fromDate.getFullYear();
+    const fromMonth = fromDate.getMonth() + 1;
+    const fromInt = fromYear * 100 + fromMonth;
+    const toInt = thisYear * 100 + thisMonth;
+    const periodInt = sql<number>`${payrollRunsTable.periodYear} * 100 + ${payrollRunsTable.periodMonth}`;
+
+    // Indian financial year (Apr–Mar)
+    const fyStartYear = thisMonth >= 4 ? thisYear : thisYear - 1;
+    const fyFromInt = fyStartYear * 100 + 4;
+    const fyToInt = (fyStartYear + 1) * 100 + 3;
+
+    const isCommitted = or(eq(payrollRunsTable.status, "Approved"), eq(payrollRunsTable.status, "Locked"))!;
+
+    // 1) Monthly trend (last 12 months)
+    const monthlyRows = await db.select({
+      year: payrollRunsTable.periodYear,
+      month: payrollRunsTable.periodMonth,
+      totalGross: sql<string>`COALESCE(SUM(${payrollRunsTable.totalGross}), 0)`,
+      totalDeductions: sql<string>`COALESCE(SUM(${payrollRunsTable.totalDeductions}), 0)`,
+      totalNet: sql<string>`COALESCE(SUM(${payrollRunsTable.totalNet}), 0)`,
+      employees: sql<number>`COALESCE(SUM(${payrollRunsTable.totalEmployees}), 0)`,
+    })
+      .from(payrollRunsTable)
+      .where(and(isCommitted, gte(periodInt, fromInt), lte(periodInt, toInt)))
+      .groupBy(payrollRunsTable.periodYear, payrollRunsTable.periodMonth)
+      .orderBy(asc(payrollRunsTable.periodYear), asc(payrollRunsTable.periodMonth));
+
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const monthlyTrend = monthlyRows.map(r => ({
+      year: r.year,
+      month: r.month,
+      label: `${monthNames[r.month - 1]} ${String(r.year).slice(-2)}`,
+      totalGross: Number(r.totalGross),
+      totalDeductions: Number(r.totalDeductions),
+      totalNet: Number(r.totalNet),
+      employees: Number(r.employees),
+    }));
+
+    // 2) Department-wise cost breakdown (latest finalized run)
+    const [latestRun] = await db.select({ id: payrollRunsTable.id, year: payrollRunsTable.periodYear, month: payrollRunsTable.periodMonth })
+      .from(payrollRunsTable)
+      .where(isCommitted)
+      .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth))
+      .limit(1);
+
+    let departmentBreakdown: Array<{ departmentId: number | null; departmentName: string; totalGross: number; totalNet: number; employees: number }> = [];
+    let latestPeriodLabel: string | null = null;
+    if (latestRun) {
+      latestPeriodLabel = `${monthNames[latestRun.month - 1]} ${latestRun.year}`;
+      const deptRows = await db.select({
+        departmentId: employeesTable.departmentId,
+        departmentName: sql<string>`COALESCE(${departmentsTable.name}, 'Unassigned')`,
+        totalGross: sql<string>`COALESCE(SUM(${payrollRecordsTable.grossEarnings}), 0)`,
+        totalNet: sql<string>`COALESCE(SUM(${payrollRecordsTable.netPay}), 0)`,
+        employees: sql<number>`COUNT(${payrollRecordsTable.id})`,
+      })
+        .from(payrollRecordsTable)
+        .leftJoin(employeesTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
+        .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+        .where(eq(payrollRecordsTable.payrollRunId, latestRun.id))
+        .groupBy(employeesTable.departmentId, departmentsTable.name);
+      departmentBreakdown = deptRows
+        .map(r => ({
+          departmentId: r.departmentId,
+          departmentName: r.departmentName,
+          totalGross: Number(r.totalGross),
+          totalNet: Number(r.totalNet),
+          employees: Number(r.employees),
+        }))
+        .sort((a, b) => b.totalNet - a.totalNet);
+    }
+
+    // 3) Statutory deductions (current FY YTD)
+    const [statRow] = await db.select({
+      pfEmployee: sql<string>`COALESCE(SUM(${payrollRecordsTable.pfEmployee}), 0)`,
+      pfEmployer: sql<string>`COALESCE(SUM(${payrollRecordsTable.pfEmployer}), 0)`,
+      esiEmployee: sql<string>`COALESCE(SUM(${payrollRecordsTable.esiEmployee}), 0)`,
+      esiEmployer: sql<string>`COALESCE(SUM(${payrollRecordsTable.esiEmployer}), 0)`,
+      professionalTax: sql<string>`COALESCE(SUM(${payrollRecordsTable.professionalTax}), 0)`,
+      tds: sql<string>`COALESCE(SUM(${payrollRecordsTable.tds}), 0)`,
+    })
+      .from(payrollRecordsTable)
+      .innerJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
+      .where(and(isCommitted, gte(periodInt, fyFromInt), lte(periodInt, fyToInt)));
+
+    const statutoryDeductions = {
+      pfEmployee: Number(statRow?.pfEmployee ?? 0),
+      pfEmployer: Number(statRow?.pfEmployer ?? 0),
+      esiEmployee: Number(statRow?.esiEmployee ?? 0),
+      esiEmployer: Number(statRow?.esiEmployer ?? 0),
+      professionalTax: Number(statRow?.professionalTax ?? 0),
+      tds: Number(statRow?.tds ?? 0),
+    };
+
+    // 4) FY YTD totals
+    const [ytdRow] = await db.select({
+      totalGross: sql<string>`COALESCE(SUM(${payrollRunsTable.totalGross}), 0)`,
+      totalDeductions: sql<string>`COALESCE(SUM(${payrollRunsTable.totalDeductions}), 0)`,
+      totalNet: sql<string>`COALESCE(SUM(${payrollRunsTable.totalNet}), 0)`,
+      runs: sql<number>`COUNT(${payrollRunsTable.id})`,
+    })
+      .from(payrollRunsTable)
+      .where(and(isCommitted, gte(periodInt, fyFromInt), lte(periodInt, fyToInt)));
+
+    res.json({
+      financialYear: `${fyStartYear}-${String(fyStartYear + 1).slice(-2)}`,
+      latestPeriodLabel,
+      monthlyTrend,
+      departmentBreakdown,
+      statutoryDeductions,
+      ytdTotals: {
+        totalGross: Number(ytdRow?.totalGross ?? 0),
+        totalDeductions: Number(ytdRow?.totalDeductions ?? 0),
+        totalNet: Number(ytdRow?.totalNet ?? 0),
+        runs: Number(ytdRow?.runs ?? 0),
+      },
+    });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 // ─── STATUTORY REPORTS ────────────────────────────────────────────────────────
 
 // Helper: build a WHERE condition supporting single period (year/month) or date range (fromYear/fromMonth to toYear/toMonth)

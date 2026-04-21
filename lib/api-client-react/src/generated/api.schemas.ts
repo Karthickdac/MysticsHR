@@ -3474,6 +3474,49 @@ export type FinalizePayrollRun200 = {
   message?: string;
 };
 
+export type GetPayrollAnalytics200MonthlyTrendItem = {
+  year?: number;
+  month?: number;
+  label?: string;
+  totalGross?: number;
+  totalDeductions?: number;
+  totalNet?: number;
+  employees?: number;
+};
+
+export type GetPayrollAnalytics200DepartmentBreakdownItem = {
+  departmentId?: number | null;
+  departmentName?: string;
+  totalGross?: number;
+  totalNet?: number;
+  employees?: number;
+};
+
+export type GetPayrollAnalytics200StatutoryDeductions = {
+  pfEmployee?: number;
+  pfEmployer?: number;
+  esiEmployee?: number;
+  esiEmployer?: number;
+  professionalTax?: number;
+  tds?: number;
+};
+
+export type GetPayrollAnalytics200YtdTotals = {
+  totalGross?: number;
+  totalDeductions?: number;
+  totalNet?: number;
+  runs?: number;
+};
+
+export type GetPayrollAnalytics200 = {
+  financialYear?: string;
+  latestPeriodLabel?: string | null;
+  monthlyTrend?: GetPayrollAnalytics200MonthlyTrendItem[];
+  departmentBreakdown?: GetPayrollAnalytics200DepartmentBreakdownItem[];
+  statutoryDeductions?: GetPayrollAnalytics200StatutoryDeductions;
+  ytdTotals?: GetPayrollAnalytics200YtdTotals;
+};
+
 export type ListPayslipsParams = {
   employeeId?: number;
   year?: number;

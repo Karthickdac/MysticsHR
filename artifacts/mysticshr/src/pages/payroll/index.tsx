@@ -2,8 +2,15 @@ import { useState } from "react";
 import {
   useListPayrollRuns, useCreatePayrollRun, useComputePayrollRun, useApprovePayrollRun,
   useFinalizePayrollRun, useListPayrollLocks, useLockPayroll, useUnlockPayroll,
-  getListPayrollRunsQueryKey, getListPayrollLocksQueryKey,
+  useGetPayrollAnalytics,
+  getListPayrollRunsQueryKey, getListPayrollLocksQueryKey, getGetPayrollAnalyticsQueryKey,
 } from "@workspace/api-client-react";
+import type { GetPayrollAnalytics200 } from "@workspace/api-client-react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
+  ComposedChart,
+} from "recharts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 import { extractError } from "@/lib/utils";
@@ -71,6 +78,189 @@ function EmployeePayrollPortal() {
   );
 }
 
+const CHART_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6"];
+
+function compactInr(n: number): string {
+  if (!Number.isFinite(n)) return "₹0";
+  const abs = Math.abs(n);
+  if (abs >= 1e7) return `₹${(n / 1e7).toFixed(2)}Cr`;
+  if (abs >= 1e5) return `₹${(n / 1e5).toFixed(2)}L`;
+  if (abs >= 1e3) return `₹${(n / 1e3).toFixed(1)}K`;
+  return `₹${Math.round(n)}`;
+}
+
+function PayrollAnalyticsSection({ analytics }: { analytics: GetPayrollAnalytics200 | undefined }) {
+  if (!analytics) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Analytics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="h-64 bg-muted/30 rounded animate-pulse lg:col-span-2" />
+            <div className="h-64 bg-muted/30 rounded animate-pulse" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const trend = analytics.monthlyTrend ?? [];
+  const dept = analytics.departmentBreakdown ?? [];
+  const statutory = analytics.statutoryDeductions ?? {
+    pfEmployee: 0, pfEmployer: 0, esiEmployee: 0, esiEmployer: 0, professionalTax: 0, tds: 0,
+  };
+  const fy = analytics.financialYear ?? "";
+  const latestPeriod = analytics.latestPeriodLabel ?? "latest period";
+
+  const hasAnyData = trend.length > 0 || dept.length > 0;
+  if (!hasAnyData) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Analytics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No analytics yet — approve a payroll run to see cost insights.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const statutoryData = [
+    { name: "PF (Employee)", value: statutory.pfEmployee },
+    { name: "PF (Employer)", value: statutory.pfEmployer },
+    { name: "ESI (Employee)", value: statutory.esiEmployee },
+    { name: "ESI (Employer)", value: statutory.esiEmployer },
+    { name: "Professional Tax", value: statutory.professionalTax },
+    { name: "TDS", value: statutory.tds },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card className="lg:col-span-2">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Monthly Cost Trend</CardTitle>
+            <span className="text-xs text-muted-foreground">Last 12 months · Approved & Locked runs</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {trend.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">No finalized runs in the last 12 months.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={trend} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={compactInr} tick={{ fontSize: 12 }} width={70} />
+                <Tooltip formatter={(v: number) => compactInr(Number(v))} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Line type="monotone" dataKey="totalGross" name="Gross" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="totalNet" name="Net" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="totalDeductions" name="Deductions" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Headcount vs Cost</CardTitle>
+            <span className="text-xs text-muted-foreground">Last 12 months</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {trend.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">No data.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={trend} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="left" tickFormatter={compactInr} tick={{ fontSize: 11 }} width={60} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={32} />
+                <Tooltip formatter={(value: number, name: string) => name === "Employees" ? value : compactInr(Number(value))} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar yAxisId="left" dataKey="totalNet" name="Net Cost" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="employees" name="Employees" stroke="#f59e0b" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-1">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Department-wise Cost</CardTitle>
+            <span className="text-xs text-muted-foreground">{latestPeriod}</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {dept.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">No department data.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={dept}
+                  dataKey="totalNet"
+                  nameKey="departmentName"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  label={(entry: { departmentName: string }) => entry.departmentName}
+                  labelLine={false}
+                >
+                  {dept.map((_d, i) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number) => compactInr(Number(v))} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Statutory Contributions</CardTitle>
+            <span className="text-xs text-muted-foreground">FY {fy} · YTD totals</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {statutoryData.every(s => s.value === 0) ? (
+            <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">No statutory deductions recorded for this FY yet.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={statutoryData} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={60} />
+                <YAxis tickFormatter={compactInr} tick={{ fontSize: 11 }} width={70} />
+                <Tooltip formatter={(v: number) => compactInr(Number(v))} />
+                <Bar dataKey="value" name="Total" radius={[4, 4, 0, 0]}>
+                  {statutoryData.map((_, i) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const qc = useQueryClient();
   const now = new Date();
@@ -79,6 +269,7 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   const { data: runs, isLoading } = useListPayrollRuns();
   const { data: locks } = useListPayrollLocks({ year: currentYear, month: currentMonth });
+  const { data: analytics } = useGetPayrollAnalytics();
 
   const createRun = useCreatePayrollRun();
   const computeRun = useComputePayrollRun();
@@ -103,6 +294,7 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       await createRun.mutateAsync({ data: { periodYear: Number(newForm.periodYear), periodMonth: Number(newForm.periodMonth), notes: newForm.notes || undefined } });
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
       qc.invalidateQueries({ queryKey: getListPayrollLocksQueryKey({}) });
+      qc.invalidateQueries({ queryKey: getGetPayrollAnalyticsQueryKey() });
       setShowNew(false);
     } catch (err: unknown) { setActionError(extractError(err, "Failed to create run")); }
   }
@@ -112,6 +304,7 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     try {
       await computeRun.mutateAsync({ id });
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetPayrollAnalyticsQueryKey() });
     } catch (err: unknown) { setActionError(extractError(err, "Failed to compute")); }
     finally { setBusy(null); }
   }
@@ -121,6 +314,7 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     try {
       await approveRun.mutateAsync({ id });
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetPayrollAnalyticsQueryKey() });
     } catch (err: unknown) { setActionError(extractError(err, "Failed to approve")); }
     finally { setBusy(null); }
   }
@@ -130,6 +324,8 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     try {
       await finalizeRun.mutateAsync({ id });
       qc.invalidateQueries({ queryKey: getListPayrollRunsQueryKey() });
+      qc.invalidateQueries({ queryKey: getListPayrollLocksQueryKey({}) });
+      qc.invalidateQueries({ queryKey: getGetPayrollAnalyticsQueryKey() });
     } catch (err: unknown) { setActionError(extractError(err, "Failed to finalize")); }
     finally { setBusy(null); }
   }
@@ -211,6 +407,8 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           </CardContent>
         </Card>
       </div>
+
+      <PayrollAnalyticsSection analytics={analytics} />
 
       <Card className={`border-2 ${isCurrentlyLocked ? "border-red-200 bg-red-50/40" : "border-green-200 bg-green-50/40"}`}>
         <CardContent className="p-4 flex items-center justify-between">

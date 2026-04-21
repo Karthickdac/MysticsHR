@@ -129,6 +129,7 @@ import type {
   GetLeaveUtilizationReport200,
   GetLeaveUtilizationReportParams,
   GetOnboardingChecklistsParams,
+  GetPayrollAnalytics200,
   GetPayrollRegisterReport200,
   GetPayrollRegisterReportParams,
   GetPerformanceSummaryReport200,
@@ -16004,6 +16005,81 @@ export function useGetPayrollRunRecords<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetPayrollRunRecordsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Aggregated payroll analytics (trend, department breakdown, statutory totals)
+ */
+export const getGetPayrollAnalyticsUrl = () => {
+  return `/api/payroll/analytics`;
+};
+
+export const getPayrollAnalytics = async (
+  options?: RequestInit,
+): Promise<GetPayrollAnalytics200> => {
+  return customFetch<GetPayrollAnalytics200>(getGetPayrollAnalyticsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPayrollAnalyticsQueryKey = () => {
+  return [`/api/payroll/analytics`] as const;
+};
+
+export const getGetPayrollAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPayrollAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPayrollAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPayrollAnalyticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPayrollAnalytics>>
+  > = ({ signal }) => getPayrollAnalytics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPayrollAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPayrollAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPayrollAnalytics>>
+>;
+export type GetPayrollAnalyticsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Aggregated payroll analytics (trend, department breakdown, statutory totals)
+ */
+
+export function useGetPayrollAnalytics<
+  TData = Awaited<ReturnType<typeof getPayrollAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPayrollAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPayrollAnalyticsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
