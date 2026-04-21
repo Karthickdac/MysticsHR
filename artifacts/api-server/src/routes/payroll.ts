@@ -1059,7 +1059,7 @@ router.post("/payroll/runs/:id/approve", requireHrmsUser, requireRole(...PAYROLL
         if (!empUser?.email) return;
         const [slip] = await db.select({ id: payslipsTable.id }).from(payslipsTable)
           .where(eq(payslipsTable.payrollRecordId, record.id)).limit(1);
-        const payslipUrl = buildAppUrl(slip ? `/payroll/payslips?view=${slip.id}` : `/payroll/payslips`);
+        const payslipUrl = buildAppUrl(slip ? `/payroll/payslips?highlight=${slip.id}` : `/payroll/payslips`);
         return dispatchNotification({
           eventType: "payslip_published", module: "payroll",
           recipientEmail: empUser.email, recipientName: empUser.name,
