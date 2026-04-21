@@ -709,10 +709,18 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   // first load. The user's last selection is persisted in localStorage and
   // rehydrated on mount — bad/missing payloads silently fall back to defaults.
   const defaultRange = resolvePeriod("last12", { from: "", to: "" }, now);
-  const initialControls = loadAnalyticsControls(defaultRange);
-  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>(initialControls.preset);
-  const [customRange, setCustomRange] = useState<{ from: string; to: string }>(initialControls.custom);
-  const [compareYoY, setCompareYoY] = useState(initialControls.compare);
+  // Lazy initializers — `loadAnalyticsControls` parses JSON and touches
+  // localStorage, so we only want it to run on the first render, not on
+  // every subsequent re-render of this dashboard.
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>(
+    () => loadAnalyticsControls(defaultRange).preset,
+  );
+  const [customRange, setCustomRange] = useState<{ from: string; to: string }>(
+    () => loadAnalyticsControls(defaultRange).custom,
+  );
+  const [compareYoY, setCompareYoY] = useState(
+    () => loadAnalyticsControls(defaultRange).compare,
+  );
   // Persist any change. Skipped on the first synchronous render because we
   // already loaded from storage above; useEffect runs after commit so this
   // simply mirrors current state back out.
