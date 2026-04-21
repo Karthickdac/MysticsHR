@@ -268,12 +268,18 @@ function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAna
     if (!d?.name) return;
     const reportType = STATUTORY_TO_REPORT[d.name];
     if (!reportType || !analytics.latestPeriodLabel) return;
-    // Pre-fill the latest finalized month — gives HR a non-empty starting view.
+    // Pre-fill the report to the current Indian FY (Apr 1 → latest finalized
+    // month). Compliance officers always reconcile statutory totals at FY scope,
+    // so a single-month view would force them to re-filter immediately.
     const latest = analytics.monthlyTrend?.[analytics.monthlyTrend.length - 1];
     const qs = new URLSearchParams({ type: reportType });
     if (latest?.year && latest?.month) {
-      qs.set("year", String(latest.year));
-      qs.set("month", String(latest.month));
+      const fyStartYear = latest.month >= 4 ? latest.year : latest.year - 1;
+      qs.set("filterMode", "range");
+      qs.set("fromYear", String(fyStartYear));
+      qs.set("fromMonth", "4");
+      qs.set("toYear", String(latest.year));
+      qs.set("toMonth", String(latest.month));
     }
     navigate(`/payroll/reports?${qs.toString()}`);
   };

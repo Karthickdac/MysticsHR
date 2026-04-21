@@ -175,20 +175,28 @@ export default function StatutoryReportsPage() {
   const initialType: ReportType = (urlType && (validTypes as string[]).includes(urlType)) ? (urlType as ReportType) : "pf-ecr";
   const urlYear = params.get("year");
   const urlMonth = params.get("month");
+  const urlFilterMode = params.get("filterMode");
+  const urlFromYear = params.get("fromYear");
+  const urlFromMonth = params.get("fromMonth");
+  const urlToYear = params.get("toYear");
+  const urlToMonth = params.get("toMonth");
+  const initialFilterMode: FilterMode = urlFilterMode === "range" ? "range" : "single";
 
   const [selectedType, setSelectedType] = useState<ReportType>(initialType);
-  const [filterMode, setFilterMode] = useState<FilterMode>("single");
+  const [filterMode, setFilterMode] = useState<FilterMode>(initialFilterMode);
 
   const [year, setYear] = useState(urlYear ?? String(now.getFullYear()));
   const [month, setMonth] = useState(urlMonth ?? String(now.getMonth() + 1));
 
-  const [fromYear, setFromYear] = useState(String(now.getFullYear()));
-  const [fromMonth, setFromMonth] = useState("1");
-  const [toYear, setToYear] = useState(String(now.getFullYear()));
-  const [toMonth, setToMonth] = useState(String(now.getMonth() + 1));
+  const [fromYear, setFromYear] = useState(urlFromYear ?? String(now.getFullYear()));
+  const [fromMonth, setFromMonth] = useState(urlFromMonth ?? "1");
+  const [toYear, setToYear] = useState(urlToYear ?? String(now.getFullYear()));
+  const [toMonth, setToMonth] = useState(urlToMonth ?? String(now.getMonth() + 1));
 
   // Auto-fetch when arriving from a chart click (URL params present); otherwise
-  // require an explicit "Generate Report" click.
+  // require an explicit "Generate Report" click. For range mode, the table only
+  // shows the first month — but landing pre-fetched still saves a click before
+  // the user hits Export CSV (which honors the full range).
   const [fetched, setFetched] = useState(Boolean(urlType && initialType !== "form-16"));
 
   // Typed hooks support single-period display. Date-range is CSV-export only (direct API download).
