@@ -4997,6 +4997,7 @@ export const GetEssDashboardResponse = zod.object({
   recentPayslip: zod.object({}).passthrough().nullish(),
   performanceGoals: zod.array(zod.object({}).passthrough()),
   pendingActions: zod.array(zod.object({}).passthrough()),
+  openTicketCount: zod.number().optional(),
 });
 
 /**
@@ -5388,6 +5389,78 @@ export const GenerateDocumentBody = zod.object({
   ]),
   templateId: zod.number(),
   fieldValues: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+/**
+ * @summary List document requests (employee sees own; HOD sees team; HR sees all)
+ */
+export const ListDocumentRequestsQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+});
+
+export const ListDocumentRequestsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  documentType: zod.string(),
+  reason: zod.string().nullish(),
+  status: zod.enum(["Pending", "Fulfilled", "Cancelled"]),
+  issuedDocumentId: zod.number().nullish(),
+  fulfilledBy: zod.number().nullish(),
+  fulfilledByName: zod.string().nullish(),
+  fulfilledAt: zod.coerce.date().nullish(),
+  hrNote: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListDocumentRequestsResponse = zod.array(
+  ListDocumentRequestsResponseItem,
+);
+
+/**
+ * @summary Submit a document request (employee)
+ */
+export const CreateDocumentRequestBody = zod.object({
+  documentType: zod.enum([
+    "Experience Certificate",
+    "Appointment Letter",
+    "Warning Notice",
+    "Offer Letter",
+    "NOC",
+    "Relieving Letter",
+  ]),
+  reason: zod.string().nullish(),
+});
+
+/**
+ * @summary Update document request status (HR fulfill or cancel)
+ */
+export const UpdateDocumentRequestParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateDocumentRequestBody = zod.object({
+  status: zod.enum(["Pending", "Fulfilled", "Cancelled"]),
+  hrNote: zod.string().nullish(),
+  issuedDocumentId: zod.number().nullish(),
+});
+
+export const UpdateDocumentRequestResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  documentType: zod.string(),
+  reason: zod.string().nullish(),
+  status: zod.enum(["Pending", "Fulfilled", "Cancelled"]),
+  issuedDocumentId: zod.number().nullish(),
+  fulfilledBy: zod.number().nullish(),
+  fulfilledByName: zod.string().nullish(),
+  fulfilledAt: zod.coerce.date().nullish(),
+  hrNote: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
 });
 
 /**

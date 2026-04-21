@@ -5,11 +5,12 @@ import { db } from "../lib/db";
 import {
   documentTemplatesTable,
   issuedDocumentsTable,
+  documentRequestsTable,
   employeesTable,
   hrmsUsersTable,
   exitRequestsTable,
 } from "@workspace/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { generatePdf, substituteTemplate } from "../lib/pdf";
 import { dispatchNotification } from "../lib/notification-service";
 
@@ -338,6 +339,160 @@ router.post("/employees/:id/fnf-approve", requireHrmsUser, requireRole(...HR_ROL
       employeeId,
       lastWorkingDay,
     });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── DOCUMENT REQUESTS ────────────────────────────────────────────────────────
+async function getEmployeeIdForUser(userId: number): Promise<number | null> {
+  const [u] = await db.select({ employeeId: hrmsUsersTable.employeeId })
+    .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, userId));
+  return u?.employeeId ?? null;
+}
+
+router.get("/documents/requests", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const { status } = req.query as Record<string, string>;
+    const isHrRole = (HR_ROLES as readonly string[]).includes(u.role);
+
+    const conds = [];
+    if (status) conds.push(eq(documentRequestsTable.status, status as "Pending"));
+
+    if (!isHrRole) {
+      const empId = await getEmployeeIdForUser(u.id);
+      if (!empId) { res.json([]); return; }
+
+      if (u.role === "hod") {
+        const reports = await db.select({ id: employeesTable.id }).from(employeesTable)
+          .where(eq(employeesTable.managerId, empId));
+        const teamIds = [empId, ...reports.map(r => r.id)];
+        conds.push(inArray(documentRequestsTable.employeeId, teamIds));
+      } else {
+        conds.push(eq(documentRequestsTable.employeeId, empId));
+      }
+    }
+
+    const rows = await db.select({
+      id: documentRequestsTable.id,
+      employeeId: documentRequestsTable.employeeId,
+      documentType: documentRequestsTable.documentType,
+      reason: documentRequestsTable.reason,
+      status: documentRequestsTable.status,
+      issuedDocumentId: documentRequestsTable.issuedDocumentId,
+      fulfilledBy: documentRequestsTable.fulfilledBy,
+      fulfilledAt: documentRequestsTable.fulfilledAt,
+      hrNote: documentRequestsTable.hrNote,
+      createdAt: documentRequestsTable.createdAt,
+      updatedAt: documentRequestsTable.updatedAt,
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      employeeCode: employeesTable.employeeId,
+      fulfilledByName: hrmsUsersTable.name,
+    }).from(documentRequestsTable)
+      .leftJoin(employeesTable, eq(documentRequestsTable.employeeId, employeesTable.id))
+      .leftJoin(hrmsUsersTable, eq(documentRequestsTable.fulfilledBy, hrmsUsersTable.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(documentRequestsTable.createdAt));
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      employeeId: r.employeeId,
+      employeeName: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : null,
+      employeeCode: r.employeeCode,
+      documentType: r.documentType,
+      reason: r.reason,
+      status: r.status,
+      issuedDocumentId: r.issuedDocumentId,
+      fulfilledBy: r.fulfilledBy,
+      fulfilledByName: r.fulfilledByName,
+      fulfilledAt: r.fulfilledAt,
+      hrNote: r.hrNote,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    })));
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/documents/requests", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const { documentType, reason } = req.body;
+    if (!documentType) {
+      res.status(400).json({ error: "documentType is required" }); return;
+    }
+    const empId = await getEmployeeIdForUser(u.id);
+    if (!empId) { res.status(400).json({ error: "No employee record linked to your account" }); return; }
+
+    const [created] = await db.insert(documentRequestsTable).values({
+      employeeId: empId,
+      documentType,
+      reason: reason ?? null,
+    }).returning();
+
+    // Notify HR managers in-app
+    const hrUsers = await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+      .from(hrmsUsersTable)
+      .where(inArray(hrmsUsersTable.role, ["hr_manager", "hr_executive", "super_admin"]));
+    const [emp] = await db.select({ firstName: employeesTable.firstName, lastName: employeesTable.lastName })
+      .from(employeesTable).where(eq(employeesTable.id, empId));
+    const empName = emp ? `${emp.firstName} ${emp.lastName}` : "An employee";
+    for (const hr of hrUsers) {
+      if (hr.email) {
+        dispatchNotification({
+          eventType: "document_request_created", module: "documents",
+          recipientEmail: hr.email, recipientName: hr.name ?? undefined,
+          variables: {
+            employeeName: empName, documentType, reason: reason ?? "",
+            recipientName: hr.name ?? "HR",
+          },
+          entityType: "document_request", entityId: created.id,
+        }).catch(() => {});
+      }
+    }
+
+    res.status(201).json(created);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.put("/documents/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const id = Number(req.params.id);
+    const { status, hrNote, issuedDocumentId } = req.body;
+    if (!status) { res.status(400).json({ error: "status is required" }); return; }
+
+    const updates: Partial<typeof documentRequestsTable.$inferInsert> = {
+      status,
+      updatedAt: new Date(),
+    };
+    if (hrNote !== undefined) updates.hrNote = hrNote;
+    if (issuedDocumentId !== undefined) updates.issuedDocumentId = issuedDocumentId;
+    if (status === "Fulfilled" || status === "Cancelled") {
+      updates.fulfilledBy = u.id;
+      updates.fulfilledAt = new Date();
+    }
+
+    const [updated] = await db.update(documentRequestsTable).set(updates)
+      .where(eq(documentRequestsTable.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: "Document request not found" }); return; }
+
+    await logAudit({ user: u, action: `document_request_${status.toLowerCase()}`, module: "documents", recordId: id });
+
+    // Notify employee
+    const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+      .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, updated.employeeId)).limit(1);
+    if (empUser?.email) {
+      dispatchNotification({
+        eventType: status === "Fulfilled" ? "document_request_fulfilled" : "document_request_cancelled",
+        module: "documents",
+        recipientEmail: empUser.email, recipientName: empUser.name ?? undefined,
+        recipientEmployeeDbId: updated.employeeId,
+        variables: { documentType: updated.documentType, hrNote: hrNote ?? "", recipientName: empUser.name ?? "Team Member" },
+        entityType: "document_request", entityId: updated.id,
+      }).catch(() => {});
+    }
+
+    res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

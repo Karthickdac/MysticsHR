@@ -37,5 +37,25 @@ export const issuedDocumentsTable = pgTable("issued_documents", {
   fileContent: text("file_content"),
 });
 
+// ─── DOCUMENT REQUESTS (employee-initiated) ───────────────────────────────────
+export const documentRequestStatusEnum = pgEnum("document_request_status", [
+  "Pending", "Fulfilled", "Cancelled",
+]);
+
+export const documentRequestsTable = pgTable("document_requests", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employeesTable.id),
+  documentType: hrDocumentTypeEnum("document_type").notNull(),
+  reason: text("reason"),
+  status: documentRequestStatusEnum("status").notNull().default("Pending"),
+  issuedDocumentId: integer("issued_document_id").references(() => issuedDocumentsTable.id),
+  fulfilledBy: integer("fulfilled_by").references(() => hrmsUsersTable.id),
+  fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+  hrNote: text("hr_note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type DocumentTemplate = typeof documentTemplatesTable.$inferSelect;
 export type IssuedDocument = typeof issuedDocumentsTable.$inferSelect;
+export type DocumentRequest = typeof documentRequestsTable.$inferSelect;

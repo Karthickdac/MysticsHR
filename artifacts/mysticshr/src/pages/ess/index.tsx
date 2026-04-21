@@ -7,11 +7,18 @@ import {
   useListIssuedDocuments,
   useListHelpdeskTickets,
   useCreateHelpdeskTicket,
+  useListDocumentRequests,
+  useCreateDocumentRequest,
   getListHelpdeskTicketsQueryKey,
+  getListDocumentRequestsQueryKey,
+  getGetEssDashboardQueryKey,
   type EssProfile,
   type IssuedDocument,
   type CreateHelpdeskTicketBody,
   type HelpdeskTicket,
+  type DocumentRequest,
+  type CreateDocumentRequestBody,
+  type CreateDocumentRequestBodyDocumentType,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -25,7 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import {
   User, FileText, Calendar, Clock, Target, Wallet, Home, Phone, AlertCircle,
-  ChevronRight, CheckCircle2, Eye, Download, LifeBuoy, Plus, Ticket,
+  ChevronRight, CheckCircle2, Eye, Download, LifeBuoy, Plus, Ticket, Send,
 } from "lucide-react";
 
 type LeaveBalanceItem = {
@@ -183,6 +190,7 @@ function RaiseTicketModal({ open, onClose }: { open: boolean; onClose: () => voi
     create.mutate({ data: form }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getListHelpdeskTicketsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetEssDashboardQueryKey() });
         setForm({ subject: "", description: "", category: "IT", priority: "Medium", attachmentUrl: null });
         onClose();
       },
@@ -368,6 +376,7 @@ const ESS_MODULES = [
 
 export default function EssPortalPage() {
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showDashboardTicket, setShowDashboardTicket] = useState(false);
   const search = useSearch();
   const { data: profile, isLoading: loadingProfile } = useGetEssProfile();
   const { data: dashboard } = useGetEssDashboard();
@@ -458,6 +467,38 @@ export default function EssPortalPage() {
                 </Card>
               </Link>
             </div>
+          )}
+
+          {dashboard && (
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("helpdesk")}
+                  className="flex items-center gap-3 flex-1 text-left hover:opacity-80"
+                  data-testid="card-open-tickets"
+                >
+                  <div className="p-2 rounded-lg bg-rose-100">
+                    <LifeBuoy className="w-5 h-5 text-rose-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-2xl font-bold" data-testid="text-open-ticket-count">
+                      {dashboard.openTicketCount ?? 0}
+                      <span className="text-base font-normal text-muted-foreground"> open</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">Helpdesk Tickets</p>
+                    <p className="text-xs text-muted-foreground">Tap to view your tickets</p>
+                  </div>
+                </button>
+                <Button
+                  size="sm"
+                  data-testid="button-dashboard-raise-ticket"
+                  onClick={() => setShowDashboardTicket(true)}
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Raise a Ticket
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {dashboard && (
@@ -680,6 +721,8 @@ export default function EssPortalPage() {
         </TabsContent>
 
         <TabsContent value="services" className="space-y-6">
+          <DocumentRequestSection />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {ESS_MODULES.map(mod => (
               <Link key={mod.href} href={mod.href}>
@@ -734,6 +777,7 @@ export default function EssPortalPage() {
       </Tabs>
 
       <EditProfileModal open={showEditProfile} onClose={() => setShowEditProfile(false)} />
+      <RaiseTicketModal open={showDashboardTicket} onClose={() => setShowDashboardTicket(false)} />
     </div>
   );
 }
@@ -761,6 +805,125 @@ function ProfileDetails({ profile }: { profile: EssProfile }) {
         </div>
       </div>
     </div>
+  );
+}
+
+const DOC_REQUEST_TYPES: CreateDocumentRequestBodyDocumentType[] = [
+  "Experience Certificate",
+  "Appointment Letter",
+  "NOC",
+  "Offer Letter",
+  "Relieving Letter",
+];
+
+const DOC_REQUEST_STATUS_COLORS: Record<string, string> = {
+  Pending: "bg-yellow-100 text-yellow-800",
+  Fulfilled: "bg-green-100 text-green-800",
+  Cancelled: "bg-gray-100 text-gray-500",
+};
+
+function DocumentRequestSection() {
+  const qc = useQueryClient();
+  const create = useCreateDocumentRequest();
+  const { data: requests = [], isLoading } = useListDocumentRequests();
+  const [form, setForm] = useState<CreateDocumentRequestBody>({
+    documentType: "Experience Certificate",
+    reason: "",
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    create.mutate({ data: { ...form, reason: form.reason || null } }, {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListDocumentRequestsQueryKey() });
+        setForm({ documentType: "Experience Certificate", reason: "" });
+      },
+    });
+  }
+
+  const myRequests = requests as DocumentRequest[];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <FileText className="w-4 h-4" /> Request HR Document
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Pick a document type and HR will generate &amp; issue it to you. You can download it from the My Documents tab once it's ready.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end" data-testid="form-document-request">
+          <div className="md:col-span-1">
+            <Label>Document Type *</Label>
+            <Select
+              value={form.documentType}
+              onValueChange={(v: CreateDocumentRequestBodyDocumentType) =>
+                setForm(f => ({ ...f, documentType: v }))
+              }
+            >
+              <SelectTrigger data-testid="select-document-type"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DOC_REQUEST_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-1">
+            <Label>Reason (optional)</Label>
+            <Input
+              data-testid="input-document-reason"
+              value={form.reason ?? ""}
+              onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
+              placeholder="e.g., visa application"
+            />
+          </div>
+          <div>
+            <Button
+              type="submit"
+              disabled={create.isPending}
+              data-testid="button-submit-document-request"
+              className="w-full"
+            >
+              <Send className="w-4 h-4 mr-1" />
+              {create.isPending ? "Submitting..." : "Submit Request"}
+            </Button>
+          </div>
+        </form>
+
+        <div className="mt-6">
+          <p className="text-xs font-medium text-muted-foreground mb-2">My Recent Requests</p>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground py-4">Loading...</p>
+          ) : myRequests.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">You haven't submitted any document requests yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {myRequests.slice(0, 5).map(r => (
+                <div
+                  key={r.id}
+                  data-testid={`row-doc-request-${r.id}`}
+                  className="flex items-center gap-3 p-2.5 rounded border bg-muted/20"
+                >
+                  <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{r.documentType}</p>
+                    {r.reason && <p className="text-xs text-muted-foreground truncate">{r.reason}</p>}
+                    {r.hrNote && <p className="text-xs text-muted-foreground">HR note: {r.hrNote}</p>}
+                  </div>
+                  <Badge className={`text-xs ${DOC_REQUEST_STATUS_COLORS[r.status] ?? ""}`}>
+                    {r.status}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {new Date(r.createdAt).toLocaleDateString("en-IN")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

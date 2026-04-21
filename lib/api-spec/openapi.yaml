@@ -4523,6 +4523,66 @@ paths:
               schema:
                 $ref: "#/components/schemas/IssuedDocument"
 
+  /documents/requests:
+    get:
+      operationId: listDocumentRequests
+      tags: [documents]
+      summary: List document requests (employee sees own; HOD sees team; HR sees all)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of document requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentRequest"
+    post:
+      operationId: createDocumentRequest
+      tags: [documents]
+      summary: Submit a document request (employee)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequestBody"
+      responses:
+        "201":
+          description: Document request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentRequest"
+
+  /documents/requests/{id}:
+    put:
+      operationId: updateDocumentRequest
+      tags: [documents]
+      summary: Update document request status (HR fulfill or cancel)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocumentRequestBody"
+      responses:
+        "200":
+          description: Updated document request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentRequest"
+
   /documents/issued/{id}/download:
     get:
       operationId: downloadIssuedDocument
@@ -8080,6 +8140,7 @@ components:
           type: array
           items:
             type: object
+        openTicketCount: { type: integer }
       required: [attendance, leaveBalances, performanceGoals, pendingActions]
 
     # ─── HELPDESK ────────────────────────────────────────────────────────────────
@@ -8290,6 +8351,46 @@ components:
         fieldValues:
           type: object
           additionalProperties: true
+
+    DocumentRequest:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        employeeName: { type: ['string', 'null'] }
+        employeeCode: { type: ['string', 'null'] }
+        documentType: { type: string }
+        reason: { type: ['string', 'null'] }
+        status:
+          type: string
+          enum: [Pending, Fulfilled, Cancelled]
+        issuedDocumentId: { type: ['integer', 'null'] }
+        fulfilledBy: { type: ['integer', 'null'] }
+        fulfilledByName: { type: ['string', 'null'] }
+        fulfilledAt: { type: ['string', 'null'], format: date-time }
+        hrNote: { type: ['string', 'null'] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, documentType, status, createdAt, updatedAt]
+
+    CreateDocumentRequestBody:
+      type: object
+      required: [documentType]
+      properties:
+        documentType:
+          type: string
+          enum: [Experience Certificate, Appointment Letter, Warning Notice, Offer Letter, NOC, Relieving Letter]
+        reason: { type: string, nullable: true }
+
+    UpdateDocumentRequestBody:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [Pending, Fulfilled, Cancelled]
+        hrNote: { type: string, nullable: true }
+        issuedDocumentId: { type: ['integer', 'null'] }
 
     ExitRequest:
       type: object

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useListDocumentTemplates,
   useCreateDocumentTemplate,
@@ -6,10 +6,14 @@ import {
   useListIssuedDocuments,
   useGenerateDocument,
   useListEmployees,
+  useListDocumentRequests,
+  useUpdateDocumentRequest,
   getListDocumentTemplatesQueryKey,
   getListIssuedDocumentsQueryKey,
+  getListDocumentRequestsQueryKey,
   type DocumentTemplate,
   type IssuedDocument,
+  type DocumentRequest,
   type CreateDocumentTemplateBody,
   type GenerateDocumentBody,
   type CreateDocumentTemplateBodyDocumentType,
@@ -27,7 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Download, Settings, Edit } from "lucide-react";
+import { Plus, FileText, Download, Settings, Edit, Inbox, CheckCircle2, X } from "lucide-react";
 
 const DOC_TYPES = [
   "Experience Certificate",
@@ -117,17 +121,26 @@ function TemplateForm({
   );
 }
 
+type GeneratePrefill = {
+  employeeId: number;
+  documentType: string;
+  requestId: number;
+};
+
 function GenerateModal({
   open,
   onClose,
   templates,
+  prefill,
 }: {
   open: boolean;
   onClose: () => void;
   templates: DocumentTemplate[];
+  prefill?: GeneratePrefill | null;
 }) {
   const qc = useQueryClient();
   const generate = useGenerateDocument();
+  const updateRequest = useUpdateDocumentRequest();
   const { data: empList } = useListEmployees({ status: "Active", limit: 500 });
   const employees = empList?.data ?? [];
 
@@ -136,6 +149,23 @@ function GenerateModal({
   const [extraFields, setExtraFields] = useState<Record<string, string>>({});
 
   const selectedTemplate = templates.find(t => t.id === Number(templateId));
+
+  // When opened with prefill (from a pending request), pin employee + auto-pick first
+  // active template that matches the requested document type.
+  useEffect(() => {
+    if (!open) return;
+    if (prefill) {
+      setEmployeeId(String(prefill.employeeId));
+      const match = templates.find(
+        t => t.isActive && t.documentType === prefill.documentType,
+      );
+      if (match) setTemplateId(String(match.id));
+    } else {
+      setEmployeeId("");
+      setTemplateId("");
+    }
+    setExtraFields({});
+  }, [open, prefill, templates]);
 
   function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
@@ -151,11 +181,35 @@ function GenerateModal({
     generate.mutate({ data: body }, {
       onSuccess: (doc) => {
         qc.invalidateQueries({ queryKey: getListIssuedDocumentsQueryKey() });
-        alert(`Document "${doc.filename}" generated successfully!`);
-        onClose();
-        setEmployeeId("");
-        setTemplateId("");
-        setExtraFields({});
+
+        const finishUp = () => {
+          alert(`Document "${doc.filename}" generated successfully!`);
+          onClose();
+          setEmployeeId("");
+          setTemplateId("");
+          setExtraFields({});
+        };
+
+        if (prefill?.requestId) {
+          updateRequest.mutate(
+            {
+              id: prefill.requestId,
+              data: {
+                status: "Fulfilled",
+                hrNote: `Issued: ${doc.filename}`,
+                issuedDocumentId: doc.id,
+              },
+            },
+            {
+              onSettled: () => {
+                qc.invalidateQueries({ queryKey: getListDocumentRequestsQueryKey() });
+                finishUp();
+              },
+            },
+          );
+        } else {
+          finishUp();
+        }
       },
     });
   }
@@ -167,9 +221,14 @@ function GenerateModal({
           <DialogTitle>Generate Document</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleGenerate} className="space-y-4">
+          {prefill && (
+            <div className="rounded-md bg-blue-50 border border-blue-200 p-2 text-xs text-blue-800">
+              Generating for employee request #{prefill.requestId} ({prefill.documentType}). Marking it Fulfilled on success.
+            </div>
+          )}
           <div>
             <Label>Employee *</Label>
-            <Select value={employeeId} onValueChange={setEmployeeId}>
+            <Select value={employeeId} onValueChange={setEmployeeId} disabled={!!prefill}>
               <SelectTrigger><SelectValue placeholder="Select employee..." /></SelectTrigger>
               <SelectContent>
                 {employees.map(e => (
@@ -181,13 +240,18 @@ function GenerateModal({
             </Select>
           </div>
           <div>
-            <Label>Template *</Label>
-            <Select value={templateId} onValueChange={setTemplateId}>
+            <Label>Template *{prefill && <span className="ml-1 text-xs text-muted-foreground">(restricted to {prefill.documentType})</span>}</Label>
+            <Select
+              value={templateId}
+              onValueChange={setTemplateId}
+            >
               <SelectTrigger><SelectValue placeholder="Select template..." /></SelectTrigger>
               <SelectContent>
-                {templates.filter(t => t.isActive).map(t => (
-                  <SelectItem key={t.id} value={String(t.id)}>{t.name} ({t.documentType})</SelectItem>
-                ))}
+                {templates
+                  .filter(t => t.isActive && (!prefill || t.documentType === prefill.documentType))
+                  .map(t => (
+                    <SelectItem key={t.id} value={String(t.id)}>{t.name} ({t.documentType})</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -242,6 +306,113 @@ function DocumentRow({ doc }: { doc: IssuedDocument }) {
   );
 }
 
+function DocumentRequestsHrPanel({
+  templates,
+  onGenerateForRequest,
+}: {
+  templates: DocumentTemplate[];
+  onGenerateForRequest: (req: DocumentRequest) => void;
+}) {
+  const qc = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState<string>("Pending");
+  const { data: requests = [], isLoading } = useListDocumentRequests(
+    statusFilter ? { status: statusFilter } : {}
+  );
+  const update = useUpdateDocumentRequest();
+
+  function handleUpdate(id: number, status: "Fulfilled" | "Cancelled") {
+    const hrNote = status === "Cancelled"
+      ? prompt("Add an HR note (optional)") ?? ""
+      : "";
+    update.mutate({ id, data: { status, hrNote: hrNote || null } }, {
+      onSuccess: () => qc.invalidateQueries({ queryKey: getListDocumentRequestsQueryKey() }),
+    });
+  }
+
+  const myRequests = requests as DocumentRequest[];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Employee-submitted document requests. Mark as fulfilled after generating the document.
+        </p>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Fulfilled">Fulfilled</SelectItem>
+            <SelectItem value="Cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <Card><CardContent className="py-10 text-center text-muted-foreground">Loading...</CardContent></Card>
+      ) : myRequests.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            <Inbox className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p>No {statusFilter.toLowerCase()} document requests.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {myRequests.map(r => (
+            <Card key={r.id} data-testid={`row-doc-request-hr-${r.id}`}>
+              <CardContent className="p-4 flex items-center gap-4 flex-wrap">
+                <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">
+                    {r.documentType} — {r.employeeName ?? `Employee #${r.employeeId}`}
+                    {r.employeeCode && <span className="text-muted-foreground"> ({r.employeeCode})</span>}
+                  </div>
+                  {r.reason && <div className="text-xs text-muted-foreground mt-0.5">Reason: {r.reason}</div>}
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Requested {new Date(r.createdAt).toLocaleDateString("en-IN")}
+                    {r.fulfilledByName && ` • ${r.status} by ${r.fulfilledByName}`}
+                  </div>
+                </div>
+                <Badge className="text-xs">{r.status}</Badge>
+                {r.status === "Pending" && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-testid={`button-generate-for-request-${r.id}`}
+                      onClick={() => onGenerateForRequest(r)}
+                      disabled={templates.filter(t => t.isActive && t.documentType === r.documentType).length === 0}
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Generate
+                    </Button>
+                    <Button
+                      size="sm"
+                      data-testid={`button-fulfill-request-${r.id}`}
+                      onClick={() => handleUpdate(r.id, "Fulfilled")}
+                      disabled={update.isPending}
+                    >
+                      <CheckCircle2 className="w-3 h-3 mr-1" /> Mark Fulfilled
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-testid={`button-cancel-request-${r.id}`}
+                      onClick={() => handleUpdate(r.id, "Cancelled")}
+                      disabled={update.isPending}
+                    >
+                      <X className="w-3 h-3 mr-1" /> Cancel
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DocumentsPage() {
   const { role } = useCurrentHrmsUser();
   const isHr = ["super_admin", "hr_manager", "hr_executive"].includes(role ?? "");
@@ -250,6 +421,7 @@ export default function DocumentsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editTemplate, setEditTemplate] = useState<DocumentTemplate | null>(null);
   const [showGenerate, setShowGenerate] = useState(false);
+  const [generatePrefill, setGeneratePrefill] = useState<GeneratePrefill | null>(null);
 
   const { data: templates = [] } = useListDocumentTemplates({ query: { enabled: isHr, queryKey: getListDocumentTemplatesQueryKey() } });
   const { data: issued = [] } = useListIssuedDocuments({});
@@ -272,7 +444,7 @@ export default function DocumentsPage() {
               <Settings className="w-4 h-4 mr-2" />
               New Template
             </Button>
-            <Button onClick={() => setShowGenerate(true)} disabled={templates.filter(t => t.isActive).length === 0}>
+            <Button onClick={() => { setGeneratePrefill(null); setShowGenerate(true); }} disabled={templates.filter(t => t.isActive).length === 0}>
               <Plus className="w-4 h-4 mr-2" />
               Generate Document
             </Button>
@@ -281,11 +453,28 @@ export default function DocumentsPage() {
       </div>
 
       {isHr ? (
-        <Tabs defaultValue="issued">
+        <Tabs defaultValue="requests">
           <TabsList>
+            <TabsTrigger value="requests">
+              <Inbox className="w-3.5 h-3.5 mr-1" /> Requests
+            </TabsTrigger>
             <TabsTrigger value="issued">Issued Documents ({issued.length})</TabsTrigger>
             <TabsTrigger value="templates">Templates ({templates.length})</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="requests" className="space-y-3 mt-4">
+            <DocumentRequestsHrPanel
+              templates={templates}
+              onGenerateForRequest={(req) => {
+                setGeneratePrefill({
+                  employeeId: req.employeeId,
+                  documentType: req.documentType,
+                  requestId: req.id,
+                });
+                setShowGenerate(true);
+              }}
+            />
+          </TabsContent>
 
           <TabsContent value="issued" className="space-y-3 mt-4">
             {issued.length === 0 ? (
@@ -378,7 +567,12 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <GenerateModal open={showGenerate} onClose={() => setShowGenerate(false)} templates={templates} />
+      <GenerateModal
+        open={showGenerate}
+        onClose={() => { setShowGenerate(false); setGeneratePrefill(null); }}
+        templates={templates}
+        prefill={generatePrefill}
+      />
     </div>
   );
 }

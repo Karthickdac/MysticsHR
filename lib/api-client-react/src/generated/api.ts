@@ -53,6 +53,7 @@ import type {
   CreateDepartmentBody,
   CreateDesignationBody,
   CreateDocumentBody,
+  CreateDocumentRequestBody,
   CreateDocumentTemplateBody,
   CreateEmployeeBody,
   CreateEmployeeDocumentBody,
@@ -86,6 +87,7 @@ import type {
   DashboardKpis,
   Department,
   Designation,
+  DocumentRequest,
   DocumentTemplate,
   DownloadIssuedDocumentParams,
   Employee,
@@ -177,6 +179,7 @@ import type {
   ListBlackoutDatesParams,
   ListCandidatesParams,
   ListDesignationsParams,
+  ListDocumentRequestsParams,
   ListEmployeesParams,
   ListExitRequestsParams,
   ListHelpdeskTicketsParams,
@@ -274,6 +277,7 @@ import type {
   UpdateClearanceTaskBody,
   UpdateDepartmentBody,
   UpdateDesignationBody,
+  UpdateDocumentRequestBody,
   UpdateEmployeeBody,
   UpdateEmployeeStatusBody,
   UpdateEssProfileBody,
@@ -20420,6 +20424,281 @@ export const useGenerateDocument = <
   TContext
 > => {
   return useMutation(getGenerateDocumentMutationOptions(options));
+};
+
+/**
+ * @summary List document requests (employee sees own; HOD sees team; HR sees all)
+ */
+export const getListDocumentRequestsUrl = (
+  params?: ListDocumentRequestsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/documents/requests?${stringifiedParams}`
+    : `/api/documents/requests`;
+};
+
+export const listDocumentRequests = async (
+  params?: ListDocumentRequestsParams,
+  options?: RequestInit,
+): Promise<DocumentRequest[]> => {
+  return customFetch<DocumentRequest[]>(getListDocumentRequestsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDocumentRequestsQueryKey = (
+  params?: ListDocumentRequestsParams,
+) => {
+  return [`/api/documents/requests`, ...(params ? [params] : [])] as const;
+};
+
+export const getListDocumentRequestsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDocumentRequests>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDocumentRequestsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDocumentRequests>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDocumentRequestsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDocumentRequests>>
+  > = ({ signal }) =>
+    listDocumentRequests(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDocumentRequests>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDocumentRequestsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDocumentRequests>>
+>;
+export type ListDocumentRequestsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List document requests (employee sees own; HOD sees team; HR sees all)
+ */
+
+export function useListDocumentRequests<
+  TData = Awaited<ReturnType<typeof listDocumentRequests>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDocumentRequestsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDocumentRequests>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDocumentRequestsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit a document request (employee)
+ */
+export const getCreateDocumentRequestUrl = () => {
+  return `/api/documents/requests`;
+};
+
+export const createDocumentRequest = async (
+  createDocumentRequestBody: CreateDocumentRequestBody,
+  options?: RequestInit,
+): Promise<DocumentRequest> => {
+  return customFetch<DocumentRequest>(getCreateDocumentRequestUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createDocumentRequestBody),
+  });
+};
+
+export const getCreateDocumentRequestMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDocumentRequest>>,
+    TError,
+    { data: BodyType<CreateDocumentRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createDocumentRequest>>,
+  TError,
+  { data: BodyType<CreateDocumentRequestBody> },
+  TContext
+> => {
+  const mutationKey = ["createDocumentRequest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createDocumentRequest>>,
+    { data: BodyType<CreateDocumentRequestBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createDocumentRequest(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateDocumentRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createDocumentRequest>>
+>;
+export type CreateDocumentRequestMutationBody =
+  BodyType<CreateDocumentRequestBody>;
+export type CreateDocumentRequestMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit a document request (employee)
+ */
+export const useCreateDocumentRequest = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDocumentRequest>>,
+    TError,
+    { data: BodyType<CreateDocumentRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createDocumentRequest>>,
+  TError,
+  { data: BodyType<CreateDocumentRequestBody> },
+  TContext
+> => {
+  return useMutation(getCreateDocumentRequestMutationOptions(options));
+};
+
+/**
+ * @summary Update document request status (HR fulfill or cancel)
+ */
+export const getUpdateDocumentRequestUrl = (id: number) => {
+  return `/api/documents/requests/${id}`;
+};
+
+export const updateDocumentRequest = async (
+  id: number,
+  updateDocumentRequestBody: UpdateDocumentRequestBody,
+  options?: RequestInit,
+): Promise<DocumentRequest> => {
+  return customFetch<DocumentRequest>(getUpdateDocumentRequestUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateDocumentRequestBody),
+  });
+};
+
+export const getUpdateDocumentRequestMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDocumentRequest>>,
+    TError,
+    { id: number; data: BodyType<UpdateDocumentRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateDocumentRequest>>,
+  TError,
+  { id: number; data: BodyType<UpdateDocumentRequestBody> },
+  TContext
+> => {
+  const mutationKey = ["updateDocumentRequest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateDocumentRequest>>,
+    { id: number; data: BodyType<UpdateDocumentRequestBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateDocumentRequest(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateDocumentRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateDocumentRequest>>
+>;
+export type UpdateDocumentRequestMutationBody =
+  BodyType<UpdateDocumentRequestBody>;
+export type UpdateDocumentRequestMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update document request status (HR fulfill or cancel)
+ */
+export const useUpdateDocumentRequest = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDocumentRequest>>,
+    TError,
+    { id: number; data: BodyType<UpdateDocumentRequestBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateDocumentRequest>>,
+  TError,
+  { id: number; data: BodyType<UpdateDocumentRequestBody> },
+  TContext
+> => {
+  return useMutation(getUpdateDocumentRequestMutationOptions(options));
 };
 
 /**

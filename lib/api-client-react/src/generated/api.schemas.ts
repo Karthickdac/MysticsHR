@@ -2400,6 +2400,7 @@ export interface EssDashboard {
   recentPayslip?: EssDashboardRecentPayslip;
   performanceGoals: EssDashboardPerformanceGoalsItem[];
   pendingActions: EssDashboardPendingActionsItem[];
+  openTicketCount?: number;
 }
 
 export interface HelpdeskTicket {
@@ -2657,6 +2658,73 @@ export interface GenerateDocumentBody {
   documentType: GenerateDocumentBodyDocumentType;
   templateId: number;
   fieldValues?: GenerateDocumentBodyFieldValues;
+}
+
+export type DocumentRequestStatus =
+  (typeof DocumentRequestStatus)[keyof typeof DocumentRequestStatus];
+
+export const DocumentRequestStatus = {
+  Pending: "Pending",
+  Fulfilled: "Fulfilled",
+  Cancelled: "Cancelled",
+} as const;
+
+export interface DocumentRequest {
+  id: number;
+  employeeId: number;
+  /** @nullable */
+  employeeName?: string | null;
+  /** @nullable */
+  employeeCode?: string | null;
+  documentType: string;
+  /** @nullable */
+  reason?: string | null;
+  status: DocumentRequestStatus;
+  /** @nullable */
+  issuedDocumentId?: number | null;
+  /** @nullable */
+  fulfilledBy?: number | null;
+  /** @nullable */
+  fulfilledByName?: string | null;
+  /** @nullable */
+  fulfilledAt?: string | null;
+  /** @nullable */
+  hrNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateDocumentRequestBodyDocumentType =
+  (typeof CreateDocumentRequestBodyDocumentType)[keyof typeof CreateDocumentRequestBodyDocumentType];
+
+export const CreateDocumentRequestBodyDocumentType = {
+  Experience_Certificate: "Experience Certificate",
+  Appointment_Letter: "Appointment Letter",
+  Warning_Notice: "Warning Notice",
+  Offer_Letter: "Offer Letter",
+  NOC: "NOC",
+  Relieving_Letter: "Relieving Letter",
+} as const;
+
+export interface CreateDocumentRequestBody {
+  documentType: CreateDocumentRequestBodyDocumentType;
+  reason?: string | null;
+}
+
+export type UpdateDocumentRequestBodyStatus =
+  (typeof UpdateDocumentRequestBodyStatus)[keyof typeof UpdateDocumentRequestBodyStatus];
+
+export const UpdateDocumentRequestBodyStatus = {
+  Pending: "Pending",
+  Fulfilled: "Fulfilled",
+  Cancelled: "Cancelled",
+} as const;
+
+export interface UpdateDocumentRequestBody {
+  status: UpdateDocumentRequestBodyStatus;
+  hrNote?: string | null;
+  /** @nullable */
+  issuedDocumentId?: number | null;
 }
 
 export type ExitRequestExitType =
@@ -3621,6 +3689,10 @@ export type RunHelpdeskSlaCheck200 = {
 export type ListIssuedDocumentsParams = {
   employeeId?: number;
   documentType?: string;
+};
+
+export type ListDocumentRequestsParams = {
+  status?: string;
 };
 
 export type DownloadIssuedDocumentParams = {

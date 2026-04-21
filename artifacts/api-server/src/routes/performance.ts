@@ -747,7 +747,7 @@ router.get("/ess/me", requireHrmsUser, requireRole(...ALL_ROLES), async (req, re
       employeeCode: employeesTable.employeeId,
       phone: employeesTable.phone,
       dateOfJoining: employeesTable.dateOfJoining,
-      designation: designationsTable.name,
+      designation: designationsTable.title,
       department: departmentsTable.name,
       currentAddress: employeeProfilesTable.currentAddress,
       personalEmail: employeeProfilesTable.personalEmail,
@@ -863,9 +863,19 @@ router.get("/ess/dashboard", requireHrmsUser, requireRole(...ALL_ROLES), async (
       .where(eq(hrmsUsersTable.id, u.id));
 
     if (!emp) {
-      res.json({ attendance: { presentDays: 0, absentDays: 0, lateDays: 0, month: "" }, leaveBalances: [], performanceGoals: [], pendingActions: [] });
+      res.json({ attendance: { presentDays: 0, absentDays: 0, lateDays: 0, month: "" }, leaveBalances: [], performanceGoals: [], pendingActions: [], openTicketCount: 0 });
       return;
     }
+
+    // Open helpdesk ticket count for this employee
+    const { helpdeskTicketsTable } = await import("@workspace/db/schema");
+    const openTicketRows = await db.select({ id: helpdeskTicketsTable.id })
+      .from(helpdeskTicketsTable)
+      .where(and(
+        eq(helpdeskTicketsTable.raisedByEmployeeId, emp.id),
+        inArray(helpdeskTicketsTable.status, ["Open", "In Progress", "Pending Employee Response"]),
+      ));
+    const openTicketCount = openTicketRows.length;
 
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -876,7 +886,7 @@ router.get("/ess/dashboard", requireHrmsUser, requireRole(...ALL_ROLES), async (
       .from(attendanceRecordsTable)
       .where(and(
         eq(attendanceRecordsTable.employeeId, emp.id),
-        sql`to_char(${attendanceRecordsTable.date}, 'YYYY-MM') = ${yearMonth}`
+        sql`to_char(${attendanceRecordsTable.attendanceDate}, 'YYYY-MM') = ${yearMonth}`
       ));
     const presentDays = attRows.filter(r => ["Present", "Half-Day", "On Leave"].includes(r.status ?? "")).length;
     const absentDays = attRows.filter(r => r.status === "Absent").length;
@@ -970,6 +980,7 @@ router.get("/ess/dashboard", requireHrmsUser, requireRole(...ALL_ROLES), async (
       recentPayslip: recentPayslip ?? null,
       performanceGoals: activeGoals,
       pendingActions: [],
+      openTicketCount,
     });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
