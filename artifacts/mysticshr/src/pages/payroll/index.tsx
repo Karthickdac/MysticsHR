@@ -178,7 +178,81 @@ function DepartmentDrilldownDialog({
   );
 }
 
-function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAnalytics200 | undefined; runs: PayrollRun[] | undefined }) {
+type PeriodPreset = "last12" | "currentFy" | "previousFy" | "custom";
+
+// Resolves a period preset to a (from, to) YYYY-MM tuple. Indian FY runs Apr–Mar.
+function resolvePeriod(preset: PeriodPreset, custom: { from: string; to: string }, now = new Date()): { from: string; to: string } {
+  const fmt = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}`;
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  if (preset === "currentFy") {
+    const fyStart = m >= 4 ? y : y - 1;
+    return { from: fmt(fyStart, 4), to: fmt(fyStart + 1, 3) };
+  }
+  if (preset === "previousFy") {
+    const fyStart = (m >= 4 ? y : y - 1) - 1;
+    return { from: fmt(fyStart, 4), to: fmt(fyStart + 1, 3) };
+  }
+  if (preset === "custom") return { from: custom.from, to: custom.to };
+  // last12 (default)
+  const fromDate = new Date(y, m - 12, 1);
+  return { from: fmt(fromDate.getFullYear(), fromDate.getMonth() + 1), to: fmt(y, m) };
+}
+
+function PayrollAnalyticsControls({
+  preset, setPreset, custom, setCustom, compare, setCompare, financialYear,
+}: {
+  preset: PeriodPreset;
+  setPreset: (p: PeriodPreset) => void;
+  custom: { from: string; to: string };
+  setCustom: (c: { from: string; to: string }) => void;
+  compare: boolean;
+  setCompare: (v: boolean) => void;
+  financialYear: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-3 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">Period</Label>
+          <Select value={preset} onValueChange={(v) => setPreset(v as PeriodPreset)}>
+            <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="last12">Last 12 months</SelectItem>
+              <SelectItem value="currentFy">Current FY ({financialYear})</SelectItem>
+              <SelectItem value="previousFy">Previous FY</SelectItem>
+              <SelectItem value="custom">Custom range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {preset === "custom" && (
+          <div className="flex items-center gap-2">
+            <Input type="month" value={custom.from} onChange={e => setCustom({ ...custom, from: e.target.value })} className="h-8 w-36" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="month" value={custom.to} onChange={e => setCustom({ ...custom, to: e.target.value })} className="h-8 w-36" />
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto select-none">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={compare}
+            onChange={e => setCompare(e.target.checked)}
+          />
+          Compare with previous year
+        </label>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PayrollAnalyticsSection({
+  analytics, runs, controls,
+}: {
+  analytics: GetPayrollAnalytics200 | undefined;
+  runs: PayrollRun[] | undefined;
+  controls: React.ReactNode;
+}) {
   const [, navigate] = useLocation();
   const [drilldown, setDrilldown] = useState<{ departmentId: number | null; departmentName: string } | null>(null);
 
@@ -293,18 +367,27 @@ function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAna
     });
   };
 
+  // Prior-year series is opt-in via the analytics endpoint's compareWithPrior
+  // flag; detect by presence on any data point rather than threading another prop.
+  const showPrior = trend.some(p => (p as { priorTotalNet?: number | null }).priorTotalNet != null);
+  const windowLabel = analytics.windowFrom && analytics.windowTo
+    ? `${analytics.windowFrom} → ${analytics.windowTo}`
+    : "selected period";
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div className="space-y-4">
+      {controls}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Monthly Cost Trend</CardTitle>
-            <span className="text-xs text-muted-foreground">Last 12 months · Approved & Locked runs</span>
+            <span className="text-xs text-muted-foreground">{windowLabel} · Approved &amp; Locked runs</span>
           </div>
         </CardHeader>
         <CardContent>
           {trend.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">No finalized runs in the last 12 months.</div>
+            <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">No finalized runs in the selected window.</div>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={trend} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
@@ -316,6 +399,11 @@ function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAna
                 <Line type="monotone" dataKey="totalGross" name="Gross" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
                 <Line type="monotone" dataKey="totalNet" name="Net" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
                 <Line type="monotone" dataKey="totalDeductions" name="Deductions" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                {showPrior && <>
+                  <Line type="monotone" dataKey="priorTotalGross" name="Gross (prev yr)" stroke="#6366f1" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls />
+                  <Line type="monotone" dataKey="priorTotalNet" name="Net (prev yr)" stroke="#10b981" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls />
+                  <Line type="monotone" dataKey="priorTotalDeductions" name="Deductions (prev yr)" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls />
+                </>}
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -326,7 +414,7 @@ function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAna
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Headcount vs Cost</CardTitle>
-            <span className="text-xs text-muted-foreground">Last 12 months</span>
+            <span className="text-xs text-muted-foreground">{windowLabel}</span>
           </div>
         </CardHeader>
         <CardContent>
@@ -390,7 +478,7 @@ function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAna
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Statutory Contributions</CardTitle>
-            <span className="text-xs text-muted-foreground">FY {fy} · YTD totals</span>
+            <span className="text-xs text-muted-foreground">{windowLabel}{fy ? ` · FY ${fy}` : ""}</span>
           </div>
         </CardHeader>
         <CardContent>
@@ -423,6 +511,7 @@ function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAna
         departmentName={drilldown?.departmentName ?? ""}
         periodLabel={latestPeriod}
       />
+      </div>
     </div>
   );
 }
@@ -435,7 +524,24 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   const { data: runs, isLoading } = useListPayrollRuns();
   const { data: locks } = useListPayrollLocks({ year: currentYear, month: currentMonth });
-  const { data: analytics } = useGetPayrollAnalytics();
+
+  // Period & YoY controls drive the analytics query. Defaults match the legacy
+  // behaviour (last 12 months, no overlay) so the dashboard looks unchanged on
+  // first load.
+  const defaultRange = resolvePeriod("last12", { from: "", to: "" }, now);
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("last12");
+  const [customRange, setCustomRange] = useState<{ from: string; to: string }>(defaultRange);
+  const [compareYoY, setCompareYoY] = useState(false);
+  const resolvedRange = resolvePeriod(periodPreset, customRange, now);
+  const analyticsParams = {
+    from: resolvedRange.from,
+    to: resolvedRange.to,
+    compareWithPrior: compareYoY,
+  };
+  const { data: analytics } = useGetPayrollAnalytics(analyticsParams, {
+    query: { queryKey: getGetPayrollAnalyticsQueryKey(analyticsParams) },
+  });
+  const fyLabel = analytics?.financialYear ?? "";
 
   const createRun = useCreatePayrollRun();
   const computeRun = useComputePayrollRun();
@@ -574,7 +680,21 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         </Card>
       </div>
 
-      <PayrollAnalyticsSection analytics={analytics} runs={runs} />
+      <PayrollAnalyticsSection
+        analytics={analytics}
+        runs={runs}
+        controls={
+          <PayrollAnalyticsControls
+            preset={periodPreset}
+            setPreset={setPeriodPreset}
+            custom={customRange}
+            setCustom={setCustomRange}
+            compare={compareYoY}
+            setCompare={setCompareYoY}
+            financialYear={fyLabel}
+          />
+        }
+      />
 
       <Card className={`border-2 ${isCurrentlyLocked ? "border-red-200 bg-red-50/40" : "border-green-200 bg-green-50/40"}`}>
         <CardContent className="p-4 flex items-center justify-between">

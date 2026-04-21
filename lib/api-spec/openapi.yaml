@@ -3627,6 +3627,19 @@ paths:
       operationId: getPayrollAnalytics
       tags: [payroll]
       summary: Aggregated payroll analytics (trend, department breakdown, statutory totals)
+      parameters:
+        - name: from
+          in: query
+          description: Window start, format YYYY-MM (e.g. 2025-04). Defaults to 12 months ago.
+          schema: { type: string }
+        - name: to
+          in: query
+          description: Window end inclusive, format YYYY-MM. Defaults to current month.
+          schema: { type: string }
+        - name: compareWithPrior
+          in: query
+          description: When true, each monthly trend point is augmented with prior-year (same month minus 12) totals.
+          schema: { type: boolean }
       responses:
         "200":
           description: Analytics payload
@@ -3636,6 +3649,12 @@ paths:
                 type: object
                 properties:
                   financialYear: { type: string }
+                  windowFrom:
+                    type: string
+                    description: Effective window start (YYYY-MM) used for this response.
+                  windowTo:
+                    type: string
+                    description: Effective window end (YYYY-MM) used for this response.
                   latestPeriodLabel:
                     type: string
                     nullable: true
@@ -3655,6 +3674,19 @@ paths:
                         totalDeductions: { type: number }
                         totalNet: { type: number }
                         employees: { type: integer }
+                        priorTotalGross:
+                          type: number
+                          nullable: true
+                          description: Same-month total gross from one year prior. Present only when compareWithPrior=true.
+                        priorTotalDeductions:
+                          type: number
+                          nullable: true
+                        priorTotalNet:
+                          type: number
+                          nullable: true
+                        priorEmployees:
+                          type: integer
+                          nullable: true
                   departmentBreakdown:
                     type: array
                     items:

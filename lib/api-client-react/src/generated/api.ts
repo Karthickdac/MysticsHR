@@ -139,6 +139,7 @@ import type {
   GetMyAttendanceTodayParams,
   GetOnboardingChecklistsParams,
   GetPayrollAnalytics200,
+  GetPayrollAnalyticsParams,
   GetPayrollRegisterReport200,
   GetPayrollRegisterReportParams,
   GetPerformanceSummaryReport200,
@@ -16608,41 +16609,66 @@ export function useGetPayrollRunRecords<
 /**
  * @summary Aggregated payroll analytics (trend, department breakdown, statutory totals)
  */
-export const getGetPayrollAnalyticsUrl = () => {
-  return `/api/payroll/analytics`;
+export const getGetPayrollAnalyticsUrl = (
+  params?: GetPayrollAnalyticsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/payroll/analytics?${stringifiedParams}`
+    : `/api/payroll/analytics`;
 };
 
 export const getPayrollAnalytics = async (
+  params?: GetPayrollAnalyticsParams,
   options?: RequestInit,
 ): Promise<GetPayrollAnalytics200> => {
-  return customFetch<GetPayrollAnalytics200>(getGetPayrollAnalyticsUrl(), {
-    ...options,
-    method: "GET",
-  });
+  return customFetch<GetPayrollAnalytics200>(
+    getGetPayrollAnalyticsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getGetPayrollAnalyticsQueryKey = () => {
-  return [`/api/payroll/analytics`] as const;
+export const getGetPayrollAnalyticsQueryKey = (
+  params?: GetPayrollAnalyticsParams,
+) => {
+  return [`/api/payroll/analytics`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetPayrollAnalyticsQueryOptions = <
   TData = Awaited<ReturnType<typeof getPayrollAnalytics>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPayrollAnalytics>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: GetPayrollAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPayrollAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetPayrollAnalyticsQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPayrollAnalyticsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getPayrollAnalytics>>
-  > = ({ signal }) => getPayrollAnalytics({ signal, ...requestOptions });
+  > = ({ signal }) =>
+    getPayrollAnalytics(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getPayrollAnalytics>>,
@@ -16663,15 +16689,18 @@ export type GetPayrollAnalyticsQueryError = ErrorType<unknown>;
 export function useGetPayrollAnalytics<
   TData = Awaited<ReturnType<typeof getPayrollAnalytics>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPayrollAnalytics>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetPayrollAnalyticsQueryOptions(options);
+>(
+  params?: GetPayrollAnalyticsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPayrollAnalytics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPayrollAnalyticsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

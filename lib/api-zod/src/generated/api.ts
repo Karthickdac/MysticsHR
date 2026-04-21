@@ -4694,8 +4694,37 @@ export const GetPayrollRunRecordsResponse = zod.array(
 /**
  * @summary Aggregated payroll analytics (trend, department breakdown, statutory totals)
  */
+export const GetPayrollAnalyticsQueryParams = zod.object({
+  from: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Window start, format YYYY-MM (e.g. 2025-04). Defaults to 12 months ago.",
+    ),
+  to: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Window end inclusive, format YYYY-MM. Defaults to current month.",
+    ),
+  compareWithPrior: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "When true, each monthly trend point is augmented with prior-year (same month minus 12) totals.",
+    ),
+});
+
 export const GetPayrollAnalyticsResponse = zod.object({
   financialYear: zod.string().optional(),
+  windowFrom: zod
+    .string()
+    .optional()
+    .describe("Effective window start (YYYY-MM) used for this response."),
+  windowTo: zod
+    .string()
+    .optional()
+    .describe("Effective window end (YYYY-MM) used for this response."),
   latestPeriodLabel: zod.string().nullish(),
   latestRunId: zod
     .number()
@@ -4713,6 +4742,15 @@ export const GetPayrollAnalyticsResponse = zod.object({
         totalDeductions: zod.number().optional(),
         totalNet: zod.number().optional(),
         employees: zod.number().optional(),
+        priorTotalGross: zod
+          .number()
+          .nullish()
+          .describe(
+            "Same-month total gross from one year prior. Present only when compareWithPrior=true.",
+          ),
+        priorTotalDeductions: zod.number().nullish(),
+        priorTotalNet: zod.number().nullish(),
+        priorEmployees: zod.number().nullish(),
       }),
     )
     .optional(),

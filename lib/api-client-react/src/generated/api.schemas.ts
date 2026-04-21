@@ -3752,6 +3752,21 @@ export type FinalizePayrollRun200 = {
   message?: string;
 };
 
+export type GetPayrollAnalyticsParams = {
+  /**
+   * Window start, format YYYY-MM (e.g. 2025-04). Defaults to 12 months ago.
+   */
+  from?: string;
+  /**
+   * Window end inclusive, format YYYY-MM. Defaults to current month.
+   */
+  to?: string;
+  /**
+   * When true, each monthly trend point is augmented with prior-year (same month minus 12) totals.
+   */
+  compareWithPrior?: boolean;
+};
+
 export type GetPayrollAnalytics200MonthlyTrendItem = {
   year?: number;
   month?: number;
@@ -3760,6 +3775,11 @@ export type GetPayrollAnalytics200MonthlyTrendItem = {
   totalDeductions?: number;
   totalNet?: number;
   employees?: number;
+  /** Same-month total gross from one year prior. Present only when compareWithPrior=true. */
+  priorTotalGross?: number | null;
+  priorTotalDeductions?: number | null;
+  priorTotalNet?: number | null;
+  priorEmployees?: number | null;
 };
 
 export type GetPayrollAnalytics200DepartmentBreakdownItem = {
@@ -3788,6 +3808,10 @@ export type GetPayrollAnalytics200YtdTotals = {
 
 export type GetPayrollAnalytics200 = {
   financialYear?: string;
+  /** Effective window start (YYYY-MM) used for this response. */
+  windowFrom?: string;
+  /** Effective window end (YYYY-MM) used for this response. */
+  windowTo?: string;
   latestPeriodLabel?: string | null;
   /** Payroll run id used for the department breakdown — enables click-through to that run's detail page. */
   latestRunId?: number | null;

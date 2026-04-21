@@ -1230,18 +1230,38 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
     const thisYear = now.getFullYear();
     const thisMonth = now.getMonth() + 1;
 
-    // Last 12 months window (inclusive of current month)
-    const fromDate = new Date(thisYear, thisMonth - 12, 1);
-    const fromYear = fromDate.getFullYear();
-    const fromMonth = fromDate.getMonth() + 1;
+    // Parse optional window from query (?from=YYYY-MM&to=YYYY-MM). Falls back to
+    // the last 12 months for backward compat.
+    const parseYearMonth = (s: string | undefined): { y: number; m: number } | null => {
+      if (!s) return null;
+      const m = /^(\d{4})-(\d{1,2})$/.exec(s);
+      if (!m) return null;
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      if (mo < 1 || mo > 12) return null;
+      return { y, m: mo };
+    };
+    const qFrom = parseYearMonth(req.query.from as string | undefined);
+    const qTo = parseYearMonth(req.query.to as string | undefined);
+    const compareWithPrior = req.query.compareWithPrior === "true" || req.query.compareWithPrior === "1";
+
+    const defaultFrom = new Date(thisYear, thisMonth - 12, 1);
+    const fromYear = qFrom?.y ?? defaultFrom.getFullYear();
+    const fromMonth = qFrom?.m ?? (defaultFrom.getMonth() + 1);
+    const toYear = qTo?.y ?? thisYear;
+    const toMonth = qTo?.m ?? thisMonth;
     const fromInt = fromYear * 100 + fromMonth;
-    const toInt = thisYear * 100 + thisMonth;
+    const toInt = toYear * 100 + toMonth;
+    if (fromInt > toInt) {
+      res.status(400).json({ error: "'from' must be on or before 'to'" });
+      return;
+    }
     const periodInt = sql<number>`${payrollRunsTable.periodYear} * 100 + ${payrollRunsTable.periodMonth}`;
 
-    // Indian financial year (Apr–Mar)
+    // Indian financial year of "today" — used only for the response label so the
+    // UI can show e.g. "FY 2025-26" badges; the actual statutory/YTD aggregates
+    // now respect the selected window below.
     const fyStartYear = thisMonth >= 4 ? thisYear : thisYear - 1;
-    const fyFromInt = fyStartYear * 100 + 4;
-    const fyToInt = (fyStartYear + 1) * 100 + 3;
 
     const isCommitted = or(eq(payrollRunsTable.status, "Approved"), eq(payrollRunsTable.status, "Locked"))!;
 
@@ -1260,20 +1280,58 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
       .orderBy(asc(payrollRunsTable.periodYear), asc(payrollRunsTable.periodMonth));
 
     const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const monthlyTrend = monthlyRows.map(r => ({
-      year: r.year,
-      month: r.month,
-      label: `${monthNames[r.month - 1]} ${String(r.year).slice(-2)}`,
-      totalGross: Number(r.totalGross),
-      totalDeductions: Number(r.totalDeductions),
-      totalNet: Number(r.totalNet),
-      employees: Number(r.employees),
-    }));
 
-    // 2) Department-wise cost breakdown (latest finalized run)
+    // 1b) Optional prior-year overlay — same months, one year earlier. Aggregated
+    //     in a single query keyed by (year+1, month) so the merge below is O(n).
+    let priorByKey: Record<string, { totalGross: number; totalDeductions: number; totalNet: number; employees: number }> = {};
+    if (compareWithPrior) {
+      const priorFromInt = (fromYear - 1) * 100 + fromMonth;
+      const priorToInt = (toYear - 1) * 100 + toMonth;
+      const priorRows = await db.select({
+        year: payrollRunsTable.periodYear,
+        month: payrollRunsTable.periodMonth,
+        totalGross: sql<string>`COALESCE(SUM(${payrollRunsTable.totalGross}), 0)`,
+        totalDeductions: sql<string>`COALESCE(SUM(${payrollRunsTable.totalDeductions}), 0)`,
+        totalNet: sql<string>`COALESCE(SUM(${payrollRunsTable.totalNet}), 0)`,
+        employees: sql<number>`COALESCE(SUM(${payrollRunsTable.totalEmployees}), 0)`,
+      })
+        .from(payrollRunsTable)
+        .where(and(isCommitted, gte(periodInt, priorFromInt), lte(periodInt, priorToInt)))
+        .groupBy(payrollRunsTable.periodYear, payrollRunsTable.periodMonth);
+      priorByKey = Object.fromEntries(priorRows.map(r => [
+        `${r.year + 1}-${r.month}`,
+        {
+          totalGross: Number(r.totalGross),
+          totalDeductions: Number(r.totalDeductions),
+          totalNet: Number(r.totalNet),
+          employees: Number(r.employees),
+        },
+      ]));
+    }
+
+    const monthlyTrend = monthlyRows.map(r => {
+      const prior = compareWithPrior ? priorByKey[`${r.year}-${r.month}`] ?? null : null;
+      return {
+        year: r.year,
+        month: r.month,
+        label: `${monthNames[r.month - 1]} ${String(r.year).slice(-2)}`,
+        totalGross: Number(r.totalGross),
+        totalDeductions: Number(r.totalDeductions),
+        totalNet: Number(r.totalNet),
+        employees: Number(r.employees),
+        ...(compareWithPrior ? {
+          priorTotalGross: prior?.totalGross ?? null,
+          priorTotalDeductions: prior?.totalDeductions ?? null,
+          priorTotalNet: prior?.totalNet ?? null,
+          priorEmployees: prior?.employees ?? null,
+        } : {}),
+      };
+    });
+
+    // 2) Department-wise cost breakdown (latest finalized run within the window)
     const [latestRun] = await db.select({ id: payrollRunsTable.id, year: payrollRunsTable.periodYear, month: payrollRunsTable.periodMonth })
       .from(payrollRunsTable)
-      .where(isCommitted)
+      .where(and(isCommitted, gte(periodInt, fromInt), lte(periodInt, toInt)))
       .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth))
       .limit(1);
 
@@ -1304,7 +1362,7 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
         .sort((a, b) => b.totalNet - a.totalNet);
     }
 
-    // 3) Statutory deductions (current FY YTD)
+    // 3) Statutory deductions — scoped to the selected window
     const [statRow] = await db.select({
       pfEmployee: sql<string>`COALESCE(SUM(${payrollRecordsTable.pfEmployee}), 0)`,
       pfEmployer: sql<string>`COALESCE(SUM(${payrollRecordsTable.pfEmployer}), 0)`,
@@ -1315,7 +1373,7 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
     })
       .from(payrollRecordsTable)
       .innerJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(and(isCommitted, gte(periodInt, fyFromInt), lte(periodInt, fyToInt)));
+      .where(and(isCommitted, gte(periodInt, fromInt), lte(periodInt, toInt)));
 
     const statutoryDeductions = {
       pfEmployee: Number(statRow?.pfEmployee ?? 0),
@@ -1326,7 +1384,8 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
       tds: Number(statRow?.tds ?? 0),
     };
 
-    // 4) FY YTD totals
+    // 4) Window totals (kept under "ytdTotals" key for backward compat with the
+    //    existing UI; semantically these now reflect the selected window).
     const [ytdRow] = await db.select({
       totalGross: sql<string>`COALESCE(SUM(${payrollRunsTable.totalGross}), 0)`,
       totalDeductions: sql<string>`COALESCE(SUM(${payrollRunsTable.totalDeductions}), 0)`,
@@ -1334,10 +1393,15 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
       runs: sql<number>`COUNT(${payrollRunsTable.id})`,
     })
       .from(payrollRunsTable)
-      .where(and(isCommitted, gte(periodInt, fyFromInt), lte(periodInt, fyToInt)));
+      .where(and(isCommitted, gte(periodInt, fromInt), lte(periodInt, toInt)));
+
+    const windowFrom = `${fromYear}-${String(fromMonth).padStart(2, "0")}`;
+    const windowTo = `${toYear}-${String(toMonth).padStart(2, "0")}`;
 
     res.json({
       financialYear: `${fyStartYear}-${String(fyStartYear + 1).slice(-2)}`,
+      windowFrom,
+      windowTo,
       latestPeriodLabel,
       latestRunId: latestRun?.id ?? null,
       monthlyTrend,
