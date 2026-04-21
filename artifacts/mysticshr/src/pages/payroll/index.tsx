@@ -200,7 +200,7 @@ function resolvePeriod(preset: PeriodPreset, custom: { from: string; to: string 
 }
 
 function PayrollAnalyticsControls({
-  preset, setPreset, custom, setCustom, compare, setCompare, financialYear,
+  preset, setPreset, custom, setCustom, compare, setCompare, financialYear, rangeError,
 }: {
   preset: PeriodPreset;
   setPreset: (p: PeriodPreset) => void;
@@ -209,49 +209,54 @@ function PayrollAnalyticsControls({
   compare: boolean;
   setCompare: (v: boolean) => void;
   financialYear: string;
+  rangeError: string | null;
 }) {
   return (
     <Card>
-      <CardContent className="p-3 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Label className="text-xs text-muted-foreground">Period</Label>
-          <Select value={preset} onValueChange={(v) => setPreset(v as PeriodPreset)}>
-            <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="last12">Last 12 months</SelectItem>
-              <SelectItem value="currentFy">Current FY ({financialYear})</SelectItem>
-              <SelectItem value="previousFy">Previous FY</SelectItem>
-              <SelectItem value="custom">Custom range</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {preset === "custom" && (
+      <CardContent className="p-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <Input type="month" value={custom.from} onChange={e => setCustom({ ...custom, from: e.target.value })} className="h-8 w-36" />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input type="month" value={custom.to} onChange={e => setCustom({ ...custom, to: e.target.value })} className="h-8 w-36" />
+            <Label className="text-xs text-muted-foreground">Period</Label>
+            <Select value={preset} onValueChange={(v) => setPreset(v as PeriodPreset)}>
+              <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="last12">Last 12 months</SelectItem>
+                <SelectItem value="currentFy">Current FY{financialYear ? ` (${financialYear})` : ""}</SelectItem>
+                <SelectItem value="previousFy">Previous FY</SelectItem>
+                <SelectItem value="custom">Custom range</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          {preset === "custom" && (
+            <div className="flex items-center gap-2">
+              <Input type="month" value={custom.from} onChange={e => setCustom({ ...custom, from: e.target.value })} className="h-8 w-36" />
+              <span className="text-xs text-muted-foreground">to</span>
+              <Input type="month" value={custom.to} onChange={e => setCustom({ ...custom, to: e.target.value })} className="h-8 w-36" />
+            </div>
+          )}
+          <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto select-none">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={compare}
+              onChange={e => setCompare(e.target.checked)}
+            />
+            Compare with previous year
+          </label>
+        </div>
+        {rangeError && (
+          <div className="text-xs text-red-600">{rangeError}</div>
         )}
-        <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto select-none">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={compare}
-            onChange={e => setCompare(e.target.checked)}
-          />
-          Compare with previous year
-        </label>
       </CardContent>
     </Card>
   );
 }
 
 function PayrollAnalyticsSection({
-  analytics, runs, controls,
+  analytics, runs,
 }: {
   analytics: GetPayrollAnalytics200 | undefined;
   runs: PayrollRun[] | undefined;
-  controls: React.ReactNode;
 }) {
   const [, navigate] = useLocation();
   const [drilldown, setDrilldown] = useState<{ departmentId: number | null; departmentName: string } | null>(null);
@@ -375,9 +380,7 @@ function PayrollAnalyticsSection({
     : "selected period";
 
   return (
-    <div className="space-y-4">
-      {controls}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
@@ -511,7 +514,6 @@ function PayrollAnalyticsSection({
         departmentName={drilldown?.departmentName ?? ""}
         periodLabel={latestPeriod}
       />
-      </div>
     </div>
   );
 }
@@ -533,13 +535,24 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [customRange, setCustomRange] = useState<{ from: string; to: string }>(defaultRange);
   const [compareYoY, setCompareYoY] = useState(false);
   const resolvedRange = resolvePeriod(periodPreset, customRange, now);
+  // Validate the custom range client-side so we don't fire a request that the
+  // backend will reject; surface the error inline beside the controls so HR can
+  // recover without losing the rest of the dashboard.
+  const rangeError = (() => {
+    if (!resolvedRange.from || !resolvedRange.to) return "Pick both a start and end month.";
+    if (resolvedRange.from > resolvedRange.to) return "Start month must be before end month.";
+    return null;
+  })();
   const analyticsParams = {
     from: resolvedRange.from,
     to: resolvedRange.to,
     compareWithPrior: compareYoY,
   };
   const { data: analytics } = useGetPayrollAnalytics(analyticsParams, {
-    query: { queryKey: getGetPayrollAnalyticsQueryKey(analyticsParams) },
+    query: {
+      enabled: rangeError === null,
+      queryKey: getGetPayrollAnalyticsQueryKey(analyticsParams),
+    },
   });
   const fyLabel = analytics?.financialYear ?? "";
 
@@ -680,21 +693,17 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         </Card>
       </div>
 
-      <PayrollAnalyticsSection
-        analytics={analytics}
-        runs={runs}
-        controls={
-          <PayrollAnalyticsControls
-            preset={periodPreset}
-            setPreset={setPeriodPreset}
-            custom={customRange}
-            setCustom={setCustomRange}
-            compare={compareYoY}
-            setCompare={setCompareYoY}
-            financialYear={fyLabel}
-          />
-        }
+      <PayrollAnalyticsControls
+        preset={periodPreset}
+        setPreset={setPeriodPreset}
+        custom={customRange}
+        setCustom={setCustomRange}
+        compare={compareYoY}
+        setCompare={setCompareYoY}
+        financialYear={fyLabel}
+        rangeError={rangeError}
       />
+      <PayrollAnalyticsSection analytics={analytics} runs={runs} />
 
       <Card className={`border-2 ${isCurrentlyLocked ? "border-red-200 bg-red-50/40" : "border-green-200 bg-green-50/40"}`}>
         <CardContent className="p-4 flex items-center justify-between">
