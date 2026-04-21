@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import {
   useGetEssDashboard,
   useGetEssProfile,
@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   User, FileText, Calendar, Clock, Target, Wallet, Home, Phone, AlertCircle,
-  ChevronRight, CheckCircle2,
+  ChevronRight, CheckCircle2, Eye, Download,
 } from "lucide-react";
 
 type LeaveBalanceItem = {
@@ -187,11 +187,21 @@ const ESS_MODULES = [
 
 export default function EssPortalPage() {
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const search = useSearch();
   const { data: profile, isLoading: loadingProfile } = useGetEssProfile();
   const { data: dashboard } = useGetEssDashboard();
   const { data: issuedDocs = [] } = useListIssuedDocuments(
     profile?.employeeId ? { employeeId: profile.employeeId } : {}
   );
+
+  const validTabs = ["dashboard", "profile", "services", "documents"];
+  const tabFromUrl = new URLSearchParams(search).get("tab");
+  const urlTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "dashboard";
+  const [activeTab, setActiveTab] = useState(urlTab);
+
+  useEffect(() => {
+    setActiveTab(urlTab);
+  }, [urlTab]);
 
   if (loadingProfile) return <div className="p-6">Loading...</div>;
 
@@ -216,10 +226,11 @@ export default function EssPortalPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="profile">My Profile</TabsTrigger>
+          <TabsTrigger value="documents">My Documents</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
         </TabsList>
 
@@ -414,6 +425,74 @@ export default function EssPortalPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="documents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                My HR Documents
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                View and download HR documents issued to you (offer letter, ID card, experience letter, salary certificates, etc.)
+              </p>
+            </CardHeader>
+            <CardContent>
+              {myDocuments.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No documents issued yet.</p>
+                  <p className="text-xs mt-1">Contact HR to request an HR document.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {myDocuments.map((doc: IssuedDocument) => (
+                    <div
+                      key={doc.id}
+                      data-testid={`row-document-${doc.id}`}
+                      className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-muted/30"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="p-2 rounded-lg bg-blue-100 text-blue-600 flex-shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium capitalize truncate">
+                            {(doc.documentType ?? "").replace(/_/g, " ")}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {doc.filename ?? "—"} · Issued{" "}
+                            {doc.generatedAt ? new Date(doc.generatedAt).toLocaleDateString() : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <a
+                          href={`/api/documents/issued/${doc.id}/download?inline=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-testid={`link-preview-${doc.id}`}
+                        >
+                          <Button variant="outline" size="sm" className="gap-1">
+                            <Eye className="w-3.5 h-3.5" /> Preview
+                          </Button>
+                        </a>
+                        <a
+                          href={`/api/documents/issued/${doc.id}/download`}
+                          data-testid={`link-download-${doc.id}`}
+                        >
+                          <Button size="sm" className="gap-1">
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </Button>
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="services" className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {ESS_MODULES.map(mod => (
@@ -432,39 +511,23 @@ export default function EssPortalPage() {
                 </Card>
               </Link>
             ))}
+            <Link href="/ess?tab=documents">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                <CardContent className="p-5 flex items-start gap-4">
+                  <div className="p-2.5 rounded-lg flex-shrink-0 bg-blue-100 text-blue-600">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">My Documents</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      View & download your HR documents
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                </CardContent>
+              </Card>
+            </Link>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                My HR Documents
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {myDocuments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No documents issued yet. Contact HR to request a document.</p>
-              ) : (
-                <div className="space-y-2">
-                  {myDocuments.map((doc: IssuedDocument) => (
-                    <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium capitalize">
-                          {(doc.documentType ?? "").replace(/_/g, " ")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Issued: {doc.generatedAt ? new Date(doc.generatedAt).toLocaleDateString() : "—"}
-                        </p>
-                      </div>
-                      <a href={`/api/documents/issued/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm" className="ml-3">Download</Button>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 

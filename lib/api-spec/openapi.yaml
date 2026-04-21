@@ -4501,6 +4501,10 @@ paths:
           name: id
           required: true
           schema: { type: integer }
+        - in: query
+          name: inline
+          description: When "1" or "true", serves PDF with Content-Disposition inline for in-browser preview
+          schema: { type: string }
       responses:
         "200":
           description: PDF file

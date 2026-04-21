@@ -256,8 +256,12 @@ router.get("/documents/issued/:id/download", requireHrmsUser, requireRole(...ALL
     if (!doc.fileContent) { res.status(404).json({ error: "Document file not found" }); return; }
 
     const pdfBuffer = Buffer.from(doc.fileContent, "base64");
+    const inline = req.query.inline === "1" || req.query.inline === "true";
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${doc.filename}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `${inline ? "inline" : "attachment"}; filename="${doc.filename}"`,
+    );
     res.setHeader("Content-Length", pdfBuffer.length.toString());
     res.send(pdfBuffer);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
