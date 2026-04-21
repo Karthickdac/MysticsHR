@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect, Link } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -83,6 +83,9 @@ function Forbidden() {
 }
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+const PayrollChartHarnessLazy = lazy(() => import("./pages/__test__/payroll-chart-harness"));
+const PayrollReportsHarnessLazy = lazy(() => import("./pages/__test__/payroll-reports-harness"));
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -272,6 +275,20 @@ function ClerkProviderWithRoutes() {
         <ClerkQueryClientCacheInvalidator />
         <Switch>
           <Route path="/" component={HomeRedirect} />
+          {import.meta.env.DEV && (
+            <Route path="/__test/payroll-chart">
+              <Suspense fallback={null}>
+                <PayrollChartHarnessLazy />
+              </Suspense>
+            </Route>
+          )}
+          {import.meta.env.DEV && (
+            <Route path="/__test/payroll-reports">
+              <Suspense fallback={null}>
+                <PayrollReportsHarnessLazy />
+              </Suspense>
+            </Route>
+          )}
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/logout" component={LogoutPage} />

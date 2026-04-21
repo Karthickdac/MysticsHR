@@ -29,6 +29,12 @@ import {
   Play, CheckCircle2, Lock, Unlock, FileText, RefreshCw, Plus, ChevronRight,
   Banknote, Users, TrendingUp,
 } from "lucide-react";
+import {
+  STATUTORY_TO_REPORT,
+  extractDatum,
+  findRunIdForMonth as findRunIdForMonthHelper,
+  buildStatutoryReportQuery,
+} from "./chart-drilldowns";
 
 const RUN_STATUS_COLORS: Record<string, string> = {
   Draft: "bg-gray-100 text-gray-700",
@@ -90,17 +96,6 @@ function compactInr(n: number): string {
   if (abs >= 1e3) return `₹${(n / 1e3).toFixed(1)}K`;
   return `₹${Math.round(n)}`;
 }
-
-// Maps a statutory bar's display name to the corresponding report tab key in
-// the Statutory Reports page (so a click navigates to the pre-filtered report).
-const STATUTORY_TO_REPORT: Record<string, string> = {
-  "PF (Employee)": "pf-ecr",
-  "PF (Employer)": "pf-ecr",
-  "ESI (Employee)": "esi",
-  "ESI (Employer)": "esi",
-  "Professional Tax": "pt",
-  "TDS": "tds",
-};
 
 function DepartmentDrilldownDialog({
   open, onOpenChange, runId, departmentId, departmentName, periodLabel,
@@ -255,15 +250,17 @@ function PayrollAnalyticsControls({
   );
 }
 
-function PayrollAnalyticsSection({
-  analytics, runs, deptPeriod, setDeptPeriod,
+export function PayrollAnalyticsSection({
+  analytics, runs, deptPeriod, setDeptPeriod, navigateOverride,
 }: {
   analytics: GetPayrollAnalytics200 | undefined;
   runs: PayrollRun[] | undefined;
   deptPeriod: { year: number; month: number } | null;
   setDeptPeriod: (p: { year: number; month: number } | null) => void;
+  navigateOverride?: (path: string) => void;
 }) {
-  const [, navigate] = useLocation();
+  const [, wouterNavigate] = useLocation();
+  const navigate = navigateOverride ?? wouterNavigate;
   const [drilldown, setDrilldown] = useState<{ departmentId: number | null; departmentName: string } | null>(null);
 
   if (!analytics) {
@@ -316,56 +313,19 @@ function PayrollAnalyticsSection({
     { name: "TDS", value: statutory.tds },
   ];
 
-  // Recharts hands click handlers either the raw datum or a wrapper with the
-  // datum nested under `payload` (Bar/Pie behave differently). This helper
-  // normalizes so handlers always receive the source data row.
-  const extractDatum = <T,>(arg: unknown): T | undefined => {
-    if (!arg || typeof arg !== "object") return undefined;
-    const a = arg as Record<string, unknown>;
-    if (a.payload && typeof a.payload === "object") return a.payload as T;
-    return arg as T;
-  };
-
-  // Resolve a runId for a clicked monthly bar by matching year+month against
-  // committed (Approved/Locked) payroll runs only — the chart shows finalized
-  // figures, so click-through must never land on a Draft/Computed run.
-  const findRunIdForMonth = (year: number, month: number): number | null => {
-    if (!runs) return null;
-    const committed = runs.filter(r =>
-      r.periodYear === year && r.periodMonth === month &&
-      (r.status === "Locked" || r.status === "Approved"),
-    );
-    if (committed.length === 0) return null;
-    const locked = committed.find(r => r.status === "Locked");
-    return (locked ?? committed[0]).id;
-  };
-
   const handleMonthBarClick = (arg: unknown) => {
     const d = extractDatum<{ year?: number; month?: number }>(arg);
     if (!d?.year || !d?.month) return;
-    const id = findRunIdForMonth(d.year, d.month);
+    const id = findRunIdForMonthHelper(runs, d.year, d.month);
     if (id) navigate(`/payroll/runs/${id}`);
   };
 
   const handleStatutoryBarClick = (arg: unknown) => {
     const d = extractDatum<{ name?: string }>(arg);
-    if (!d?.name) return;
-    const reportType = STATUTORY_TO_REPORT[d.name];
-    if (!reportType || !analytics.latestPeriodLabel) return;
-    // Pre-fill the report to the current Indian FY (Apr 1 → latest finalized
-    // month). Compliance officers always reconcile statutory totals at FY scope,
-    // so a single-month view would force them to re-filter immediately.
+    if (!d?.name || !analytics.latestPeriodLabel) return;
     const latest = analytics.monthlyTrend?.[analytics.monthlyTrend.length - 1];
-    const qs = new URLSearchParams({ type: reportType });
-    if (latest?.year && latest?.month) {
-      const fyStartYear = latest.month >= 4 ? latest.year : latest.year - 1;
-      qs.set("filterMode", "range");
-      qs.set("fromYear", String(fyStartYear));
-      qs.set("fromMonth", "4");
-      qs.set("toYear", String(latest.year));
-      qs.set("toMonth", String(latest.month));
-    }
-    navigate(`/payroll/reports?${qs.toString()}`);
+    const qs = buildStatutoryReportQuery(d.name, latest);
+    if (qs) navigate(`/payroll/reports?${qs}`);
   };
 
   const handleDeptClick = (arg: unknown) => {
