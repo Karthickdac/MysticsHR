@@ -179,6 +179,14 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
         isHrOverride: attendanceRecordsTable.isHrOverride,
         overrideReason: attendanceRecordsTable.overrideReason,
         notes: attendanceRecordsTable.notes,
+        signInLatitude: attendanceRecordsTable.signInLatitude,
+        signInLongitude: attendanceRecordsTable.signInLongitude,
+        signInAccuracyMeters: attendanceRecordsTable.signInAccuracyMeters,
+        signInUserAgent: attendanceRecordsTable.signInUserAgent,
+        signOutLatitude: attendanceRecordsTable.signOutLatitude,
+        signOutLongitude: attendanceRecordsTable.signOutLongitude,
+        signOutAccuracyMeters: attendanceRecordsTable.signOutAccuracyMeters,
+        signOutUserAgent: attendanceRecordsTable.signOutUserAgent,
         createdAt: attendanceRecordsTable.createdAt,
         updatedAt: attendanceRecordsTable.updatedAt,
       })
@@ -518,6 +526,32 @@ function todayStr(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+// Validate optional client-supplied geolocation/device telemetry on
+// self-service clock-in/out. Coordinates are bounded; accuracy is clamped
+// to a non-negative integer; userAgent falls back to the request header
+// when the client doesn't echo one in the body. Any invalid value is
+// silently dropped (the punch still succeeds without telemetry).
+function parseClockTelemetry(
+  body: unknown,
+  headerUserAgent: string | undefined,
+): { latitude: string | null; longitude: string | null; accuracy: number | null; userAgent: string | null } {
+  const b = (body ?? {}) as { latitude?: unknown; longitude?: unknown; accuracy?: unknown; userAgent?: unknown };
+  const lat = typeof b.latitude === "number" && Number.isFinite(b.latitude) && b.latitude >= -90 && b.latitude <= 90 ? b.latitude : null;
+  const lng = typeof b.longitude === "number" && Number.isFinite(b.longitude) && b.longitude >= -180 && b.longitude <= 180 ? b.longitude : null;
+  const accRaw = typeof b.accuracy === "number" && Number.isFinite(b.accuracy) && b.accuracy >= 0 ? b.accuracy : null;
+  const ua = typeof b.userAgent === "string" && b.userAgent.trim().length > 0
+    ? b.userAgent.trim().slice(0, 500)
+    : (headerUserAgent ? String(headerUserAgent).slice(0, 500) : null);
+  // Persist lat/lng paired or not at all to avoid orphaned half-coords.
+  const haveBoth = lat !== null && lng !== null;
+  return {
+    latitude: haveBoth ? lat!.toFixed(6) : null,
+    longitude: haveBoth ? lng!.toFixed(6) : null,
+    accuracy: accRaw !== null ? Math.round(accRaw) : null,
+    userAgent: ua,
+  };
+}
+
 router.get("/attendance/me/today", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const empId = await getCallerEmployeeId(req.hrmsUser!.id, req.hrmsUser!.employeeId);
@@ -559,15 +593,22 @@ router.post("/attendance/me/clock-in", requireHrmsUser, requireRole(...ALL_ROLES
       .where(and(eq(attendanceRecordsTable.employeeId, empId), eq(attendanceRecordsTable.attendanceDate, today)));
     if (existing?.signInTime) { res.status(422).json({ error: "You have already clocked in for today" }); return; }
 
+    const telemetry = parseClockTelemetry(req.body, req.get("user-agent"));
     const now = new Date();
     let record: typeof attendanceRecordsTable.$inferSelect | undefined;
     if (existing) {
       [record] = await db.update(attendanceRecordsTable)
-        .set({ signInTime: now, status: "Present", updatedAt: new Date() })
+        .set({
+          signInTime: now, status: "Present", updatedAt: new Date(),
+          signInLatitude: telemetry.latitude, signInLongitude: telemetry.longitude,
+          signInAccuracyMeters: telemetry.accuracy, signInUserAgent: telemetry.userAgent,
+        })
         .where(eq(attendanceRecordsTable.id, existing.id)).returning();
     } else {
       [record] = await db.insert(attendanceRecordsTable).values({
         employeeId: empId, attendanceDate: today, signInTime: now, breakDurationMinutes: 0, status: "Present",
+        signInLatitude: telemetry.latitude, signInLongitude: telemetry.longitude,
+        signInAccuracyMeters: telemetry.accuracy, signInUserAgent: telemetry.userAgent,
       }).returning();
     }
     if (record) {
@@ -605,8 +646,13 @@ router.post("/attendance/me/clock-out", requireHrmsUser, requireRole(...ALL_ROLE
       : 0;
     const newStatus: AttendanceStatus = computeStatus(totalMins, minWorkingMins);
 
+    const telemetry = parseClockTelemetry(req.body, req.get("user-agent"));
     const [updated] = await db.update(attendanceRecordsTable)
-      .set({ signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, updatedAt: new Date() })
+      .set({
+        signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, updatedAt: new Date(),
+        signOutLatitude: telemetry.latitude, signOutLongitude: telemetry.longitude,
+        signOutAccuracyMeters: telemetry.accuracy, signOutUserAgent: telemetry.userAgent,
+      })
       .where(eq(attendanceRecordsTable.id, existing.id)).returning();
     if (updated) {
       await upsertOvertimeRecord(updated.id, empId, today, overtimeMins, template?.shiftRatePerHour);
@@ -637,6 +683,14 @@ router.get("/attendance/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), as
         isHrOverride: attendanceRecordsTable.isHrOverride,
         overrideReason: attendanceRecordsTable.overrideReason,
         notes: attendanceRecordsTable.notes,
+        signInLatitude: attendanceRecordsTable.signInLatitude,
+        signInLongitude: attendanceRecordsTable.signInLongitude,
+        signInAccuracyMeters: attendanceRecordsTable.signInAccuracyMeters,
+        signInUserAgent: attendanceRecordsTable.signInUserAgent,
+        signOutLatitude: attendanceRecordsTable.signOutLatitude,
+        signOutLongitude: attendanceRecordsTable.signOutLongitude,
+        signOutAccuracyMeters: attendanceRecordsTable.signOutAccuracyMeters,
+        signOutUserAgent: attendanceRecordsTable.signOutUserAgent,
         createdAt: attendanceRecordsTable.createdAt,
         updatedAt: attendanceRecordsTable.updatedAt,
       })

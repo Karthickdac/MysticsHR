@@ -32,6 +32,16 @@ export const attendanceRecordsTable = pgTable("attendance_records", {
   overrideById: integer("override_by_id").references(() => hrmsUsersTable.id),
   overrideAt: timestamp("override_at", { withTimezone: true }),
   notes: text("notes"),
+  // Self-service clock-in/out telemetry (Task #36) — captured client-side
+  // for HR audit; never required (employee may decline geolocation).
+  signInLatitude: numeric("sign_in_latitude", { precision: 9, scale: 6 }),
+  signInLongitude: numeric("sign_in_longitude", { precision: 9, scale: 6 }),
+  signInAccuracyMeters: integer("sign_in_accuracy_meters"),
+  signInUserAgent: text("sign_in_user_agent"),
+  signOutLatitude: numeric("sign_out_latitude", { precision: 9, scale: 6 }),
+  signOutLongitude: numeric("sign_out_longitude", { precision: 9, scale: 6 }),
+  signOutAccuracyMeters: integer("sign_out_accuracy_meters"),
+  signOutUserAgent: text("sign_out_user_agent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

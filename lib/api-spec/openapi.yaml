@@ -2278,6 +2278,12 @@ paths:
       operationId: clockInMyAttendance
       tags: [Attendance]
       summary: Clock in for the current day (self-service)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClockPunchTelemetry"
       responses:
         "201":
           description: Clocked in
@@ -2291,6 +2297,12 @@ paths:
       operationId: clockOutMyAttendance
       tags: [Attendance]
       summary: Clock out for the current day (self-service)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClockPunchTelemetry"
       responses:
         "200":
           description: Clocked out
@@ -5799,9 +5811,26 @@ components:
         isHrOverride: { type: boolean }
         overrideReason: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+        signInLatitude: { type: ["string", "null"], description: "Latitude captured at clock-in (decimal string, 6dp)" }
+        signInLongitude: { type: ["string", "null"], description: "Longitude captured at clock-in (decimal string, 6dp)" }
+        signInAccuracyMeters: { type: ["integer", "null"], description: "Geolocation accuracy in metres at clock-in" }
+        signInUserAgent: { type: ["string", "null"], description: "Browser/device user agent recorded at clock-in" }
+        signOutLatitude: { type: ["string", "null"] }
+        signOutLongitude: { type: ["string", "null"] }
+        signOutAccuracyMeters: { type: ["integer", "null"] }
+        signOutUserAgent: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, employeeId, attendanceDate, status, isHrOverride, createdAt, updatedAt]
+
+    ClockPunchTelemetry:
+      type: object
+      description: Optional client-supplied geolocation/device info for self-service punches.
+      properties:
+        latitude: { type: ["number", "null"], minimum: -90, maximum: 90 }
+        longitude: { type: ["number", "null"], minimum: -180, maximum: 180 }
+        accuracy: { type: ["number", "null"], minimum: 0, description: "Geolocation accuracy in metres" }
+        userAgent: { type: ["string", "null"], maxLength: 500 }
 
     CreateAttendanceBody:
       type: object

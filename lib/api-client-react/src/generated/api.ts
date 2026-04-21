@@ -42,6 +42,7 @@ import type {
   CarryForwardLeaveBalances200,
   CarryForwardLeaveBalancesBody,
   ClearanceTask,
+  ClockPunchTelemetry,
   ComputeAppraisalOutcomesBody,
   ComputeFnfBody,
   ComputePayrollRun200,
@@ -10505,11 +10506,14 @@ export const getClockInMyAttendanceUrl = () => {
 };
 
 export const clockInMyAttendance = async (
+  clockPunchTelemetry?: ClockPunchTelemetry,
   options?: RequestInit,
 ): Promise<AttendanceRecord> => {
   return customFetch<AttendanceRecord>(getClockInMyAttendanceUrl(), {
     ...options,
     method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(clockPunchTelemetry),
   });
 };
 
@@ -10520,14 +10524,14 @@ export const getClockInMyAttendanceMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof clockInMyAttendance>>,
     TError,
-    void,
+    { data: BodyType<ClockPunchTelemetry> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof clockInMyAttendance>>,
   TError,
-  void,
+  { data: BodyType<ClockPunchTelemetry> },
   TContext
 > => {
   const mutationKey = ["clockInMyAttendance"];
@@ -10541,9 +10545,11 @@ export const getClockInMyAttendanceMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof clockInMyAttendance>>,
-    void
-  > = () => {
-    return clockInMyAttendance(requestOptions);
+    { data: BodyType<ClockPunchTelemetry> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return clockInMyAttendance(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -10552,7 +10558,7 @@ export const getClockInMyAttendanceMutationOptions = <
 export type ClockInMyAttendanceMutationResult = NonNullable<
   Awaited<ReturnType<typeof clockInMyAttendance>>
 >;
-
+export type ClockInMyAttendanceMutationBody = BodyType<ClockPunchTelemetry>;
 export type ClockInMyAttendanceMutationError = ErrorType<unknown>;
 
 /**
@@ -10565,14 +10571,14 @@ export const useClockInMyAttendance = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof clockInMyAttendance>>,
     TError,
-    void,
+    { data: BodyType<ClockPunchTelemetry> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof clockInMyAttendance>>,
   TError,
-  void,
+  { data: BodyType<ClockPunchTelemetry> },
   TContext
 > => {
   return useMutation(getClockInMyAttendanceMutationOptions(options));
@@ -10586,11 +10592,14 @@ export const getClockOutMyAttendanceUrl = () => {
 };
 
 export const clockOutMyAttendance = async (
+  clockPunchTelemetry?: ClockPunchTelemetry,
   options?: RequestInit,
 ): Promise<AttendanceRecord> => {
   return customFetch<AttendanceRecord>(getClockOutMyAttendanceUrl(), {
     ...options,
     method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(clockPunchTelemetry),
   });
 };
 
@@ -10601,14 +10610,14 @@ export const getClockOutMyAttendanceMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof clockOutMyAttendance>>,
     TError,
-    void,
+    { data: BodyType<ClockPunchTelemetry> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof clockOutMyAttendance>>,
   TError,
-  void,
+  { data: BodyType<ClockPunchTelemetry> },
   TContext
 > => {
   const mutationKey = ["clockOutMyAttendance"];
@@ -10622,9 +10631,11 @@ export const getClockOutMyAttendanceMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof clockOutMyAttendance>>,
-    void
-  > = () => {
-    return clockOutMyAttendance(requestOptions);
+    { data: BodyType<ClockPunchTelemetry> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return clockOutMyAttendance(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -10633,7 +10644,7 @@ export const getClockOutMyAttendanceMutationOptions = <
 export type ClockOutMyAttendanceMutationResult = NonNullable<
   Awaited<ReturnType<typeof clockOutMyAttendance>>
 >;
-
+export type ClockOutMyAttendanceMutationBody = BodyType<ClockPunchTelemetry>;
 export type ClockOutMyAttendanceMutationError = ErrorType<unknown>;
 
 /**
@@ -10646,14 +10657,14 @@ export const useClockOutMyAttendance = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof clockOutMyAttendance>>,
     TError,
-    void,
+    { data: BodyType<ClockPunchTelemetry> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof clockOutMyAttendance>>,
   TError,
-  void,
+  { data: BodyType<ClockPunchTelemetry> },
   TContext
 > => {
   return useMutation(getClockOutMyAttendanceMutationOptions(options));

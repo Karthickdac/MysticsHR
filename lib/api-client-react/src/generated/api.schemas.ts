@@ -203,8 +203,65 @@ export interface AttendanceRecord {
   overrideReason?: string | null;
   /** @nullable */
   notes?: string | null;
+  /**
+   * Latitude captured at clock-in (decimal string, 6dp)
+   * @nullable
+   */
+  signInLatitude?: string | null;
+  /**
+   * Longitude captured at clock-in (decimal string, 6dp)
+   * @nullable
+   */
+  signInLongitude?: string | null;
+  /**
+   * Geolocation accuracy in metres at clock-in
+   * @nullable
+   */
+  signInAccuracyMeters?: number | null;
+  /**
+   * Browser/device user agent recorded at clock-in
+   * @nullable
+   */
+  signInUserAgent?: string | null;
+  /** @nullable */
+  signOutLatitude?: string | null;
+  /** @nullable */
+  signOutLongitude?: string | null;
+  /** @nullable */
+  signOutAccuracyMeters?: number | null;
+  /** @nullable */
+  signOutUserAgent?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Optional client-supplied geolocation/device info for self-service punches.
+ */
+export interface ClockPunchTelemetry {
+  /**
+   * @minimum -90
+   * @maximum 90
+   * @nullable
+   */
+  latitude?: number | null;
+  /**
+   * @minimum -180
+   * @maximum 180
+   * @nullable
+   */
+  longitude?: number | null;
+  /**
+   * Geolocation accuracy in metres
+   * @minimum 0
+   * @nullable
+   */
+  accuracy?: number | null;
+  /**
+   * @maxLength 500
+   * @nullable
+   */
+  userAgent?: string | null;
 }
 
 export interface CreateAttendanceBody {

@@ -69,7 +69,21 @@ function HrAttendanceView() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [showOverride, setShowOverride] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<{ id: number; attendanceDate: string; breakDurationMinutes: number | null; status: string; notes: string | null } | null>(null);
+  const [editingRecord, setEditingRecord] = useState<{
+    id: number;
+    attendanceDate: string;
+    breakDurationMinutes: number | null;
+    status: string;
+    notes: string | null;
+    signInLatitude?: string | null;
+    signInLongitude?: string | null;
+    signInAccuracyMeters?: number | null;
+    signInUserAgent?: string | null;
+    signOutLatitude?: string | null;
+    signOutLongitude?: string | null;
+    signOutAccuracyMeters?: number | null;
+    signOutUserAgent?: string | null;
+  } | null>(null);
   const [formError, setFormError] = useState("");
 
   const { data: _empResponse } = useListEmployees({});
@@ -203,7 +217,25 @@ function HrAttendanceView() {
                       {canManage && (
                         <td className="px-4 py-2">
                           <Button size="sm" variant="ghost" onClick={() => {
-                            setEditingRecord({ id: r.id, attendanceDate: r.attendanceDate, breakDurationMinutes: r.breakDurationMinutes ?? null, status: r.status ?? "", notes: r.notes ?? null });
+                            const rt = r as typeof r & {
+                              signInLatitude?: string | null; signInLongitude?: string | null;
+                              signInAccuracyMeters?: number | null; signInUserAgent?: string | null;
+                              signOutLatitude?: string | null; signOutLongitude?: string | null;
+                              signOutAccuracyMeters?: number | null; signOutUserAgent?: string | null;
+                            };
+                            setEditingRecord({
+                              id: r.id, attendanceDate: r.attendanceDate,
+                              breakDurationMinutes: r.breakDurationMinutes ?? null,
+                              status: r.status ?? "", notes: r.notes ?? null,
+                              signInLatitude: rt.signInLatitude ?? null,
+                              signInLongitude: rt.signInLongitude ?? null,
+                              signInAccuracyMeters: rt.signInAccuracyMeters ?? null,
+                              signInUserAgent: rt.signInUserAgent ?? null,
+                              signOutLatitude: rt.signOutLatitude ?? null,
+                              signOutLongitude: rt.signOutLongitude ?? null,
+                              signOutAccuracyMeters: rt.signOutAccuracyMeters ?? null,
+                              signOutUserAgent: rt.signOutUserAgent ?? null,
+                            });
                             setOverrideForm({ signInTime: "", signOutTime: "", breakDurationMinutes: r.breakDurationMinutes ?? 0, status: r.status ?? "", overrideReason: "", notes: r.notes ?? "" });
                             setFormError("");
                             setShowOverride(true);
@@ -285,6 +317,41 @@ function HrAttendanceView() {
             </div>
             <div><Label>Override Reason *</Label><Textarea value={overrideForm.overrideReason} onChange={e => setOverrideForm({ ...overrideForm, overrideReason: e.target.value })} rows={2} placeholder="Required" /></div>
             <div><Label>Notes</Label><Textarea value={overrideForm.notes} onChange={e => setOverrideForm({ ...overrideForm, notes: e.target.value })} rows={2} /></div>
+            {editingRecord && (editingRecord.signInLatitude || editingRecord.signInUserAgent || editingRecord.signOutLatitude || editingRecord.signOutUserAgent) && (
+              <div className="rounded border bg-muted/30 p-3 text-xs space-y-2">
+                <div className="font-medium text-muted-foreground uppercase tracking-wide text-[10px]">Captured by employee</div>
+                {(editingRecord.signInLatitude || editingRecord.signInUserAgent) && (
+                  <div>
+                    <div className="font-medium">At clock-in</div>
+                    {editingRecord.signInLatitude && editingRecord.signInLongitude && (
+                      <div>
+                        Location: <a className="text-primary underline" target="_blank" rel="noreferrer"
+                          href={`https://www.google.com/maps?q=${editingRecord.signInLatitude},${editingRecord.signInLongitude}`}>
+                          {editingRecord.signInLatitude}, {editingRecord.signInLongitude}
+                        </a>
+                        {editingRecord.signInAccuracyMeters != null && <> · ±{editingRecord.signInAccuracyMeters}m</>}
+                      </div>
+                    )}
+                    {editingRecord.signInUserAgent && <div className="text-muted-foreground break-all">Device: {editingRecord.signInUserAgent}</div>}
+                  </div>
+                )}
+                {(editingRecord.signOutLatitude || editingRecord.signOutUserAgent) && (
+                  <div>
+                    <div className="font-medium">At clock-out</div>
+                    {editingRecord.signOutLatitude && editingRecord.signOutLongitude && (
+                      <div>
+                        Location: <a className="text-primary underline" target="_blank" rel="noreferrer"
+                          href={`https://www.google.com/maps?q=${editingRecord.signOutLatitude},${editingRecord.signOutLongitude}`}>
+                          {editingRecord.signOutLatitude}, {editingRecord.signOutLongitude}
+                        </a>
+                        {editingRecord.signOutAccuracyMeters != null && <> · ±{editingRecord.signOutAccuracyMeters}m</>}
+                      </div>
+                    )}
+                    {editingRecord.signOutUserAgent && <div className="text-muted-foreground break-all">Device: {editingRecord.signOutUserAgent}</div>}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowOverride(false)}>Cancel</Button>

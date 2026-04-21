@@ -52,10 +52,34 @@ export function ClockInWidget() {
     return () => clearInterval(t);
   }, [isTicking]);
 
+  // Resolve geolocation if the browser supports it and the user grants
+  // permission. Always returns a payload — at minimum the userAgent so HR
+  // gets device info even if location is denied. We never block the punch
+  // on this lookup and cap it at 8s so a stalled GPS doesn't lock the UI.
+  async function collectTelemetry(): Promise<{ latitude?: number; longitude?: number; accuracy?: number; userAgent: string }> {
+    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    if (typeof navigator === "undefined" || !navigator.geolocation) return { userAgent };
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (extra: Partial<{ latitude: number; longitude: number; accuracy: number }> = {}) => {
+        if (settled) return;
+        settled = true;
+        resolve({ ...extra, userAgent });
+      };
+      const t = setTimeout(() => finish(), 8000);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { clearTimeout(t); finish({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }); },
+        () => { clearTimeout(t); finish(); },
+        { enableHighAccuracy: true, timeout: 7000, maximumAge: 60000 },
+      );
+    });
+  }
+
   async function handleClockIn() {
     setActionError("");
     try {
-      await clockIn.mutateAsync();
+      const data = await collectTelemetry();
+      await clockIn.mutateAsync({ data });
       await qc.invalidateQueries({ queryKey: getGetMyAttendanceTodayQueryKey() });
     } catch (e) {
       const err = e as { message?: string };
@@ -66,7 +90,8 @@ export function ClockInWidget() {
   async function handleClockOut() {
     setActionError("");
     try {
-      await clockOut.mutateAsync();
+      const data = await collectTelemetry();
+      await clockOut.mutateAsync({ data });
       await qc.invalidateQueries({ queryKey: getGetMyAttendanceTodayQueryKey() });
     } catch (e) {
       const err = e as { message?: string };

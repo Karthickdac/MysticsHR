@@ -2566,6 +2566,26 @@ export const GetAttendanceResponseItem = zod.object({
   isHrOverride: zod.boolean(),
   overrideReason: zod.string().nullish(),
   notes: zod.string().nullish(),
+  signInLatitude: zod
+    .string()
+    .nullish()
+    .describe("Latitude captured at clock-in (decimal string, 6dp)"),
+  signInLongitude: zod
+    .string()
+    .nullish()
+    .describe("Longitude captured at clock-in (decimal string, 6dp)"),
+  signInAccuracyMeters: zod
+    .number()
+    .nullish()
+    .describe("Geolocation accuracy in metres at clock-in"),
+  signInUserAgent: zod
+    .string()
+    .nullish()
+    .describe("Browser\/device user agent recorded at clock-in"),
+  signOutLatitude: zod.string().nullish(),
+  signOutLongitude: zod.string().nullish(),
+  signOutAccuracyMeters: zod.number().nullish(),
+  signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -2606,6 +2626,26 @@ export const GetAttendanceIdResponse = zod.object({
   isHrOverride: zod.boolean(),
   overrideReason: zod.string().nullish(),
   notes: zod.string().nullish(),
+  signInLatitude: zod
+    .string()
+    .nullish()
+    .describe("Latitude captured at clock-in (decimal string, 6dp)"),
+  signInLongitude: zod
+    .string()
+    .nullish()
+    .describe("Longitude captured at clock-in (decimal string, 6dp)"),
+  signInAccuracyMeters: zod
+    .number()
+    .nullish()
+    .describe("Geolocation accuracy in metres at clock-in"),
+  signInUserAgent: zod
+    .string()
+    .nullish()
+    .describe("Browser\/device user agent recorded at clock-in"),
+  signOutLatitude: zod.string().nullish(),
+  signOutLongitude: zod.string().nullish(),
+  signOutAccuracyMeters: zod.number().nullish(),
+  signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -2641,6 +2681,26 @@ export const PatchAttendanceIdResponse = zod.object({
   isHrOverride: zod.boolean(),
   overrideReason: zod.string().nullish(),
   notes: zod.string().nullish(),
+  signInLatitude: zod
+    .string()
+    .nullish()
+    .describe("Latitude captured at clock-in (decimal string, 6dp)"),
+  signInLongitude: zod
+    .string()
+    .nullish()
+    .describe("Longitude captured at clock-in (decimal string, 6dp)"),
+  signInAccuracyMeters: zod
+    .number()
+    .nullish()
+    .describe("Geolocation accuracy in metres at clock-in"),
+  signInUserAgent: zod
+    .string()
+    .nullish()
+    .describe("Browser\/device user agent recorded at clock-in"),
+  signOutLatitude: zod.string().nullish(),
+  signOutLongitude: zod.string().nullish(),
+  signOutAccuracyMeters: zod.number().nullish(),
+  signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -2671,6 +2731,26 @@ export const GetEmployeesIdAttendanceResponseItem = zod.object({
   isHrOverride: zod.boolean(),
   overrideReason: zod.string().nullish(),
   notes: zod.string().nullish(),
+  signInLatitude: zod
+    .string()
+    .nullish()
+    .describe("Latitude captured at clock-in (decimal string, 6dp)"),
+  signInLongitude: zod
+    .string()
+    .nullish()
+    .describe("Longitude captured at clock-in (decimal string, 6dp)"),
+  signInAccuracyMeters: zod
+    .number()
+    .nullish()
+    .describe("Geolocation accuracy in metres at clock-in"),
+  signInUserAgent: zod
+    .string()
+    .nullish()
+    .describe("Browser\/device user agent recorded at clock-in"),
+  signOutLatitude: zod.string().nullish(),
+  signOutLongitude: zod.string().nullish(),
+  signOutAccuracyMeters: zod.number().nullish(),
+  signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -2727,6 +2807,26 @@ export const GetMyAttendanceTodayResponse = zod.object({
         isHrOverride: zod.boolean(),
         overrideReason: zod.string().nullish(),
         notes: zod.string().nullish(),
+        signInLatitude: zod
+          .string()
+          .nullish()
+          .describe("Latitude captured at clock-in (decimal string, 6dp)"),
+        signInLongitude: zod
+          .string()
+          .nullish()
+          .describe("Longitude captured at clock-in (decimal string, 6dp)"),
+        signInAccuracyMeters: zod
+          .number()
+          .nullish()
+          .describe("Geolocation accuracy in metres at clock-in"),
+        signInUserAgent: zod
+          .string()
+          .nullish()
+          .describe("Browser\/device user agent recorded at clock-in"),
+        signOutLatitude: zod.string().nullish(),
+        signOutLongitude: zod.string().nullish(),
+        signOutAccuracyMeters: zod.number().nullish(),
+        signOutUserAgent: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
       }),
@@ -2747,8 +2847,77 @@ export const GetMyAttendanceTodayResponse = zod.object({
 });
 
 /**
+ * @summary Clock in for the current day (self-service)
+ */
+export const clockInMyAttendanceBodyLatitudeMin = -90;
+export const clockInMyAttendanceBodyLatitudeMax = 90;
+
+export const clockInMyAttendanceBodyLongitudeMin = -180;
+export const clockInMyAttendanceBodyLongitudeMax = 180;
+
+export const clockInMyAttendanceBodyAccuracyMin = 0;
+
+export const clockInMyAttendanceBodyUserAgentMax = 500;
+
+export const ClockInMyAttendanceBody = zod
+  .object({
+    latitude: zod
+      .number()
+      .min(clockInMyAttendanceBodyLatitudeMin)
+      .max(clockInMyAttendanceBodyLatitudeMax)
+      .nullish(),
+    longitude: zod
+      .number()
+      .min(clockInMyAttendanceBodyLongitudeMin)
+      .max(clockInMyAttendanceBodyLongitudeMax)
+      .nullish(),
+    accuracy: zod
+      .number()
+      .min(clockInMyAttendanceBodyAccuracyMin)
+      .nullish()
+      .describe("Geolocation accuracy in metres"),
+    userAgent: zod.string().max(clockInMyAttendanceBodyUserAgentMax).nullish(),
+  })
+  .describe(
+    "Optional client-supplied geolocation\/device info for self-service punches.",
+  );
+
+/**
  * @summary Clock out for the current day (self-service)
  */
+export const clockOutMyAttendanceBodyLatitudeMin = -90;
+export const clockOutMyAttendanceBodyLatitudeMax = 90;
+
+export const clockOutMyAttendanceBodyLongitudeMin = -180;
+export const clockOutMyAttendanceBodyLongitudeMax = 180;
+
+export const clockOutMyAttendanceBodyAccuracyMin = 0;
+
+export const clockOutMyAttendanceBodyUserAgentMax = 500;
+
+export const ClockOutMyAttendanceBody = zod
+  .object({
+    latitude: zod
+      .number()
+      .min(clockOutMyAttendanceBodyLatitudeMin)
+      .max(clockOutMyAttendanceBodyLatitudeMax)
+      .nullish(),
+    longitude: zod
+      .number()
+      .min(clockOutMyAttendanceBodyLongitudeMin)
+      .max(clockOutMyAttendanceBodyLongitudeMax)
+      .nullish(),
+    accuracy: zod
+      .number()
+      .min(clockOutMyAttendanceBodyAccuracyMin)
+      .nullish()
+      .describe("Geolocation accuracy in metres"),
+    userAgent: zod.string().max(clockOutMyAttendanceBodyUserAgentMax).nullish(),
+  })
+  .describe(
+    "Optional client-supplied geolocation\/device info for self-service punches.",
+  );
+
 export const ClockOutMyAttendanceResponse = zod.object({
   id: zod.number(),
   employeeId: zod.number(),
@@ -2764,6 +2933,26 @@ export const ClockOutMyAttendanceResponse = zod.object({
   isHrOverride: zod.boolean(),
   overrideReason: zod.string().nullish(),
   notes: zod.string().nullish(),
+  signInLatitude: zod
+    .string()
+    .nullish()
+    .describe("Latitude captured at clock-in (decimal string, 6dp)"),
+  signInLongitude: zod
+    .string()
+    .nullish()
+    .describe("Longitude captured at clock-in (decimal string, 6dp)"),
+  signInAccuracyMeters: zod
+    .number()
+    .nullish()
+    .describe("Geolocation accuracy in metres at clock-in"),
+  signInUserAgent: zod
+    .string()
+    .nullish()
+    .describe("Browser\/device user agent recorded at clock-in"),
+  signOutLatitude: zod.string().nullish(),
+  signOutLongitude: zod.string().nullish(),
+  signOutAccuracyMeters: zod.number().nullish(),
+  signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
