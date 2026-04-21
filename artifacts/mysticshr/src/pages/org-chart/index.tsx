@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, Users, Network } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Users, Network, TrendingUp } from "lucide-react";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
 
 type Node = OrgChartEmployee & { children: Node[] };
@@ -90,11 +90,13 @@ function NodeCard({
   expanded,
   onToggle,
   canViewDetail,
+  canViewPerformanceHistory,
 }: {
   node: Node;
   expanded: boolean;
   onToggle: () => void;
   canViewDetail: boolean;
+  canViewPerformanceHistory: boolean;
 }) {
   const hasChildren = node.children.length > 0;
   const fullName = `${node.firstName} ${node.lastName}`;
@@ -139,6 +141,16 @@ function NodeCard({
             <div className="text-xs text-muted-foreground truncate" title={node.departmentName ?? ""}>
               {node.departmentName ?? "No department"}
             </div>
+            {canViewPerformanceHistory && (
+              <Link
+                href={`/employees/${node.id}?tab=performance`}
+                className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                title="View performance history"
+                data-testid={`link-performance-history-${node.id}`}
+              >
+                <TrendingUp className="w-3 h-3" /> Performance History
+              </Link>
+            )}
           </div>
         </div>
         {hasChildren && (
@@ -176,11 +188,13 @@ function TreeNode({
   expandedIds,
   toggle,
   canViewDetail,
+  canViewPerformanceHistory,
 }: {
   node: Node;
   expandedIds: Set<number>;
   toggle: (id: number) => void;
   canViewDetail: boolean;
+  canViewPerformanceHistory: boolean;
 }) {
   const isExpanded = expandedIds.has(node.id);
   const hasChildren = node.children.length > 0;
@@ -201,6 +215,7 @@ function TreeNode({
         expanded={isExpanded}
         onToggle={() => toggle(node.id)}
         canViewDetail={canViewDetail}
+        canViewPerformanceHistory={canViewPerformanceHistory}
       />
       {hasChildren && isExpanded && (
         <ul className="mt-1 ml-2 list-none">
@@ -211,6 +226,7 @@ function TreeNode({
               expandedIds={expandedIds}
               toggle={toggle}
               canViewDetail={canViewDetail}
+              canViewPerformanceHistory={canViewPerformanceHistory}
             />
           ))}
         </ul>
@@ -224,6 +240,7 @@ export default function OrgChartPage() {
 
   const { role } = useCurrentHrmsUser();
   const canViewDetail = hasRole(role, ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"]);
+  const canViewPerformanceHistory = hasRole(role, ["super_admin", "hr_manager", "hr_executive", "hod"]);
 
   // Use the dedicated org-chart endpoint which returns only the safe subset of fields.
   const { data, isLoading } = useListOrgChart();
@@ -324,6 +341,7 @@ export default function OrgChartPage() {
                 expandedIds={effectiveExpanded}
                 toggle={toggle}
                 canViewDetail={canViewDetail}
+                canViewPerformanceHistory={canViewPerformanceHistory}
               />
             ))}
           </ul>
@@ -344,6 +362,7 @@ export default function OrgChartPage() {
                     expandedIds={effectiveExpanded}
                     toggle={toggle}
                     canViewDetail={canViewDetail}
+                    canViewPerformanceHistory={canViewPerformanceHistory}
                   />
                 ))}
               </ul>
@@ -366,6 +385,7 @@ export default function OrgChartPage() {
                     expandedIds={effectiveExpanded}
                     toggle={toggle}
                     canViewDetail={canViewDetail}
+                    canViewPerformanceHistory={canViewPerformanceHistory}
                   />
                 ))}
               </ul>

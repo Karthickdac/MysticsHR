@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useParams, useSearch } from "wouter";
 import {
   useGetEmployee,
   useGetEmployeesIdProfile,
@@ -415,10 +415,19 @@ function OnboardingTab({ employeeId, canEdit }: { employeeId: number; canEdit: b
 
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const search = useSearch();
   const { role } = useCurrentHrmsUser();
   const canEdit = hasRole(role, ["super_admin", "hr_manager", "hr_executive"]);
   const canViewPerformanceHistory = hasRole(role, ["super_admin", "hr_manager", "hr_executive", "hod"]);
   const empId = parseInt(id, 10);
+
+  const validTabs = [
+    "personal", "statutory", "address", "employment", "education",
+    "workexp", "documents", "history", "onboarding",
+    ...(canViewPerformanceHistory ? ["performance"] : []),
+  ];
+  const tabFromUrl = new URLSearchParams(search).get("tab");
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "personal";
   const { data: emp, isLoading, error } = useGetEmployee(empId);
   const { data: profile } = useGetEmployeesIdProfile(empId);
   const upsertProfile = usePutEmployeesIdProfile();
@@ -521,7 +530,7 @@ export default function EmployeeDetailPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="personal">
+      <Tabs defaultValue={initialTab}>
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="statutory">Statutory & Bank</TabsTrigger>
