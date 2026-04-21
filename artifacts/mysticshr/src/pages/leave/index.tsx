@@ -505,6 +505,7 @@ function MyLeaveCalendar({ applications }: { applications: AppLite[] }) {
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const [selectedApp, setSelectedApp] = useState<AppLite | null>(null);
+  const [dayDetail, setDayDetail] = useState<{ date: Date; apps: AppLite[] } | null>(null);
 
   // Only show approved + pending (incl. mid-flow). Skip cancelled / rejected.
   const visible = applications.filter((a) =>
@@ -569,7 +570,8 @@ function MyLeaveCalendar({ applications }: { applications: AppLite[] }) {
           return (
             <div
               key={day}
-              className={`min-h-[72px] rounded p-1 border ${isToday ? "border-blue-400 bg-blue-50" : "border-gray-100"}`}
+              onClick={() => apps.length > 0 && setDayDetail({ date: new Date(year, monthIdx, day), apps })}
+              className={`min-h-[72px] rounded p-1 border ${isToday ? "border-blue-400 bg-blue-50" : "border-gray-100"} ${apps.length > 0 ? "cursor-pointer hover:bg-gray-50" : ""}`}
             >
               <div className={`text-xs font-medium mb-1 ${isToday ? "text-blue-600" : "text-gray-600"}`}>{day}</div>
               <div className="space-y-0.5">
@@ -577,7 +579,7 @@ function MyLeaveCalendar({ applications }: { applications: AppLite[] }) {
                   <button
                     key={a.id}
                     type="button"
-                    onClick={() => setSelectedApp(a)}
+                    onClick={(e) => { e.stopPropagation(); setSelectedApp(a); }}
                     title={`${a.leaveTypeName ?? a.leaveTypeCode ?? ""} • ${a.status}`}
                     className={`w-full text-left text-[10px] rounded px-1 truncate hover:opacity-80 ${colorForCode(a.leaveTypeCode)} ${a.status === "Pending" || a.status === "HOD Approved" || a.status === "HR Approved" || a.status === "Cancel Requested" ? "ring-1 ring-yellow-400/60" : ""}`}
                   >
@@ -585,7 +587,13 @@ function MyLeaveCalendar({ applications }: { applications: AppLite[] }) {
                   </button>
                 ))}
                 {apps.length > 3 && (
-                  <div className="text-[10px] text-gray-400">+{apps.length - 3} more</div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setDayDetail({ date: new Date(year, monthIdx, day), apps }); }}
+                    className="text-[10px] text-indigo-500 hover:underline"
+                  >
+                    +{apps.length - 3} more
+                  </button>
                 )}
               </div>
             </div>
@@ -606,6 +614,37 @@ function MyLeaveCalendar({ applications }: { applications: AppLite[] }) {
           </div>
         </div>
       )}
+
+      <Dialog open={!!dayDetail} onOpenChange={(o) => !o && setDayDetail(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {dayDetail?.date.toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {dayDetail?.apps.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => { setSelectedApp(a); setDayDetail(null); }}
+                className="w-full text-left border rounded p-2 hover:bg-gray-50 flex items-center justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{a.leaveTypeName ?? a.leaveTypeCode}</div>
+                  <div className="text-xs text-gray-500">
+                    {fmtDate(a.fromDate)} — {fmtDate(a.toDate)} ({a.totalDays}d){a.isHalfDay ? ` • ${a.halfDaySession}` : ""}
+                  </div>
+                </div>
+                <Badge className={STATUS_COLORS[a.status] ?? ""}>{a.status}</Badge>
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDayDetail(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedApp} onOpenChange={(o) => !o && setSelectedApp(null)}>
         <DialogContent className="max-w-md">
