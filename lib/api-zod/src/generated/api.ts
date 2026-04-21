@@ -4713,6 +4713,18 @@ export const GetPayrollAnalyticsQueryParams = zod.object({
     .describe(
       "When true, each monthly trend point is augmented with prior-year (same month minus 12) totals.",
     ),
+  deptYear: zod.coerce
+    .number()
+    .optional()
+    .describe(
+      "Year of the period to use for the department breakdown. Defaults to the latest finalized run in the window.",
+    ),
+  deptMonth: zod.coerce
+    .number()
+    .optional()
+    .describe(
+      "Month (1-12) of the period to use for the department breakdown. Used together with deptYear.",
+    ),
 });
 
 export const GetPayrollAnalyticsResponse = zod.object({
@@ -4731,6 +4743,26 @@ export const GetPayrollAnalyticsResponse = zod.object({
     .nullish()
     .describe(
       "Payroll run id used for the department breakdown — enables click-through to that run's detail page.",
+    ),
+  latestPeriodYear: zod
+    .number()
+    .nullish()
+    .describe("Year of the period used for the department breakdown."),
+  latestPeriodMonth: zod
+    .number()
+    .nullish()
+    .describe("Month (1-12) of the period used for the department breakdown."),
+  availablePeriods: zod
+    .array(
+      zod.object({
+        year: zod.number().optional(),
+        month: zod.number().optional(),
+        label: zod.string().optional(),
+      }),
+    )
+    .optional()
+    .describe(
+      "All distinct (year, month) periods that have a finalized run in the window — used to populate the department-card period selector.",
     ),
   monthlyTrend: zod
     .array(

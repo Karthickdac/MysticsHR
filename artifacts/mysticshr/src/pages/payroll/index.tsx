@@ -112,6 +112,9 @@ function DepartmentDrilldownDialog({
   departmentName: string;
   periodLabel: string;
 }) {
+  // The runId is owned by the parent and reflects the period the parent has
+  // selected on the dept card. When that selection changes, this dialog will
+  // refetch automatically because the query key changes.
   // Only fetch when dialog is open and we have a run id.
   const safeRunId = runId ?? 0;
   const { data: records, isLoading } = useGetPayrollRunRecords(
@@ -253,10 +256,12 @@ function PayrollAnalyticsControls({
 }
 
 function PayrollAnalyticsSection({
-  analytics, runs,
+  analytics, runs, deptPeriod, setDeptPeriod,
 }: {
   analytics: GetPayrollAnalytics200 | undefined;
   runs: PayrollRun[] | undefined;
+  deptPeriod: { year: number; month: number } | null;
+  setDeptPeriod: (p: { year: number; month: number } | null) => void;
 }) {
   const [, navigate] = useLocation();
   const [drilldown, setDrilldown] = useState<{ departmentId: number | null; departmentName: string } | null>(null);
@@ -443,9 +448,32 @@ function PayrollAnalyticsSection({
 
       <Card className="lg:col-span-1">
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">Department-wise Cost</CardTitle>
-            <span className="text-xs text-muted-foreground">{latestPeriod}</span>
+            {analytics.availablePeriods && analytics.availablePeriods.length > 0 ? (
+              <Select
+                value={deptPeriod
+                  ? `${deptPeriod.year}-${deptPeriod.month}`
+                  : (analytics.latestPeriodYear && analytics.latestPeriodMonth
+                      ? `${analytics.latestPeriodYear}-${analytics.latestPeriodMonth}`
+                      : "")}
+                onValueChange={(v) => {
+                  const [y, m] = v.split("-").map(Number);
+                  setDeptPeriod({ year: y, month: m });
+                }}
+              >
+                <SelectTrigger className="h-7 w-32 text-xs"><SelectValue placeholder={latestPeriod} /></SelectTrigger>
+                <SelectContent>
+                  {analytics.availablePeriods.map(p => (
+                    <SelectItem key={`${p.year}-${p.month}`} value={`${p.year}-${p.month}`} className="text-xs">
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="text-xs text-muted-foreground">{latestPeriod}</span>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -543,10 +571,16 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     if (resolvedRange.from > resolvedRange.to) return "Start month must be before end month.";
     return null;
   })();
+  // Period override for the Department-wise Cost card. Defaults to the latest
+  // finalized run (returned by the analytics endpoint); HR can pick any older
+  // period from the dept card's selector to investigate spikes without changing
+  // the trend window above.
+  const [deptPeriod, setDeptPeriod] = useState<{ year: number; month: number } | null>(null);
   const analyticsParams = {
     from: resolvedRange.from,
     to: resolvedRange.to,
     compareWithPrior: compareYoY,
+    ...(deptPeriod ? { deptYear: deptPeriod.year, deptMonth: deptPeriod.month } : {}),
   };
   const { data: analytics } = useGetPayrollAnalytics(analyticsParams, {
     query: {
@@ -703,7 +737,7 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         financialYear={fyLabel}
         rangeError={rangeError}
       />
-      <PayrollAnalyticsSection analytics={analytics} runs={runs} />
+      <PayrollAnalyticsSection analytics={analytics} runs={runs} deptPeriod={deptPeriod} setDeptPeriod={setDeptPeriod} />
 
       <Card className={`border-2 ${isCurrentlyLocked ? "border-red-200 bg-red-50/40" : "border-green-200 bg-green-50/40"}`}>
         <CardContent className="p-4 flex items-center justify-between">

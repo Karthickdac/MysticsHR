@@ -3883,6 +3883,20 @@ export type GetPayrollAnalyticsParams = {
    * When true, each monthly trend point is augmented with prior-year (same month minus 12) totals.
    */
   compareWithPrior?: boolean;
+  /**
+   * Year of the period to use for the department breakdown. Defaults to the latest finalized run in the window.
+   */
+  deptYear?: number;
+  /**
+   * Month (1-12) of the period to use for the department breakdown. Used together with deptYear.
+   */
+  deptMonth?: number;
+};
+
+export type GetPayrollAnalytics200AvailablePeriodsItem = {
+  year?: number;
+  month?: number;
+  label?: string;
 };
 
 export type GetPayrollAnalytics200MonthlyTrendItem = {
@@ -3933,6 +3947,12 @@ export type GetPayrollAnalytics200 = {
   latestPeriodLabel?: string | null;
   /** Payroll run id used for the department breakdown — enables click-through to that run's detail page. */
   latestRunId?: number | null;
+  /** Year of the period used for the department breakdown. */
+  latestPeriodYear?: number | null;
+  /** Month (1-12) of the period used for the department breakdown. */
+  latestPeriodMonth?: number | null;
+  /** All distinct (year, month) periods that have a finalized run in the window — used to populate the department-card period selector. */
+  availablePeriods?: GetPayrollAnalytics200AvailablePeriodsItem[];
   monthlyTrend?: GetPayrollAnalytics200MonthlyTrendItem[];
   departmentBreakdown?: GetPayrollAnalytics200DepartmentBreakdownItem[];
   statutoryDeductions?: GetPayrollAnalytics200StatutoryDeductions;

@@ -1244,6 +1244,13 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
     const qFrom = parseYearMonth(req.query.from as string | undefined);
     const qTo = parseYearMonth(req.query.to as string | undefined);
     const compareWithPrior = req.query.compareWithPrior === "true" || req.query.compareWithPrior === "1";
+    // Optional explicit period for the department breakdown (drill-down). Lets HR
+    // pick an older month for "who drove the spike" investigations without
+    // changing the trend window. Falls back to the latest finalized run in window.
+    const qDeptYear = req.query.deptYear ? Number(req.query.deptYear) : undefined;
+    const qDeptMonth = req.query.deptMonth ? Number(req.query.deptMonth) : undefined;
+    const hasDeptOverride = Number.isInteger(qDeptYear) && Number.isInteger(qDeptMonth)
+      && qDeptMonth! >= 1 && qDeptMonth! <= 12;
 
     const defaultFrom = new Date(thisYear, thisMonth - 12, 1);
     const fromYear = qFrom?.y ?? defaultFrom.getFullYear();
@@ -1328,12 +1335,46 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
       };
     });
 
-    // 2) Department-wise cost breakdown (latest finalized run within the window)
-    const [latestRun] = await db.select({ id: payrollRunsTable.id, year: payrollRunsTable.periodYear, month: payrollRunsTable.periodMonth })
+    // 2) Department-wise cost breakdown
+    // First gather all distinct (year, month) of committed runs within the
+    // window so the UI can offer a period selector on the dept card.
+    const periodRows = await db.select({
+      year: payrollRunsTable.periodYear,
+      month: payrollRunsTable.periodMonth,
+    })
       .from(payrollRunsTable)
       .where(and(isCommitted, gte(periodInt, fromInt), lte(periodInt, toInt)))
-      .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth))
-      .limit(1);
+      .groupBy(payrollRunsTable.periodYear, payrollRunsTable.periodMonth)
+      .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth));
+    const availablePeriods = periodRows.map(r => ({
+      year: r.year,
+      month: r.month,
+      label: `${monthNames[r.month - 1]} ${r.year}`,
+    }));
+
+    // Pick the run for the dept breakdown — either the explicit override or the
+    // latest finalized run within the window.
+    const deptCols = { id: payrollRunsTable.id, year: payrollRunsTable.periodYear, month: payrollRunsTable.periodMonth };
+    let latestRun: { id: number; year: number; month: number } | undefined;
+    if (hasDeptOverride) {
+      [latestRun] = await db.select(deptCols)
+        .from(payrollRunsTable)
+        .where(and(isCommitted,
+          eq(payrollRunsTable.periodYear, qDeptYear!),
+          eq(payrollRunsTable.periodMonth, qDeptMonth!),
+        ))
+        .orderBy(desc(payrollRunsTable.id))
+        .limit(1);
+    }
+    if (!latestRun) {
+      // Either no override, or the override didn't match a committed run —
+      // fall back to the latest finalized run in window.
+      [latestRun] = await db.select(deptCols)
+        .from(payrollRunsTable)
+        .where(and(isCommitted, gte(periodInt, fromInt), lte(periodInt, toInt)))
+        .orderBy(desc(payrollRunsTable.periodYear), desc(payrollRunsTable.periodMonth))
+        .limit(1);
+    }
 
     let departmentBreakdown: Array<{ departmentId: number | null; departmentName: string; totalGross: number; totalNet: number; employees: number }> = [];
     let latestPeriodLabel: string | null = null;
@@ -1404,6 +1445,9 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
       windowTo,
       latestPeriodLabel,
       latestRunId: latestRun?.id ?? null,
+      latestPeriodYear: latestRun?.year ?? null,
+      latestPeriodMonth: latestRun?.month ?? null,
+      availablePeriods,
       monthlyTrend,
       departmentBreakdown,
       statutoryDeductions,

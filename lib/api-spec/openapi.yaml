@@ -3640,6 +3640,14 @@ paths:
           in: query
           description: When true, each monthly trend point is augmented with prior-year (same month minus 12) totals.
           schema: { type: boolean }
+        - name: deptYear
+          in: query
+          description: Year of the period to use for the department breakdown. Defaults to the latest finalized run in the window.
+          schema: { type: integer }
+        - name: deptMonth
+          in: query
+          description: Month (1-12) of the period to use for the department breakdown. Used together with deptYear.
+          schema: { type: integer }
       responses:
         "200":
           description: Analytics payload
@@ -3662,6 +3670,23 @@ paths:
                     type: integer
                     nullable: true
                     description: Payroll run id used for the department breakdown — enables click-through to that run's detail page.
+                  latestPeriodYear:
+                    type: integer
+                    nullable: true
+                    description: Year of the period used for the department breakdown.
+                  latestPeriodMonth:
+                    type: integer
+                    nullable: true
+                    description: Month (1-12) of the period used for the department breakdown.
+                  availablePeriods:
+                    type: array
+                    description: All distinct (year, month) periods that have a finalized run in the window — used to populate the department-card period selector.
+                    items:
+                      type: object
+                      properties:
+                        year: { type: integer }
+                        month: { type: integer }
+                        label: { type: string }
                   monthlyTrend:
                     type: array
                     items:
