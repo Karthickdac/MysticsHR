@@ -99,6 +99,36 @@ async function autoGenerateClearanceTasks(exitRequestId: number, actualLwd: stri
   ];
 
   const dueDate = actualLwd;
+
+  // Resolve employee name + code once for notifications
+  let empName = "an employee";
+  let empCode = "";
+  if (employeeId) {
+    const [emp] = await db.select({
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      employeeCode: employeesTable.employeeId,
+    }).from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+    if (emp) {
+      empName = `${emp.firstName} ${emp.lastName}`;
+      empCode = emp.employeeCode ?? "";
+    }
+  }
+
+  // Cache assignee user lookups so we don't re-query for each task
+  const assigneeCache = new Map<number, { email: string; name: string; employeeId: number | null }>();
+  const resolveAssignee = async (userId: number) => {
+    if (assigneeCache.has(userId)) return assigneeCache.get(userId)!;
+    const [u] = await db.select({
+      email: hrmsUsersTable.email,
+      name: hrmsUsersTable.name,
+      employeeId: hrmsUsersTable.employeeId,
+    }).from(hrmsUsersTable).where(eq(hrmsUsersTable.id, userId)).limit(1);
+    if (!u) return null as unknown as { email: string; name: string; employeeId: number | null };
+    assigneeCache.set(userId, u);
+    return u;
+  };
+
   for (const task of defaultTasks) {
     await db.insert(exitClearanceTasksTable).values({
       exitRequestId,
@@ -108,6 +138,31 @@ async function autoGenerateClearanceTasks(exitRequestId: number, actualLwd: stri
       dueDate,
       assignedToUserId: task.assignedToUserId ?? null,
     });
+
+    // Notify the assignee (if any) that a clearance task has been assigned to them
+    if (task.assignedToUserId) {
+      const assignee = await resolveAssignee(task.assignedToUserId);
+      if (assignee?.email) {
+        dispatchNotification({
+          eventType: "exit_clearance_task_assigned",
+          module: "exit",
+          recipientEmail: assignee.email,
+          recipientName: assignee.name,
+          recipientEmployeeDbId: assignee.employeeId,
+          variables: {
+            recipientName: assignee.name,
+            employeeName: empName,
+            employeeId: empCode || String(employeeId ?? ""),
+            department: task.department,
+            taskName: task.taskName,
+            taskDescription: task.description,
+            dueDate: dueDate ?? "",
+          },
+          entityType: "exit_request",
+          entityId: exitRequestId,
+        }).catch(() => {});
+      }
+    }
   }
 }
 
@@ -329,7 +384,15 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
       updates.approvedByUserId = u.id;
       updates.approvedAt = new Date();
       const lwd = actualLwd ?? existing.requestedLwd;
-      await autoGenerateClearanceTasks(id, lwd, existing.employeeId);
+      // Idempotency guard: only auto-generate clearance tasks (and dispatch assignment notifications)
+      // the first time the request enters Clearance Pending. Repeated PUTs must not re-spam assignees.
+      const existingTasks = await db.select({ id: exitClearanceTasksTable.id })
+        .from(exitClearanceTasksTable)
+        .where(eq(exitClearanceTasksTable.exitRequestId, id))
+        .limit(1);
+      if (existingTasks.length === 0) {
+        await autoGenerateClearanceTasks(id, lwd, existing.employeeId);
+      }
     }
 
     if (status === "Separated") {
@@ -359,6 +422,30 @@ router.put("/exit/requests/:id", requireHrmsUser, requireRole(...HR_ROLES), asyn
       .where(eq(exitRequestsTable.id, id)).returning();
 
     await logAudit({ user: u, action: "update_exit_request", module: "exit", recordId: id });
+
+    // Notify employee on rejection (only on transition into Rejected — avoid resending on repeat PUTs).
+    // Fire-and-forget so notification lookup/dispatch failures cannot fail the business request.
+    if (status === "Rejected" && existing.status !== "Rejected") {
+      void (async () => {
+        try {
+          const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+            .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, existing.employeeId)).limit(1);
+          if (empUser?.email) {
+            await dispatchNotification({
+              eventType: "exit_request_rejected", module: "exit",
+              recipientEmail: empUser.email, recipientName: empUser.name,
+              recipientEmployeeDbId: existing.employeeId,
+              variables: {
+                recipientName: empUser.name,
+                submittedDate: existing.createdAt ? new Date(existing.createdAt).toLocaleDateString("en-IN") : "",
+                reason: hrRemarks ?? existing.hrRemarks ?? "",
+              },
+              entityType: "exit_request", entityId: id,
+            });
+          }
+        } catch (e) { console.error("[exit] rejection notification failed:", e); }
+      })();
+    }
 
     // Notify employee of status change
     // "FnF Pending" is the real clearance-complete event (all clearance tasks done → FnF initiated)
@@ -700,6 +787,33 @@ router.post("/exit/requests/:id/fnf", requireHrmsUser, requireRole(...HR_ROLES, 
 
     await logAudit({ user: u, action: "compute_fnf", module: "exit", recordId: fnf.id });
 
+    // Notify Finance (payroll_admin) and HR Manager / Super Admin that FnF is ready for approval.
+    (async () => {
+      const [emp] = await db.select({
+        firstName: employeesTable.firstName,
+        lastName: employeesTable.lastName,
+        employeeCode: employeesTable.employeeId,
+      }).from(employeesTable).where(eq(employeesTable.id, exitReq.employeeId)).limit(1);
+      const empName = emp ? `${emp.firstName} ${emp.lastName}` : "an employee";
+      const empCodeStr = emp?.employeeCode ?? String(exitReq.employeeId);
+      const approvers = await getUsersByRoles(["super_admin", "hr_manager", "payroll_admin"]);
+      await Promise.allSettled(approvers.map(a =>
+        dispatchNotification({
+          eventType: "fnf_pending_approval", module: "exit",
+          recipientEmail: a.email, recipientName: a.name,
+          recipientEmployeeDbId: a.employeeId,
+          variables: {
+            recipientName: a.name,
+            employeeName: empName,
+            employeeId: empCodeStr,
+            totalPayable: String(Math.max(0, totalPayable)),
+            computedBy: u.name ?? "the payroll team",
+          },
+          entityType: "exit_request", entityId: exitRequestId,
+        })
+      ));
+    })().catch(() => {});
+
     res.json(fnf);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -728,6 +842,7 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
     const [fnf] = await db.select().from(fnfComputationsTable)
       .where(eq(fnfComputationsTable.exitRequestId, exitRequestId));
     if (!fnf) { res.status(404).json({ error: "FnF computation not found — compute FnF first" }); return; }
+    const wasFullyApprovedBefore = !!(fnf.hrApprovedAt && fnf.financeApprovedAt);
 
     const updates: Partial<typeof fnfComputationsTable.$inferInsert> = { updatedAt: new Date() };
     if (approverLane === "hr") {
@@ -802,6 +917,33 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
     }
 
     await logAudit({ user: u, action: "approve_fnf", module: "exit", recordId: fnf.id });
+
+    // Notify the employee that their FnF is fully approved and relieving documents have been issued.
+    // Idempotency: only fire on the transition from "not fully approved" → "fully approved" so a repeat
+    // approve call by either lane cannot resend the closure email.
+    // Fire-and-forget so notification failures cannot break the approval response.
+    if (fullyApproved && !wasFullyApprovedBefore) {
+      void (async () => {
+        try {
+          const [exitReqAfter] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, exitRequestId));
+          if (!exitReqAfter) return;
+          const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+            .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, exitReqAfter.employeeId)).limit(1);
+          if (empUser?.email) {
+            await dispatchNotification({
+              eventType: "fnf_approved", module: "exit",
+              recipientEmail: empUser.email, recipientName: empUser.name,
+              recipientEmployeeDbId: exitReqAfter.employeeId,
+              variables: {
+                recipientName: empUser.name,
+                totalPayable: String(updated.totalPayable ?? ""),
+              },
+              entityType: "exit_request", entityId: exitRequestId,
+            });
+          }
+        } catch (e) { console.error("[exit] fnf_approved notification failed:", e); }
+      })();
+    }
 
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
