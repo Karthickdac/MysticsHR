@@ -1357,14 +1357,21 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
     const deptCols = { id: payrollRunsTable.id, year: payrollRunsTable.periodYear, month: payrollRunsTable.periodMonth };
     let latestRun: { id: number; year: number; month: number } | undefined;
     if (hasDeptOverride) {
-      [latestRun] = await db.select(deptCols)
-        .from(payrollRunsTable)
-        .where(and(isCommitted,
-          eq(payrollRunsTable.periodYear, qDeptYear!),
-          eq(payrollRunsTable.periodMonth, qDeptMonth!),
-        ))
-        .orderBy(desc(payrollRunsTable.id))
-        .limit(1);
+      // Constrain override to the active window so a stale UI selector (e.g.
+      // user shrank the range after picking an old period) can't return data
+      // outside the rest of the response. Falls through to the latest-in-window
+      // branch below if the override is now out of range.
+      const overrideInt = qDeptYear! * 100 + qDeptMonth!;
+      if (overrideInt >= fromInt && overrideInt <= toInt) {
+        [latestRun] = await db.select(deptCols)
+          .from(payrollRunsTable)
+          .where(and(isCommitted,
+            eq(payrollRunsTable.periodYear, qDeptYear!),
+            eq(payrollRunsTable.periodMonth, qDeptMonth!),
+          ))
+          .orderBy(desc(payrollRunsTable.id))
+          .limit(1);
+      }
     }
     if (!latestRun) {
       // Either no override, or the override didn't match a committed run —

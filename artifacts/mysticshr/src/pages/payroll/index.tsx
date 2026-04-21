@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useListPayrollRuns, useCreatePayrollRun, useComputePayrollRun, useApprovePayrollRun,
   useFinalizePayrollRun, useListPayrollLocks, useLockPayroll, useUnlockPayroll,
@@ -574,8 +574,12 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   // Period override for the Department-wise Cost card. Defaults to the latest
   // finalized run (returned by the analytics endpoint); HR can pick any older
   // period from the dept card's selector to investigate spikes without changing
-  // the trend window above.
+  // the trend window above. Reset whenever the trend window changes so we don't
+  // hold a stale out-of-window selection.
   const [deptPeriod, setDeptPeriod] = useState<{ year: number; month: number } | null>(null);
+  useEffect(() => {
+    setDeptPeriod(null);
+  }, [resolvedRange.from, resolvedRange.to]);
   const analyticsParams = {
     from: resolvedRange.from,
     to: resolvedRange.to,
