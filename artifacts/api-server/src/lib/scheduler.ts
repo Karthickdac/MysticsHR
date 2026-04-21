@@ -1168,6 +1168,7 @@ export async function dispatchForm16ForFy(year: number): Promise<{ eligible: num
         },
         entityType: entityTypeKey, entityId: e.id,
         bypassPreferences: true,
+        channels: ["email"],
       }).then(() => { sent++; })
         .catch((err) => logger.warn({ err, employeeId: e.id, to: e.email }, "[scheduler] form_16 dispatch failed"));
     }

@@ -349,6 +349,9 @@ export async function dispatchNotification(params: {
   /** Mandatory/compliance notifications (e.g. annual Form 16) — when true,
    * skip per-employee opt-out preferences. Default false. */
   bypassPreferences?: boolean;
+  /** Restrict dispatch to a specific set of channels regardless of template
+   * configuration. Useful for compliance flows that must be email-only. */
+  channels?: Array<"email" | "whatsapp">;
 }): Promise<void> {
   try {
     const templates = await db.select().from(notificationTemplatesTable).where(
@@ -357,9 +360,15 @@ export async function dispatchNotification(params: {
     const tpl = templates[0];
     const vars = params.variables ?? {};
 
-    const shouldEmail = tpl ? (tpl.channel === "email" || tpl.channel === "both") : true;
+    const tplEmail = tpl ? (tpl.channel === "email" || tpl.channel === "both") : true;
     // Default to true so WhatsApp fires for all events (if credentials are configured)
-    const shouldWA = tpl ? (tpl.channel === "whatsapp" || tpl.channel === "both") : true;
+    const tplWA = tpl ? (tpl.channel === "whatsapp" || tpl.channel === "both") : true;
+    // Caller-supplied channel restriction (e.g. compliance email-only flows)
+    // takes precedence over template configuration.
+    const allowEmail = params.channels ? params.channels.includes("email") : true;
+    const allowWA = params.channels ? params.channels.includes("whatsapp") : true;
+    const shouldEmail = tplEmail && allowEmail;
+    const shouldWA = tplWA && allowWA;
 
     // Per-employee opt-out: if the recipient is an employee, respect their
     // notification preferences for this event. Defaults to enabled when no
