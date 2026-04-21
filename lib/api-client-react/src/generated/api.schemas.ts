@@ -1961,6 +1961,16 @@ export interface CreateTaxDeclarationBody {
   declarationDate: string;
 }
 
+export interface Form16DispatchResult {
+  eligible: number;
+  sent: number;
+  skipped: number;
+  financialYear?: string;
+  force?: boolean;
+  employeeId?: number;
+  error?: string;
+}
+
 export type Form16ReportEmployee = {
   name?: string;
   /** @nullable */
@@ -3918,6 +3928,20 @@ export type GetTdsSummaryReportParams = {
 export type GetBankTransferReportParams = {
   year: string;
   month: string;
+};
+
+export type DispatchForm16ForFyBody = {
+  /** FY start year (e.g. 2024 for FY 2024-25) */
+  year: number;
+  /** If true, bypass per-employee dedup and re-send to everyone eligible */
+  force?: boolean;
+};
+
+export type DispatchForm16ForEmployeeBody = {
+  /** FY start year (e.g. 2024 for FY 2024-25) */
+  year: number;
+  /** Defaults to true. Pass false to respect existing dedup. */
+  force?: boolean;
 };
 
 export type ListPerformanceCyclesParams = {

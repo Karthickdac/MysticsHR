@@ -91,6 +91,8 @@ import type {
   DashboardKpis,
   Department,
   Designation,
+  DispatchForm16ForEmployeeBody,
+  DispatchForm16ForFyBody,
   DocumentRequest,
   DocumentTemplate,
   DownloadIssuedDocumentParams,
@@ -111,6 +113,7 @@ import type {
   FnfApproveBody,
   FnfApproveResult,
   FnfComputation,
+  Form16DispatchResult,
   Form16Report,
   GenerateDocumentBody,
   GetAttendanceParams,
@@ -17572,6 +17575,184 @@ export function useGetForm16Pdf<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Manually trigger Form 16 email dispatch for an entire FY (HR / payroll admin)
+ */
+export const getDispatchForm16ForFyUrl = () => {
+  return `/api/payroll/reports/form-16/dispatch`;
+};
+
+export const dispatchForm16ForFy = async (
+  dispatchForm16ForFyBody: DispatchForm16ForFyBody,
+  options?: RequestInit,
+): Promise<Form16DispatchResult> => {
+  return customFetch<Form16DispatchResult>(getDispatchForm16ForFyUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(dispatchForm16ForFyBody),
+  });
+};
+
+export const getDispatchForm16ForFyMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dispatchForm16ForFy>>,
+    TError,
+    { data: BodyType<DispatchForm16ForFyBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dispatchForm16ForFy>>,
+  TError,
+  { data: BodyType<DispatchForm16ForFyBody> },
+  TContext
+> => {
+  const mutationKey = ["dispatchForm16ForFy"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dispatchForm16ForFy>>,
+    { data: BodyType<DispatchForm16ForFyBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return dispatchForm16ForFy(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DispatchForm16ForFyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dispatchForm16ForFy>>
+>;
+export type DispatchForm16ForFyMutationBody = BodyType<DispatchForm16ForFyBody>;
+export type DispatchForm16ForFyMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Manually trigger Form 16 email dispatch for an entire FY (HR / payroll admin)
+ */
+export const useDispatchForm16ForFy = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dispatchForm16ForFy>>,
+    TError,
+    { data: BodyType<DispatchForm16ForFyBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dispatchForm16ForFy>>,
+  TError,
+  { data: BodyType<DispatchForm16ForFyBody> },
+  TContext
+> => {
+  return useMutation(getDispatchForm16ForFyMutationOptions(options));
+};
+
+/**
+ * @summary Manually re-send Form 16 to a single employee (HR / payroll admin)
+ */
+export const getDispatchForm16ForEmployeeUrl = (employeeId: number) => {
+  return `/api/payroll/reports/form-16/dispatch/${employeeId}`;
+};
+
+export const dispatchForm16ForEmployee = async (
+  employeeId: number,
+  dispatchForm16ForEmployeeBody: DispatchForm16ForEmployeeBody,
+  options?: RequestInit,
+): Promise<Form16DispatchResult> => {
+  return customFetch<Form16DispatchResult>(
+    getDispatchForm16ForEmployeeUrl(employeeId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(dispatchForm16ForEmployeeBody),
+    },
+  );
+};
+
+export const getDispatchForm16ForEmployeeMutationOptions = <
+  TError = ErrorType<Form16DispatchResult>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dispatchForm16ForEmployee>>,
+    TError,
+    { employeeId: number; data: BodyType<DispatchForm16ForEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dispatchForm16ForEmployee>>,
+  TError,
+  { employeeId: number; data: BodyType<DispatchForm16ForEmployeeBody> },
+  TContext
+> => {
+  const mutationKey = ["dispatchForm16ForEmployee"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dispatchForm16ForEmployee>>,
+    { employeeId: number; data: BodyType<DispatchForm16ForEmployeeBody> }
+  > = (props) => {
+    const { employeeId, data } = props ?? {};
+
+    return dispatchForm16ForEmployee(employeeId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DispatchForm16ForEmployeeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dispatchForm16ForEmployee>>
+>;
+export type DispatchForm16ForEmployeeMutationBody =
+  BodyType<DispatchForm16ForEmployeeBody>;
+export type DispatchForm16ForEmployeeMutationError =
+  ErrorType<Form16DispatchResult>;
+
+/**
+ * @summary Manually re-send Form 16 to a single employee (HR / payroll admin)
+ */
+export const useDispatchForm16ForEmployee = <
+  TError = ErrorType<Form16DispatchResult>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dispatchForm16ForEmployee>>,
+    TError,
+    { employeeId: number; data: BodyType<DispatchForm16ForEmployeeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dispatchForm16ForEmployee>>,
+  TError,
+  { employeeId: number; data: BodyType<DispatchForm16ForEmployeeBody> },
+  TContext
+> => {
+  return useMutation(getDispatchForm16ForEmployeeMutationOptions(options));
+};
 
 /**
  * @summary Compare projected income tax under Old vs New regime

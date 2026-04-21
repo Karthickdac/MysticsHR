@@ -1757,6 +1757,79 @@ router.get("/payroll/reports/form-16/:employeeId/:year/pdf", requireHrmsUser, re
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── Manual Form 16 dispatch (HR / payroll admin) ─────────────────────────
+// Lets HR manually re-send Form 16 emails — either FY-wide or to a single
+// employee — without waiting for the annual cron. Useful after a bounced
+// email is fixed, a payroll correction is made, or a new joiner missed
+// the original notification. `force=true` bypasses the per-employee dedup
+// so an already-notified employee gets a fresh email.
+router.post(
+  "/payroll/reports/form-16/dispatch",
+  requireHrmsUser,
+  requireRole(...PAYROLL_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const body = req.body as { year?: number; force?: boolean };
+      const year = Number(body.year);
+      if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+        res.status(400).json({ error: "year must be a valid FY start year (e.g. 2024 for FY 2024-25)." });
+        return;
+      }
+      const force = body.force === true;
+      const { dispatchForm16ForFy } = await import("../lib/scheduler");
+      const result = await dispatchForm16ForFy(year, { force, throwOnError: true });
+      await logAudit({
+        user: req.hrmsUser, action: "DISPATCH", module: "Payroll",
+        recordId: `form_16_fy_${year}`,
+        newValue: `Manual Form 16 dispatch for FY ${year}-${String(year + 1).slice(2)} — eligible=${result.eligible}, sent=${result.sent}, skipped=${result.skipped}, force=${force}`,
+        ipAddress: req.ip,
+      });
+      res.json({ ...result, financialYear: `${year}-${String(year + 1).slice(2)}`, force });
+    } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+  },
+);
+
+router.post(
+  "/payroll/reports/form-16/dispatch/:employeeId",
+  requireHrmsUser,
+  requireRole(...PAYROLL_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const employeeId = Number(req.params.employeeId);
+      const body = req.body as { year?: number; force?: boolean };
+      const year = Number(body.year);
+      if (!Number.isInteger(employeeId) || employeeId <= 0) {
+        res.status(400).json({ error: "employeeId must be a positive integer." });
+        return;
+      }
+      if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+        res.status(400).json({ error: "year must be a valid FY start year (e.g. 2024 for FY 2024-25)." });
+        return;
+      }
+      // Single-employee re-sends default to force=true so HR doesn't have to
+      // toggle it explicitly when fixing a bounce. Pass force=false to respect
+      // the dedup check (no-op if already sent).
+      const force = body.force !== false;
+      const { dispatchForm16ForFy } = await import("../lib/scheduler");
+      const result = await dispatchForm16ForFy(year, { force, employeeIds: [employeeId], throwOnError: true });
+      await logAudit({
+        user: req.hrmsUser, action: "DISPATCH", module: "Payroll",
+        recordId: `form_16_fy_${year}_emp_${employeeId}`,
+        newValue: `Manual Form 16 re-send for employee #${employeeId}, FY ${year}-${String(year + 1).slice(2)} — sent=${result.sent}, skipped=${result.skipped}, force=${force}`,
+        ipAddress: req.ip,
+      });
+      if (result.eligible === 0) {
+        res.status(404).json({
+          error: "No payroll records found for this employee in the requested financial year, or the employee is inactive.",
+          ...result,
+        });
+        return;
+      }
+      res.json({ ...result, employeeId, financialYear: `${year}-${String(year + 1).slice(2)}`, force });
+    } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+  },
+);
+
 // Interactive tax calculator - compares Old vs New regime
 router.post("/payroll/tax-calculator", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {

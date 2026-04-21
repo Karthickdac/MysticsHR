@@ -4939,6 +4939,54 @@ export const GetForm16PdfParams = zod.object({
 });
 
 /**
+ * @summary Manually trigger Form 16 email dispatch for an entire FY (HR / payroll admin)
+ */
+export const DispatchForm16ForFyBody = zod.object({
+  year: zod.number().describe("FY start year (e.g. 2024 for FY 2024-25)"),
+  force: zod
+    .boolean()
+    .optional()
+    .describe(
+      "If true, bypass per-employee dedup and re-send to everyone eligible",
+    ),
+});
+
+export const DispatchForm16ForFyResponse = zod.object({
+  eligible: zod.number(),
+  sent: zod.number(),
+  skipped: zod.number(),
+  financialYear: zod.string().optional(),
+  force: zod.boolean().optional(),
+  employeeId: zod.number().optional(),
+  error: zod.string().optional(),
+});
+
+/**
+ * @summary Manually re-send Form 16 to a single employee (HR / payroll admin)
+ */
+export const DispatchForm16ForEmployeeParams = zod.object({
+  employeeId: zod.coerce.number(),
+});
+
+export const DispatchForm16ForEmployeeBody = zod.object({
+  year: zod.number().describe("FY start year (e.g. 2024 for FY 2024-25)"),
+  force: zod
+    .boolean()
+    .optional()
+    .describe("Defaults to true. Pass false to respect existing dedup."),
+});
+
+export const DispatchForm16ForEmployeeResponse = zod.object({
+  eligible: zod.number(),
+  sent: zod.number(),
+  skipped: zod.number(),
+  financialYear: zod.string().optional(),
+  force: zod.boolean().optional(),
+  employeeId: zod.number().optional(),
+  error: zod.string().optional(),
+});
+
+/**
  * @summary Compare projected income tax under Old vs New regime
  */
 export const CalculateTaxBody = zod.object({

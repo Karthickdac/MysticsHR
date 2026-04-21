@@ -1108,11 +1108,25 @@ async function remindPendingPayrollApprovals() {
  * dedup considers only `channel='email'` rows with `status='sent'`. A failed
  * email or a WhatsApp-only success will NOT block a future email retry.
  */
-export async function dispatchForm16ForFy(year: number): Promise<{ eligible: number; sent: number; skipped: number }> {
+export async function dispatchForm16ForFy(
+  year: number,
+  options: { force?: boolean; employeeIds?: number[]; throwOnError?: boolean } = {},
+): Promise<{ eligible: number; sent: number; skipped: number }> {
   const fyLabel = `${year}-${String(year + 1).slice(2)}`;
   const entityTypeKey = `form_16_fy_${year}`;
+  const force = options.force === true;
+  const throwOnError = options.throwOnError === true;
+  const employeeIdFilter = options.employeeIds && options.employeeIds.length > 0
+    ? options.employeeIds
+    : null;
   try {
     // Active employees who actually had payroll records in this FY.
+    const recipientConds = [
+      eq(employeesTable.isActive, true),
+      sql`(${payrollRunsTable.periodYear} = ${year} AND ${payrollRunsTable.periodMonth} >= 4)
+          OR (${payrollRunsTable.periodYear} = ${year + 1} AND ${payrollRunsTable.periodMonth} <= 3)`,
+    ];
+    if (employeeIdFilter) recipientConds.push(inArray(employeesTable.id, employeeIdFilter));
     const recipients = await db.selectDistinctOn([employeesTable.id], {
       id: employeesTable.id,
       firstName: employeesTable.firstName,
@@ -1122,30 +1136,31 @@ export async function dispatchForm16ForFy(year: number): Promise<{ eligible: num
       .from(employeesTable)
       .innerJoin(payrollRecordsTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
       .innerJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(and(
-        eq(employeesTable.isActive, true),
-        sql`(${payrollRunsTable.periodYear} = ${year} AND ${payrollRunsTable.periodMonth} >= 4)
-            OR (${payrollRunsTable.periodYear} = ${year + 1} AND ${payrollRunsTable.periodMonth} <= 3)`,
-      ));
+      .where(and(...recipientConds));
 
     if (recipients.length === 0) {
-      logger.info({ fy: fyLabel }, "[scheduler] dispatchForm16ForFy — no eligible employees");
+      logger.info({ fy: fyLabel, force, employeeIdFilter }, "[scheduler] dispatchForm16ForFy — no eligible employees");
       return { eligible: 0, sent: 0, skipped: 0 };
     }
 
     // Employee+email-channel idempotency: skip only employees whose email was
     // already successfully sent for this FY. Failed emails or WhatsApp-only
     // sends will not block a retry. Keyed on entityId (= employeeId) under
-    // entityType=`form_16_fy_<year>`.
-    const sentLogs = await db.select({ entityId: notificationLogsTable.entityId })
-      .from(notificationLogsTable)
-      .where(and(
-        eq(notificationLogsTable.eventType, "form_16_available"),
-        eq(notificationLogsTable.entityType, entityTypeKey),
-        eq(notificationLogsTable.channel, "email"),
-        eq(notificationLogsTable.status, "sent"),
-      ));
-    const alreadySent = new Set(sentLogs.map(l => l.entityId));
+    // entityType=`form_16_fy_<year>`. When `force` is set (manual HR re-send),
+    // the dedup check is bypassed entirely — the new send will append a fresh
+    // notification_logs row alongside the original.
+    const alreadySent = new Set<number>();
+    if (!force) {
+      const sentLogs = await db.select({ entityId: notificationLogsTable.entityId })
+        .from(notificationLogsTable)
+        .where(and(
+          eq(notificationLogsTable.eventType, "form_16_available"),
+          eq(notificationLogsTable.entityType, entityTypeKey),
+          eq(notificationLogsTable.channel, "email"),
+          eq(notificationLogsTable.status, "sent"),
+        ));
+      for (const l of sentLogs) if (l.entityId != null) alreadySent.add(l.entityId);
+    }
 
     const { dispatchNotification } = await import("./notification-service");
     const baseUrl = (process.env.APP_URL ?? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "")).replace(/\/$/, "");
@@ -1178,6 +1193,7 @@ export async function dispatchForm16ForFy(year: number): Promise<{ eligible: num
     return { eligible: recipients.length, sent, skipped };
   } catch (err) {
     logger.error({ err, year }, "[scheduler] dispatchForm16ForFy error");
+    if (throwOnError) throw err;
     return { eligible: 0, sent: 0, skipped: 0 };
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   useListTaxDeclarations, useCreateTaxDeclaration, getListTaxDeclarationsQueryKey,
   useCalculateTax, useGetMyActiveSalaryStructure, getGetMyActiveSalaryStructureQueryKey,
+  useDispatchForm16ForFy, useDispatchForm16ForEmployee,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Banknote, Plus, CheckCircle2, Calculator, Download, FileText } from "lucide-react";
+import { Banknote, Plus, CheckCircle2, Calculator, Download, FileText, Send, RefreshCw } from "lucide-react";
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
@@ -61,6 +62,7 @@ function buildApiBase() {
 export default function TaxDeclarationPage() {
   const { role, hrmsUser } = useCurrentHrmsUser();
   const isHr = ["super_admin", "hr_manager", "hr_executive", "payroll_admin"].includes(role ?? "");
+  const isPayrollAdmin = ["super_admin", "payroll_admin"].includes(role ?? "");
   const isEmployee = role === "employee";
 
   const qc = useQueryClient();
@@ -332,6 +334,11 @@ export default function TaxDeclarationPage() {
         </CardContent>
       </Card>
 
+      {/* ─── Manual Form 16 Dispatch (HR / Payroll Admin only) ─────── */}
+      {isPayrollAdmin && (
+        <ManualForm16Dispatch defaultYear={fyStartYear(currentFY) - 1} />
+      )}
+
       {/* ─── Form 16 Download ─────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -489,6 +496,146 @@ export default function TaxDeclarationPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function ManualForm16Dispatch({ defaultYear }: { defaultYear: number }) {
+  const [yearInput, setYearInput] = useState<string>(String(defaultYear));
+  const [employeeId, setEmployeeId] = useState("");
+  const [force, setForce] = useState(false);
+  const [forceSingle, setForceSingle] = useState(true);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const year = Number(yearInput);
+  const yearValid = Number.isInteger(year) && year >= 2000 && year <= 2100;
+  const fyLabel = yearValid ? `${year}-${String(year + 1).slice(2)}` : "—";
+
+  const fyMutation = useDispatchForm16ForFy();
+  const empMutation = useDispatchForm16ForEmployee();
+
+  async function runFyDispatch() {
+    setError(null); setResult(null);
+    if (!yearValid) { setError("Enter a valid FY start year (e.g. 2024 for FY 2024-25)."); return; }
+    try {
+      const r = await fyMutation.mutateAsync({ data: { year, force } });
+      setResult(`FY ${r.financialYear ?? fyLabel}: ${r.sent} email(s) sent, ${r.skipped} skipped (eligible: ${r.eligible}).`);
+    } catch (err: unknown) { setError(extractError(err, "FY dispatch failed")); }
+  }
+
+  async function runEmployeeDispatch() {
+    setError(null); setResult(null);
+    if (!yearValid) { setError("Enter a valid FY start year (e.g. 2024 for FY 2024-25)."); return; }
+    const empId = Number(employeeId);
+    if (!Number.isInteger(empId) || empId <= 0) {
+      setError("Enter a valid employee ID.");
+      return;
+    }
+    try {
+      const r = await empMutation.mutateAsync({ employeeId: empId, data: { year, force: forceSingle } });
+      setResult(`Employee #${empId} (FY ${r.financialYear ?? fyLabel}): ${r.sent} email(s) sent, ${r.skipped} skipped.`);
+    } catch (err: unknown) { setError(extractError(err, "Employee dispatch failed")); }
+  }
+
+  const busy = fyMutation.isPending || empMutation.isPending;
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/30">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Send className="w-4 h-4 text-amber-700" /> Manual Form 16 Dispatch
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          Re-send Form 16 emails outside the annual April cron — useful after fixing a bounced address,
+          a payroll correction, or for an employee who missed the original notification. Each manual
+          dispatch is recorded in the audit log.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">FY Start Year</Label>
+            <Input
+              type="number"
+              min={2000}
+              max={2100}
+              step={1}
+              className="w-32"
+              value={yearInput}
+              onChange={e => setYearInput(e.target.value)}
+              placeholder="2024"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              {yearValid ? `FY ${fyLabel} (Apr ${year} → Mar ${year + 1})` : "Enter a 4-digit year (e.g. 2024 for FY 2024-25)"}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-xs cursor-pointer pb-6">
+            <input
+              type="checkbox"
+              checked={force}
+              onChange={e => setForce(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Force re-send (bypass already-sent dedup)
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <Button
+            variant="outline"
+            onClick={runFyDispatch}
+            disabled={busy || !yearValid}
+          >
+            <RefreshCw className={`w-4 h-4 mr-1 ${fyMutation.isPending ? "animate-spin" : ""}`} />
+            {fyMutation.isPending ? "Dispatching…" : `Dispatch to all eligible employees`}
+          </Button>
+        </div>
+
+        <div className="border-t border-amber-200 pt-4 space-y-2">
+          <p className="text-xs font-medium">Or re-send to a single employee:</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Employee DB ID</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 42"
+                className="w-40"
+                value={employeeId}
+                onChange={e => setEmployeeId(e.target.value)}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs cursor-pointer pb-2">
+              <input
+                type="checkbox"
+                checked={forceSingle}
+                onChange={e => setForceSingle(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Force re-send (bypass dedup)
+            </label>
+            <Button
+              variant="outline"
+              onClick={runEmployeeDispatch}
+              disabled={busy || !employeeId || !yearValid}
+            >
+              <Send className={`w-4 h-4 mr-1 ${empMutation.isPending ? "animate-pulse" : ""}`} />
+              {empMutation.isPending ? "Sending…" : "Re-send to this employee"}
+            </Button>
+          </div>
+        </div>
+
+        {result && (
+          <div className="text-sm rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900">
+            {result}
+          </div>
+        )}
+        {error && (
+          <div className="text-sm rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+            {error}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

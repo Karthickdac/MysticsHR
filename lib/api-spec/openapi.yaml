@@ -3914,6 +3914,71 @@ paths:
                 type: string
                 format: binary
 
+  /payroll/reports/form-16/dispatch:
+    post:
+      operationId: dispatchForm16ForFy
+      tags: [payroll]
+      summary: Manually trigger Form 16 email dispatch for an entire FY (HR / payroll admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year:
+                  type: integer
+                  description: FY start year (e.g. 2024 for FY 2024-25)
+                force:
+                  type: boolean
+                  description: If true, bypass per-employee dedup and re-send to everyone eligible
+      responses:
+        "200":
+          description: Dispatch summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Form16DispatchResult"
+
+  /payroll/reports/form-16/dispatch/{employeeId}:
+    post:
+      operationId: dispatchForm16ForEmployee
+      tags: [payroll]
+      summary: Manually re-send Form 16 to a single employee (HR / payroll admin)
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year:
+                  type: integer
+                  description: FY start year (e.g. 2024 for FY 2024-25)
+                force:
+                  type: boolean
+                  description: Defaults to true. Pass false to respect existing dedup.
+      responses:
+        "200":
+          description: Dispatch summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Form16DispatchResult"
+        "404":
+          description: No eligible payroll records for this employee in the FY
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Form16DispatchResult"
+
   /payroll/tax-calculator:
     post:
       operationId: calculateTax
@@ -8108,6 +8173,18 @@ components:
         regime: { type: string, enum: [Old, New] }
         investmentDeclarations: {}
         declarationDate: { type: string, format: date }
+
+    Form16DispatchResult:
+      type: object
+      required: [eligible, sent, skipped]
+      properties:
+        eligible: { type: integer }
+        sent: { type: integer }
+        skipped: { type: integer }
+        financialYear: { type: string }
+        force: { type: boolean }
+        employeeId: { type: integer }
+        error: { type: string }
 
     Form16Report:
       type: object
