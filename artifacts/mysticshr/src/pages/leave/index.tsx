@@ -5,6 +5,7 @@ import {
   useListLeaveBalances,
   useListLeaveAccrualHistory,
   useGetLeaveUsageTrend,
+  getGetLeaveUsageTrendQueryKey,
   useSubmitLeaveApplication,
   useCancelLeaveApplication,
   getListLeaveApplicationsQueryKey,
@@ -20,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Calendar, AlertCircle, ArrowRight } from "lucide-react";
+import { Plus, Calendar, AlertCircle, ArrowRight, ChevronLeft, ChevronRight, List, CalendarDays } from "lucide-react";
 import {
   ResponsiveContainer as RCResponsiveContainer,
   BarChart as RCBarChart,
@@ -66,6 +67,7 @@ export default function LeavePage() {
   const submitMutation = useSubmitLeaveApplication();
   const cancelMutation = useCancelLeaveApplication();
 
+  const [myView, setMyView] = useState<"list" | "calendar">("list");
   const [showApply, setShowApply] = useState(false);
   const [showLopWarning, setShowLopWarning] = useState(false);
   const [lopInfo, setLopInfo] = useState<{ available: number; requested: number } | null>(null);
@@ -302,16 +304,38 @@ export default function LeavePage() {
 
       {/* My Applications */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-3">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">My Applications</h2>
-          {isHr && (
-            <Link href="/leave/approvals">
-              <Button variant="ghost" size="sm" className="text-xs">All Applications <ArrowRight className="w-3 h-3 ml-1" /></Button>
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-md border bg-white overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setMyView("list")}
+                className={`px-2.5 py-1 text-xs flex items-center gap-1 ${myView === "list" ? "bg-indigo-50 text-indigo-700" : "text-gray-500 hover:bg-gray-50"}`}
+                aria-pressed={myView === "list"}
+              >
+                <List className="w-3.5 h-3.5" /> List
+              </button>
+              <button
+                type="button"
+                onClick={() => setMyView("calendar")}
+                className={`px-2.5 py-1 text-xs flex items-center gap-1 border-l ${myView === "calendar" ? "bg-indigo-50 text-indigo-700" : "text-gray-500 hover:bg-gray-50"}`}
+                aria-pressed={myView === "calendar"}
+              >
+                <CalendarDays className="w-3.5 h-3.5" /> Calendar
+              </button>
+            </div>
+            {isHr && (
+              <Link href="/leave/approvals">
+                <Button variant="ghost" size="sm" className="text-xs">All Applications <ArrowRight className="w-3 h-3 ml-1" /></Button>
+              </Link>
+            )}
+          </div>
         </div>
 
-        {isLoading ? (
+        {myView === "calendar" ? (
+          <MyLeaveCalendar applications={applications ?? []} />
+        ) : isLoading ? (
           <div className="text-sm text-gray-400">Loading...</div>
         ) : (applications ?? []).length === 0 ? (
           <div className="text-center py-10 text-gray-400">
@@ -444,8 +468,183 @@ export default function LeavePage() {
   );
 }
 
+type AppLite = {
+  id: number;
+  fromDate: string;
+  toDate: string;
+  status: string;
+  leaveTypeCode?: string | null;
+  leaveTypeName?: string | null;
+  totalDays: string;
+  isHalfDay?: boolean | null;
+  halfDaySession?: string | null;
+  reason?: string | null;
+};
+
+const TYPE_PALETTE = [
+  "bg-indigo-200 text-indigo-800",
+  "bg-emerald-200 text-emerald-800",
+  "bg-amber-200 text-amber-800",
+  "bg-sky-200 text-sky-800",
+  "bg-rose-200 text-rose-800",
+  "bg-violet-200 text-violet-800",
+  "bg-teal-200 text-teal-800",
+  "bg-pink-200 text-pink-800",
+];
+
+function colorForCode(code: string | null | undefined) {
+  if (!code) return TYPE_PALETTE[0];
+  let h = 0;
+  for (let i = 0; i < code.length; i++) h = (h * 31 + code.charCodeAt(i)) >>> 0;
+  return TYPE_PALETTE[h % TYPE_PALETTE.length];
+}
+
+function MyLeaveCalendar({ applications }: { applications: AppLite[] }) {
+  const [cursor, setCursor] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [selectedApp, setSelectedApp] = useState<AppLite | null>(null);
+
+  // Only show approved + pending (incl. mid-flow). Skip cancelled / rejected.
+  const visible = applications.filter((a) =>
+    ["Approved", "Pending", "HOD Approved", "HR Approved", "Cancel Requested"].includes(a.status),
+  );
+
+  const year = cursor.getFullYear();
+  const monthIdx = cursor.getMonth();
+  const numDays = new Date(year, monthIdx + 1, 0).getDate();
+  const firstDay = new Date(year, monthIdx, 1).getDay();
+
+  const monthStart = new Date(year, monthIdx, 1);
+  const monthEnd = new Date(year, monthIdx, numDays);
+
+  // day-of-month → AppLite[]
+  const dayMap = new Map<number, AppLite[]>();
+  for (const app of visible) {
+    const from = new Date(app.fromDate);
+    const to = new Date(app.toDate);
+    if (to < monthStart || from > monthEnd) continue;
+    const start = from < monthStart ? monthStart : from;
+    const end = to > monthEnd ? monthEnd : to;
+    const cur = new Date(start);
+    while (cur <= end) {
+      const d = cur.getDate();
+      if (!dayMap.has(d)) dayMap.set(d, []);
+      dayMap.get(d)!.push(app);
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  const monthName = cursor.toLocaleString("default", { month: "long", year: "numeric" });
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const today = new Date();
+
+  // Distinct leave types in this month for the legend.
+  const legendCodes = Array.from(
+    new Map(
+      Array.from(dayMap.values()).flat().map((a) => [a.leaveTypeCode ?? "", a]),
+    ).values(),
+  );
+
+  return (
+    <div className="border rounded-lg bg-white">
+      <div className="flex items-center justify-between p-3 border-b">
+        <Button variant="ghost" size="sm" onClick={() => setCursor((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <h3 className="font-semibold text-gray-700 text-sm">{monthName}</h3>
+        <Button variant="ghost" size="sm" onClick={() => setCursor((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 p-3">
+        {weekDays.map((d) => (
+          <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
+        ))}
+        {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+        {Array.from({ length: numDays }, (_, i) => i + 1).map((day) => {
+          const apps = dayMap.get(day) ?? [];
+          const isToday = today.getDate() === day && today.getMonth() === monthIdx && today.getFullYear() === year;
+          return (
+            <div
+              key={day}
+              className={`min-h-[72px] rounded p-1 border ${isToday ? "border-blue-400 bg-blue-50" : "border-gray-100"}`}
+            >
+              <div className={`text-xs font-medium mb-1 ${isToday ? "text-blue-600" : "text-gray-600"}`}>{day}</div>
+              <div className="space-y-0.5">
+                {apps.slice(0, 3).map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => setSelectedApp(a)}
+                    title={`${a.leaveTypeName ?? a.leaveTypeCode ?? ""} • ${a.status}`}
+                    className={`w-full text-left text-[10px] rounded px-1 truncate hover:opacity-80 ${colorForCode(a.leaveTypeCode)} ${a.status === "Pending" || a.status === "HOD Approved" || a.status === "HR Approved" || a.status === "Cancel Requested" ? "ring-1 ring-yellow-400/60" : ""}`}
+                  >
+                    {a.leaveTypeCode ?? a.leaveTypeName ?? "Leave"}
+                  </button>
+                ))}
+                {apps.length > 3 && (
+                  <div className="text-[10px] text-gray-400">+{apps.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {legendCodes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 px-3 pb-3 border-t pt-3">
+          {legendCodes.map((a) => (
+            <div key={a.id} className="flex items-center gap-1.5">
+              <span className={`inline-block w-3 h-3 rounded ${colorForCode(a.leaveTypeCode)}`} />
+              <span className="text-[11px] text-gray-500">{a.leaveTypeCode ?? a.leaveTypeName}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded ring-1 ring-yellow-400/60 bg-gray-100" />
+            <span className="text-[11px] text-gray-500">Pending approval</span>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={!!selectedApp} onOpenChange={(o) => !o && setSelectedApp(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedApp?.leaveTypeName ?? selectedApp?.leaveTypeCode ?? "Leave"}</DialogTitle>
+          </DialogHeader>
+          {selectedApp && (
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Status</span>
+                <Badge className={STATUS_COLORS[selectedApp.status] ?? ""}>{selectedApp.status}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Dates</span>
+                <span>{fmtDate(selectedApp.fromDate)} — {fmtDate(selectedApp.toDate)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Total days</span>
+                <span>{selectedApp.totalDays}{selectedApp.isHalfDay ? ` • ${selectedApp.halfDaySession}` : ""}</span>
+              </div>
+              {selectedApp.reason && (
+                <div>
+                  <div className="text-gray-500 mb-1">Reason</div>
+                  <div className="text-gray-700 bg-gray-50 rounded p-2 text-xs">{selectedApp.reason}</div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedApp(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function LeaveUsageTrendChart({ isEmployee }: { isEmployee: boolean }) {
-  const { data } = useGetLeaveUsageTrend({ years: 3 }, { query: { enabled: isEmployee } });
+  const { data } = useGetLeaveUsageTrend({ years: 3 }, { query: { enabled: isEmployee, queryKey: getGetLeaveUsageTrendQueryKey({ years: 3 }) } });
 
   if (!isEmployee) return null;
   if (!data || data.byLeaveType.length === 0 || data.years.length === 0) {
