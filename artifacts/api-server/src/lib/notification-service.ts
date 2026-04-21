@@ -25,18 +25,52 @@ interface SendWhatsAppOptions {
   entityId?: number;
 }
 
-async function getSmtpSettings() {
-  const rows = await db.select().from(systemSettingsTable).where(eq(systemSettingsTable.category, "email"));
-  const cfg: Record<string, string> = {};
-  for (const r of rows) cfg[r.key] = r.value as string;
-  return cfg;
+/**
+ * Coerce a JSONB value to a string for credential reads. JSON values can come
+ * back as string | number | boolean | null; anything truthy gets stringified
+ * and trimmed, empty strings collapse to undefined so env-fallback can kick in.
+ */
+function asConfigString(v: unknown): string | undefined {
+  if (v === null || v === undefined) return undefined;
+  const s = typeof v === "string" ? v : String(v);
+  const trimmed = s.trim();
+  return trimmed === "" ? undefined : trimmed;
 }
 
+/**
+ * Read SMTP credentials. Source of truth is the `system_settings` table
+ * (category=`email`, set via the System Config UI). Each individual key falls
+ * back to its corresponding SMTP_* environment variable when the DB value is
+ * missing or empty, so on a fresh install env-driven credentials still work.
+ */
+async function getSmtpSettings() {
+  const rows = await db.select().from(systemSettingsTable).where(eq(systemSettingsTable.category, "email"));
+  const db_: Record<string, string | undefined> = {};
+  for (const r of rows) db_[r.key] = asConfigString(r.value);
+
+  return {
+    host: db_["host"] ?? process.env["SMTP_HOST"],
+    port: db_["port"] ?? process.env["SMTP_PORT"],
+    secure: db_["secure"] ?? process.env["SMTP_SECURE"],
+    username: db_["username"] ?? process.env["SMTP_USER"],
+    password: db_["password"] ?? process.env["SMTP_PASS"],
+    from: db_["from"] ?? process.env["SMTP_FROM"],
+  };
+}
+
+/**
+ * Read WhatsApp Cloud API credentials. Same DB-first / env-fallback pattern as
+ * `getSmtpSettings()`.
+ */
 async function getWhatsAppSettings() {
   const rows = await db.select().from(systemSettingsTable).where(eq(systemSettingsTable.category, "whatsapp"));
-  const cfg: Record<string, string> = {};
-  for (const r of rows) cfg[r.key] = r.value as string;
-  return cfg;
+  const db_: Record<string, string | undefined> = {};
+  for (const r of rows) db_[r.key] = asConfigString(r.value);
+
+  return {
+    phone_number_id: db_["phone_number_id"] ?? process.env["WHATSAPP_PHONE_NUMBER_ID"],
+    access_token: db_["access_token"] ?? process.env["WHATSAPP_ACCESS_TOKEN"],
+  };
 }
 
 async function logNotification(params: {
