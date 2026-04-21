@@ -19,6 +19,23 @@ const objectStorageService = new ObjectStorageService();
 
 const HR_ROLES = new Set(["super_admin", "hr_manager", "hr_executive"]);
 
+// Server-side MIME allowlist. Blocks HTML/JS/SVG and other active content
+// even if the client is malicious. Mirrors the frontend allowlist but is
+// authoritative.
+const ALLOWED_CONTENT_TYPES = new Set<string>([
+  "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+]);
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 // Returns true if the requesting user can access the ticket the attachment
 // belongs to. Mirrors checkTicketAccess() in helpdesk.ts but is intentionally
 // scoped to attachment-by-objectPath lookups so storage.ts stays self-contained.
@@ -58,6 +75,15 @@ router.post("/storage/uploads/request-url", requireHrmsUser, async (req: Request
 
   try {
     const { name, size, contentType } = parsed.data;
+
+    if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
+      res.status(400).json({ error: "Unsupported file type" });
+      return;
+    }
+    if (size > MAX_UPLOAD_BYTES) {
+      res.status(400).json({ error: "File exceeds 10 MB limit" });
+      return;
+    }
 
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
@@ -134,7 +160,38 @@ router.get("/storage/objects/*path", requireHrmsUser, async (req: Request, res: 
     const response = await objectStorageService.downloadObject(objectFile);
 
     res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
+    response.headers.forEach((value, key) => {
+      // We override Content-Type/Disposition below to prevent the browser
+      // from rendering attacker-supplied HTML/JS/SVG inline. Drop any
+      // upstream values for these headers.
+      const lower = key.toLowerCase();
+      if (lower === "content-type" || lower === "content-disposition") return;
+      res.setHeader(key, value);
+    });
+
+    // Look up the original filename and stored content-type from the DB so
+    // the download has a sensible name and the type matches what was vetted
+    // at upload time.
+    const [meta] = await db.select({
+      fileName: ticketAttachmentsTable.fileName,
+      contentType: ticketAttachmentsTable.contentType,
+    }).from(ticketAttachmentsTable)
+      .where(eq(ticketAttachmentsTable.objectPath, objectPath))
+      .limit(1);
+
+    const safeContentType = meta && ALLOWED_CONTENT_TYPES.has(meta.contentType)
+      ? meta.contentType
+      : "application/octet-stream";
+    res.setHeader("Content-Type", safeContentType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Force download for non-image/PDF; inline-allow images and PDFs which are
+    // safe to render. RFC 6266 quoted filename for safety.
+    const inlineSafe = safeContentType.startsWith("image/") || safeContentType === "application/pdf";
+    const filename = (meta?.fileName ?? "attachment").replace(/[\r\n"]/g, "");
+    res.setHeader(
+      "Content-Disposition",
+      `${inlineSafe ? "inline" : "attachment"}; filename="${filename}"`,
+    );
 
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);

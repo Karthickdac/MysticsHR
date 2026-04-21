@@ -174,14 +174,29 @@ async function insertAttachments(
   return rows;
 }
 
+// Same allowlist as storage.ts; duplicated to keep modules decoupled.
+const ALLOWED_ATTACHMENT_TYPES = new Set<string>([
+  "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+]);
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
 function isValidUploadedAttachment(a: unknown): a is { objectPath: string; fileName: string; fileSize: number; contentType: string } {
   if (!a || typeof a !== "object") return false;
   const o = a as Record<string, unknown>;
   return (
     typeof o["objectPath"] === "string" && o["objectPath"].startsWith("/objects/") &&
-    typeof o["fileName"] === "string" && o["fileName"].length > 0 &&
-    typeof o["fileSize"] === "number" && Number.isFinite(o["fileSize"]) && o["fileSize"] >= 0 &&
-    typeof o["contentType"] === "string" && o["contentType"].length > 0
+    typeof o["fileName"] === "string" && o["fileName"].length > 0 && o["fileName"].length <= 255 &&
+    typeof o["fileSize"] === "number" && Number.isFinite(o["fileSize"]) && o["fileSize"] >= 0 && o["fileSize"] <= MAX_ATTACHMENT_BYTES &&
+    typeof o["contentType"] === "string" && ALLOWED_ATTACHMENT_TYPES.has(o["contentType"])
   );
 }
 
