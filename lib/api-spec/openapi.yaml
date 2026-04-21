@@ -3639,6 +3639,10 @@ paths:
                   latestPeriodLabel:
                     type: string
                     nullable: true
+                  latestRunId:
+                    type: integer
+                    nullable: true
+                    description: Payroll run id used for the department breakdown — enables click-through to that run's detail page.
                   monthlyTrend:
                     type: array
                     items:
@@ -8165,6 +8169,7 @@ components:
         createdAt: { type: string, format: date-time }
         employeeName: { type: ["string", "null"] }
         employeeCode: { type: ["string", "null"] }
+        departmentId: { type: ["integer", "null"] }
       required: [id, payrollRunId, employeeId, workingDays, presentDays, lopDays, grossEarnings, totalDeductions, netPay, status, createdAt]
 
     PayslipSummary:

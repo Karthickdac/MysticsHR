@@ -2,10 +2,12 @@ import { useState } from "react";
 import {
   useListPayrollRuns, useCreatePayrollRun, useComputePayrollRun, useApprovePayrollRun,
   useFinalizePayrollRun, useListPayrollLocks, useLockPayroll, useUnlockPayroll,
-  useGetPayrollAnalytics,
+  useGetPayrollAnalytics, useGetPayrollRunRecords,
   getListPayrollRunsQueryKey, getListPayrollLocksQueryKey, getGetPayrollAnalyticsQueryKey,
+  getGetPayrollRunRecordsQueryKey,
 } from "@workspace/api-client-react";
-import type { GetPayrollAnalytics200 } from "@workspace/api-client-react";
+import type { GetPayrollAnalytics200, PayrollRun } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
@@ -89,7 +91,97 @@ function compactInr(n: number): string {
   return `₹${Math.round(n)}`;
 }
 
-function PayrollAnalyticsSection({ analytics }: { analytics: GetPayrollAnalytics200 | undefined }) {
+// Maps a statutory bar's display name to the corresponding report tab key in
+// the Statutory Reports page (so a click navigates to the pre-filtered report).
+const STATUTORY_TO_REPORT: Record<string, string> = {
+  "PF (Employee)": "pf-ecr",
+  "PF (Employer)": "pf-ecr",
+  "ESI (Employee)": "esi",
+  "ESI (Employer)": "esi",
+  "Professional Tax": "pt",
+  "TDS": "tds",
+};
+
+function DepartmentDrilldownDialog({
+  open, onOpenChange, runId, departmentId, departmentName, periodLabel,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  runId: number | null;
+  departmentId: number | null;
+  departmentName: string;
+  periodLabel: string;
+}) {
+  // Only fetch when dialog is open and we have a run id.
+  const safeRunId = runId ?? 0;
+  const { data: records, isLoading } = useGetPayrollRunRecords(
+    safeRunId,
+    { query: { enabled: open && !!runId, queryKey: getGetPayrollRunRecordsQueryKey(safeRunId) } },
+  );
+  const filtered = (records ?? []).filter(r =>
+    departmentId == null ? r.departmentId == null : r.departmentId === departmentId,
+  );
+  const totalNet = filtered.reduce((s, r) => s + Number(r.netPay ?? 0), 0);
+  const totalGross = filtered.reduce((s, r) => s + Number(r.grossEarnings ?? 0), 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{departmentName} — {periodLabel}</DialogTitle>
+        </DialogHeader>
+        <div className="text-xs text-muted-foreground mb-2">
+          {filtered.length} employee{filtered.length === 1 ? "" : "s"} · Gross {fmt(totalGross)} · Net {fmt(totalNet)}
+        </div>
+        <div className="max-h-[60vh] overflow-auto border rounded-lg">
+          {isLoading ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No payroll records for this department in the period.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-xs uppercase text-muted-foreground sticky top-0">
+                <tr>
+                  <th className="text-left p-2">Code</th>
+                  <th className="text-left p-2">Employee</th>
+                  <th className="text-right p-2">Gross</th>
+                  <th className="text-right p-2">Deductions</th>
+                  <th className="text-right p-2">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(r => (
+                  <tr key={r.id} className="border-t">
+                    <td className="p-2 font-mono text-xs">{r.employeeCode ?? "—"}</td>
+                    <td className="p-2">{r.employeeName ?? `#${r.employeeId}`}</td>
+                    <td className="p-2 text-right">{fmt(r.grossEarnings)}</td>
+                    <td className="p-2 text-right">{fmt(r.totalDeductions)}</td>
+                    <td className="p-2 text-right font-semibold">{fmt(r.netPay)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <DialogFooter>
+          {runId && (
+            <Link href={`/payroll/runs/${runId}`}>
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Open full payroll run
+              </Button>
+            </Link>
+          )}
+          <Button size="sm" onClick={() => onOpenChange(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PayrollAnalyticsSection({ analytics, runs }: { analytics: GetPayrollAnalytics200 | undefined; runs: PayrollRun[] | undefined }) {
+  const [, navigate] = useLocation();
+  const [drilldown, setDrilldown] = useState<{ departmentId: number | null; departmentName: string } | null>(null);
+
   if (!analytics) {
     return (
       <Card>
@@ -140,6 +232,61 @@ function PayrollAnalyticsSection({ analytics }: { analytics: GetPayrollAnalytics
     { name: "TDS", value: statutory.tds },
   ];
 
+  // Recharts hands click handlers either the raw datum or a wrapper with the
+  // datum nested under `payload` (Bar/Pie behave differently). This helper
+  // normalizes so handlers always receive the source data row.
+  const extractDatum = <T,>(arg: unknown): T | undefined => {
+    if (!arg || typeof arg !== "object") return undefined;
+    const a = arg as Record<string, unknown>;
+    if (a.payload && typeof a.payload === "object") return a.payload as T;
+    return arg as T;
+  };
+
+  // Resolve a runId for a clicked monthly bar by matching year+month against
+  // committed (Approved/Locked) payroll runs only — the chart shows finalized
+  // figures, so click-through must never land on a Draft/Computed run.
+  const findRunIdForMonth = (year: number, month: number): number | null => {
+    if (!runs) return null;
+    const committed = runs.filter(r =>
+      r.periodYear === year && r.periodMonth === month &&
+      (r.status === "Locked" || r.status === "Approved"),
+    );
+    if (committed.length === 0) return null;
+    const locked = committed.find(r => r.status === "Locked");
+    return (locked ?? committed[0]).id;
+  };
+
+  const handleMonthBarClick = (arg: unknown) => {
+    const d = extractDatum<{ year?: number; month?: number }>(arg);
+    if (!d?.year || !d?.month) return;
+    const id = findRunIdForMonth(d.year, d.month);
+    if (id) navigate(`/payroll/runs/${id}`);
+  };
+
+  const handleStatutoryBarClick = (arg: unknown) => {
+    const d = extractDatum<{ name?: string }>(arg);
+    if (!d?.name) return;
+    const reportType = STATUTORY_TO_REPORT[d.name];
+    if (!reportType || !analytics.latestPeriodLabel) return;
+    // Pre-fill the latest finalized month — gives HR a non-empty starting view.
+    const latest = analytics.monthlyTrend?.[analytics.monthlyTrend.length - 1];
+    const qs = new URLSearchParams({ type: reportType });
+    if (latest?.year && latest?.month) {
+      qs.set("year", String(latest.year));
+      qs.set("month", String(latest.month));
+    }
+    navigate(`/payroll/reports?${qs.toString()}`);
+  };
+
+  const handleDeptClick = (arg: unknown) => {
+    const d = extractDatum<{ departmentId?: number | null; departmentName?: string }>(arg);
+    if (!d) return;
+    setDrilldown({
+      departmentId: d.departmentId ?? null,
+      departmentName: d.departmentName ?? "Unassigned",
+    });
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="lg:col-span-2">
@@ -188,7 +335,8 @@ function PayrollAnalyticsSection({ analytics }: { analytics: GetPayrollAnalytics
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={32} />
                 <Tooltip formatter={(value: number, name: string) => name === "Employees" ? value : compactInr(Number(value))} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar yAxisId="left" dataKey="totalNet" name="Net Cost" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                <Bar yAxisId="left" dataKey="totalNet" name="Net Cost" fill="#6366f1" radius={[3, 3, 0, 0]}
+                  onClick={handleMonthBarClick} style={{ cursor: "pointer" }} />
                 <Line yAxisId="right" type="monotone" dataKey="employees" name="Employees" stroke="#f59e0b" strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -218,6 +366,8 @@ function PayrollAnalyticsSection({ analytics }: { analytics: GetPayrollAnalytics
                   outerRadius={90}
                   label={(entry: { departmentName: string }) => entry.departmentName}
                   labelLine={false}
+                  onClick={handleDeptClick}
+                  style={{ cursor: "pointer" }}
                 >
                   {dept.map((_d, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -247,7 +397,8 @@ function PayrollAnalyticsSection({ analytics }: { analytics: GetPayrollAnalytics
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={60} />
                 <YAxis tickFormatter={compactInr} tick={{ fontSize: 11 }} width={70} />
                 <Tooltip formatter={(v: number) => compactInr(Number(v))} />
-                <Bar dataKey="value" name="Total" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="value" name="Total" radius={[4, 4, 0, 0]}
+                  onClick={handleStatutoryBarClick} style={{ cursor: "pointer" }}>
                   {statutoryData.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
@@ -257,6 +408,15 @@ function PayrollAnalyticsSection({ analytics }: { analytics: GetPayrollAnalytics
           )}
         </CardContent>
       </Card>
+
+      <DepartmentDrilldownDialog
+        open={drilldown !== null}
+        onOpenChange={(v) => { if (!v) setDrilldown(null); }}
+        runId={analytics.latestRunId ?? null}
+        departmentId={drilldown?.departmentId ?? null}
+        departmentName={drilldown?.departmentName ?? ""}
+        periodLabel={latestPeriod}
+      />
     </div>
   );
 }
@@ -408,7 +568,7 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         </Card>
       </div>
 
-      <PayrollAnalyticsSection analytics={analytics} />
+      <PayrollAnalyticsSection analytics={analytics} runs={runs} />
 
       <Card className={`border-2 ${isCurrentlyLocked ? "border-red-200 bg-red-50/40" : "border-green-200 bg-green-50/40"}`}>
         <CardContent className="p-4 flex items-center justify-between">

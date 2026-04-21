@@ -2236,6 +2236,8 @@ export interface PayrollRecord {
   employeeName?: string | null;
   /** @nullable */
   employeeCode?: string | null;
+  /** @nullable */
+  departmentId?: number | null;
 }
 
 export interface PayslipSummary {
@@ -3787,6 +3789,8 @@ export type GetPayrollAnalytics200YtdTotals = {
 export type GetPayrollAnalytics200 = {
   financialYear?: string;
   latestPeriodLabel?: string | null;
+  /** Payroll run id used for the department breakdown — enables click-through to that run's detail page. */
+  latestRunId?: number | null;
   monthlyTrend?: GetPayrollAnalytics200MonthlyTrendItem[];
   departmentBreakdown?: GetPayrollAnalytics200DepartmentBreakdownItem[];
   statutoryDeductions?: GetPayrollAnalytics200StatutoryDeductions;

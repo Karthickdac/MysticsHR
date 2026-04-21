@@ -1339,6 +1339,7 @@ router.get("/payroll/analytics", requireHrmsUser, requireRole(...PAYROLL_ADMIN_R
     res.json({
       financialYear: `${fyStartYear}-${String(fyStartYear + 1).slice(-2)}`,
       latestPeriodLabel,
+      latestRunId: latestRun?.id ?? null,
       monthlyTrend,
       departmentBreakdown,
       statutoryDeductions,

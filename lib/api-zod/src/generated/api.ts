@@ -4685,6 +4685,7 @@ export const GetPayrollRunRecordsResponseItem = zod.object({
   createdAt: zod.coerce.date(),
   employeeName: zod.string().nullish(),
   employeeCode: zod.string().nullish(),
+  departmentId: zod.number().nullish(),
 });
 export const GetPayrollRunRecordsResponse = zod.array(
   GetPayrollRunRecordsResponseItem,
@@ -4696,6 +4697,12 @@ export const GetPayrollRunRecordsResponse = zod.array(
 export const GetPayrollAnalyticsResponse = zod.object({
   financialYear: zod.string().optional(),
   latestPeriodLabel: zod.string().nullish(),
+  latestRunId: zod
+    .number()
+    .nullish()
+    .describe(
+      "Payroll run id used for the department breakdown — enables click-through to that run's detail page.",
+    ),
   monthlyTrend: zod
     .array(
       zod.object({
