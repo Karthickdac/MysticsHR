@@ -18,7 +18,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
-import { ArrowLeft, History, Trophy, Target } from "lucide-react";
+import { ArrowLeft, History, Trophy, Target, TrendingUp } from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  type TooltipProps,
+} from "recharts";
 
 const OUTCOME_COLORS: Record<string, string> = {
   "Outstanding": "bg-green-100 text-green-800 border-green-200",
@@ -32,6 +42,106 @@ function formatScore(score: string | null | undefined): string {
   if (score === null || score === undefined) return "—";
   const n = Number(score);
   return Number.isFinite(n) ? n.toFixed(2) : String(score);
+}
+
+type TrendPoint = {
+  cycleId: number;
+  title: string;
+  startDate: string | null;
+  endDate: string | null;
+  outcomeLabel: string | null;
+  finalScore: number;
+};
+
+function PerformanceTrendTooltip({ active, payload }: TooltipProps<number, string>) {
+  if (!active || !payload || payload.length === 0) return null;
+  const p = payload[0]?.payload as TrendPoint | undefined;
+  if (!p) return null;
+  return (
+    <div className="rounded-md border bg-background shadow-sm px-3 py-2 text-xs space-y-0.5">
+      <p className="font-medium text-sm">{p.title}</p>
+      <p className="text-muted-foreground">
+        {p.startDate ?? "—"} – {p.endDate ?? "—"}
+      </p>
+      <p>
+        Final score: <span className="font-semibold">{p.finalScore.toFixed(2)}</span>
+      </p>
+      {p.outcomeLabel && (
+        <p className="text-muted-foreground">Outcome: {p.outcomeLabel}</p>
+      )}
+    </div>
+  );
+}
+
+function PerformanceTrendChart({ data }: { data: TrendPoint[] }) {
+  if (data.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" /> Year-over-Year Trend
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-muted-foreground">
+          No final scores yet — the trend will appear here once at least one cycle is finalized.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const scores = data.map(d => d.finalScore);
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  // Pad the y-axis a bit so points don't sit on the chart edges. Round to one
+  // decimal so ticks look clean.
+  const yMin = Math.max(0, Math.floor((min - 0.5) * 10) / 10);
+  const yMax = Math.ceil((max + 0.5) * 10) / 10;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-primary" /> Year-over-Year Trend
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Final score across {data.length} closed {data.length === 1 ? "cycle" : "cycles"}, oldest to newest.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-2">
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+              <XAxis
+                dataKey="title"
+                tick={{ fontSize: 11 }}
+                interval={0}
+                angle={data.length > 4 ? -20 : 0}
+                textAnchor={data.length > 4 ? "end" : "middle"}
+                height={data.length > 4 ? 50 : 30}
+              />
+              <YAxis
+                domain={[yMin, yMax]}
+                tick={{ fontSize: 11 }}
+                width={40}
+                allowDecimals
+              />
+              <Tooltip content={<PerformanceTrendTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="finalScore"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                activeDot={{ r: 6 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function CycleHistoryCard({
@@ -175,6 +285,32 @@ export default function PerformanceHistoryPage() {
 
   const outcomeByCycle = new Map(outcomes.map(o => [o.cycleId, o]));
 
+  // Chronological (oldest → newest) series of cycles that have a numeric final
+  // score, used for the trend chart at the top of the page.
+  const trendData = closedCycles
+    .slice()
+    .sort((a, b) => (a.endDate ?? "").localeCompare(b.endDate ?? ""))
+    .map(c => {
+      const o = outcomeByCycle.get(c.id);
+      const score = o?.finalScore != null ? Number(o.finalScore) : NaN;
+      return {
+        cycleId: c.id,
+        title: c.title,
+        startDate: c.startDate,
+        endDate: c.endDate,
+        outcomeLabel: o?.outcomLabel ?? null,
+        finalScore: Number.isFinite(score) ? score : null,
+      };
+    })
+    .filter(d => d.finalScore !== null) as Array<{
+      cycleId: number;
+      title: string;
+      startDate: string | null;
+      endDate: string | null;
+      outcomeLabel: string | null;
+      finalScore: number;
+    }>;
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -219,6 +355,7 @@ export default function PerformanceHistoryPage() {
         </Card>
       ) : (
         <div className="space-y-4">
+          <PerformanceTrendChart data={trendData} />
           {closedCycles.map(cycle => {
             const cycleGoals = goals.filter(g => g.cycleId === cycle.id);
             const cycleGoalIds = new Set(cycleGoals.map(g => g.id));
