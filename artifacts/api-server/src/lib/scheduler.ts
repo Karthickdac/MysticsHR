@@ -23,6 +23,7 @@ import {
   shiftTemplatesTable,
   shiftAssignmentsTable,
   notificationLogsTable,
+  systemSettingsTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, isNotNull, ne, sql, lt, count, inArray } from "drizzle-orm";
 import { generateTablePdf } from "./pdf";
@@ -979,6 +980,120 @@ async function remindPreOnboardingPending() {
 
 // alertAttendanceAnomalies removed — superseded by alertShiftAwareNoSignIn below
 
+/**
+ * Re-notify payroll admins about payroll runs in `Computed` status that have
+ * sat unapproved beyond the configured threshold (default 24h). Re-uses the
+ * existing `payroll_run_pending_approval` event so admins get a familiar
+ * email/in-app nudge with the run link.
+ *
+ * Threshold is read from `system_settings` row
+ *   { category: "payroll", key: "approval_reminder_hours" }
+ * with value `{ hours: <number> }` (or a bare number). Falls back to 24h.
+ *
+ * To avoid spamming, we only re-send if no `payroll_run_pending_approval`
+ * notification has been logged for that run+recipient in the last `hours`.
+ */
+async function remindPendingPayrollApprovals() {
+  try {
+    // Resolve threshold (hours)
+    let thresholdHours = 24;
+    try {
+      const [setting] = await db.select().from(systemSettingsTable)
+        .where(and(eq(systemSettingsTable.category, "payroll"), eq(systemSettingsTable.key, "approval_reminder_hours")))
+        .limit(1);
+      const raw = setting?.value as unknown;
+      if (typeof raw === "number" && raw > 0) thresholdHours = raw;
+      else if (raw && typeof raw === "object" && typeof (raw as { hours?: unknown }).hours === "number" && (raw as { hours: number }).hours > 0) {
+        thresholdHours = (raw as { hours: number }).hours;
+      }
+    } catch { /* fall through with default */ }
+
+    const cutoff = new Date(Date.now() - thresholdHours * 60 * 60 * 1000);
+
+    const stuckRuns = await db.select({
+      id: payrollRunsTable.id,
+      periodMonth: payrollRunsTable.periodMonth,
+      periodYear: payrollRunsTable.periodYear,
+      totalEmployees: payrollRunsTable.totalEmployees,
+      totalGross: payrollRunsTable.totalGross,
+      totalNet: payrollRunsTable.totalNet,
+      runAt: payrollRunsTable.runAt,
+      updatedAt: payrollRunsTable.updatedAt,
+    })
+      .from(payrollRunsTable)
+      .where(and(
+        eq(payrollRunsTable.status, "Computed"),
+        lte(payrollRunsTable.updatedAt, cutoff),
+      ));
+
+    if (stuckRuns.length === 0) return;
+
+    const approvers = await db.select({
+      id: hrmsUsersTable.id,
+      email: hrmsUsersTable.email,
+      name: hrmsUsersTable.name,
+    })
+      .from(hrmsUsersTable)
+      .where(and(
+        inArray(hrmsUsersTable.role, ["super_admin", "payroll_admin"]),
+        eq(hrmsUsersTable.isActive, true),
+      ));
+
+    if (approvers.length === 0) return;
+
+    // Lookup recently-sent payroll_run_pending_approval logs to suppress duplicates.
+    // Only successful sends count — a failed delivery should NOT block a retry nudge.
+    const recentLogs = await db.select({
+      recipientEmail: notificationLogsTable.recipientEmail,
+      entityId: notificationLogsTable.entityId,
+    })
+      .from(notificationLogsTable)
+      .where(and(
+        eq(notificationLogsTable.eventType, "payroll_run_pending_approval"),
+        eq(notificationLogsTable.status, "sent"),
+        eq(notificationLogsTable.entityType, "payroll_run"),
+        gte(notificationLogsTable.sentAt, cutoff),
+      ));
+    const sentSet = new Set(recentLogs.map(l => `${l.entityId}__${l.recipientEmail}`));
+
+    const { dispatchNotification } = await import("./notification-service");
+    const baseUrl = (process.env.APP_URL ?? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "")).replace(/\/$/, "");
+    const buildAppUrl = (path: string) => baseUrl ? `${baseUrl}${path.startsWith("/") ? path : `/${path}`}` : path;
+    const fmtINR = (s: string | number | null) => `₹${Number(s ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
+    for (const run of stuckRuns) {
+      const monthName = new Date(run.periodYear, run.periodMonth - 1).toLocaleString("en-IN", { month: "long" });
+      const period = `${monthName} ${run.periodYear}`;
+      const runUrl = buildAppUrl(`/payroll/runs/${run.id}`);
+      const ageHours = Math.floor((Date.now() - new Date(run.updatedAt).getTime()) / (60 * 60 * 1000));
+
+      for (const a of approvers) {
+        if (!a.email) continue;
+        if (sentSet.has(`${run.id}__${a.email}`)) continue; // already nudged within window
+
+        await dispatchNotification({
+          eventType: "payroll_run_pending_approval", module: "payroll",
+          recipientEmail: a.email, recipientName: a.name,
+          variables: {
+            recipientName: a.name ?? "",
+            period,
+            initiatorName: `Reminder — pending for ${ageHours}h`,
+            totalEmployees: String(run.totalEmployees ?? ""),
+            totalGross: fmtINR(run.totalGross),
+            totalNet: fmtINR(run.totalNet),
+            runUrl,
+          },
+          entityType: "payroll_run", entityId: run.id,
+        }).catch((e) => logger.warn({ err: e, runId: run.id, to: a.email }, "[scheduler] payroll reminder dispatch failed"));
+      }
+    }
+
+    logger.info({ runs: stuckRuns.length, approvers: approvers.length, thresholdHours }, "[scheduler] remindPendingPayrollApprovals processed stuck runs");
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] remindPendingPayrollApprovals error");
+  }
+}
+
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 export function startScheduler(_port: number) {
   // Run every hour at minute 0 — scheduled report delivery
@@ -1016,6 +1131,11 @@ export function startScheduler(_port: number) {
   // At 10:00 daily — remind candidates with pending pre-onboarding documents
   cron.schedule("0 10 * * *", () => {
     void remindPreOnboardingPending();
+  });
+  // Every 4 hours — remind payroll admins about Computed runs sitting unapproved
+  // beyond the configured threshold (system_settings payroll.approval_reminder_hours, default 24h).
+  cron.schedule("15 */4 * * *", () => {
+    void remindPendingPayrollApprovals();
   });
   // At 02:00 on Jan 1 (server local time) — auto year-end leave carry-forward
   // for the just-finished year. Idempotent — safe even if HR also triggered
