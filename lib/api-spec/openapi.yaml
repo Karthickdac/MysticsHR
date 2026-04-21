@@ -3641,7 +3641,7 @@ paths:
     get:
       operationId: getForm16Report
       tags: [payroll]
-      summary: Form 16 generation for an employee FY
+      summary: Form 16 data for an employee FY
       parameters:
         - name: employeeId
           in: path
@@ -3657,7 +3657,49 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/Form16Report"
+
+  /payroll/reports/form-16/{employeeId}/{year}/pdf:
+    get:
+      operationId: getForm16Pdf
+      tags: [payroll]
+      summary: Download Form 16 PDF for an employee FY
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: year
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Form 16 PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /payroll/tax-calculator:
+    post:
+      operationId: calculateTax
+      tags: [payroll]
+      summary: Compare projected income tax under Old vs New regime
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxCalculatorBody"
+      responses:
+        "200":
+          description: Tax comparison
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxCalculatorResult"
 
   # ──────────────────────────────────────────────
   # PERFORMANCE MANAGEMENT
@@ -7480,6 +7522,87 @@ components:
         regime: { type: string, enum: [Old, New] }
         investmentDeclarations: {}
         declarationDate: { type: string, format: date }
+
+    Form16Report:
+      type: object
+      required: [employee, financialYear, records, summary]
+      properties:
+        employee:
+          type: object
+          properties:
+            name: { type: string }
+            code: { type: ["string", "null"] }
+        financialYear: { type: string }
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              periodMonth: { type: ["integer", "null"] }
+              periodYear: { type: ["integer", "null"] }
+              grossEarnings: { type: ["string", "null"] }
+              tds: { type: ["string", "null"] }
+              taxRegime: { type: ["string", "null"] }
+              netPay: { type: ["string", "null"] }
+              basic: { type: ["string", "null"] }
+              pfEmployee: { type: ["string", "null"] }
+        summary:
+          type: object
+          properties:
+            totalGross: { type: number }
+            totalTDS: { type: number }
+            totalPF: { type: number }
+            taxableIncome: { type: number }
+            regime: { type: string }
+
+    TaxCalculatorInvestments:
+      type: object
+      properties:
+        "80C": { type: number }
+        "80D": { type: number }
+        "80CCD": { type: number }
+        HRA_EXEMPT: { type: number }
+        LTA: { type: number }
+        OTHER: { type: number }
+
+    TaxCalculatorBody:
+      type: object
+      required: [annualGross]
+      properties:
+        annualGross: { type: number }
+        investments:
+          $ref: "#/components/schemas/TaxCalculatorInvestments"
+
+    TaxBreakdown:
+      type: object
+      required: [regime, grossIncome, standardDeduction, totalDeductions, taxableIncome, taxBeforeRebate, rebate, taxAfterRebate, cess, totalTaxAnnual, monthlyTds]
+      properties:
+        regime: { type: string, enum: [Old, New] }
+        grossIncome: { type: number }
+        standardDeduction: { type: number }
+        totalDeductions: { type: number }
+        taxableIncome: { type: number }
+        taxBeforeRebate: { type: number }
+        rebate: { type: number }
+        taxAfterRebate: { type: number }
+        cess: { type: number }
+        totalTaxAnnual: { type: number }
+        monthlyTds: { type: number }
+
+    TaxCalculatorResult:
+      type: object
+      required: [annualGross, investments, investmentTotal, oldRegime, newRegime, recommended, savings]
+      properties:
+        annualGross: { type: number }
+        investments:
+          $ref: "#/components/schemas/TaxCalculatorInvestments"
+        investmentTotal: { type: number }
+        oldRegime:
+          $ref: "#/components/schemas/TaxBreakdown"
+        newRegime:
+          $ref: "#/components/schemas/TaxBreakdown"
+        recommended: { type: string, enum: [Old, New] }
+        savings: { type: number }
 
     PayrollSetting:
       type: object

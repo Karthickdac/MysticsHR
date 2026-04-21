@@ -1825,6 +1825,100 @@ export interface CreateTaxDeclarationBody {
   declarationDate: string;
 }
 
+export type Form16ReportEmployee = {
+  name?: string;
+  /** @nullable */
+  code?: string | null;
+};
+
+export type Form16ReportRecordsItem = {
+  /** @nullable */
+  periodMonth?: number | null;
+  /** @nullable */
+  periodYear?: number | null;
+  /** @nullable */
+  grossEarnings?: string | null;
+  /** @nullable */
+  tds?: string | null;
+  /** @nullable */
+  taxRegime?: string | null;
+  /** @nullable */
+  netPay?: string | null;
+  /** @nullable */
+  basic?: string | null;
+  /** @nullable */
+  pfEmployee?: string | null;
+};
+
+export type Form16ReportSummary = {
+  totalGross?: number;
+  totalTDS?: number;
+  totalPF?: number;
+  taxableIncome?: number;
+  regime?: string;
+};
+
+export interface Form16Report {
+  employee: Form16ReportEmployee;
+  financialYear: string;
+  records: Form16ReportRecordsItem[];
+  summary: Form16ReportSummary;
+}
+
+export interface TaxCalculatorInvestments {
+  "80C"?: number;
+  "80D"?: number;
+  "80CCD"?: number;
+  HRA_EXEMPT?: number;
+  LTA?: number;
+  OTHER?: number;
+}
+
+export interface TaxCalculatorBody {
+  annualGross: number;
+  investments?: TaxCalculatorInvestments;
+}
+
+export type TaxBreakdownRegime =
+  (typeof TaxBreakdownRegime)[keyof typeof TaxBreakdownRegime];
+
+export const TaxBreakdownRegime = {
+  Old: "Old",
+  New: "New",
+} as const;
+
+export interface TaxBreakdown {
+  regime: TaxBreakdownRegime;
+  grossIncome: number;
+  standardDeduction: number;
+  totalDeductions: number;
+  taxableIncome: number;
+  taxBeforeRebate: number;
+  rebate: number;
+  taxAfterRebate: number;
+  cess: number;
+  totalTaxAnnual: number;
+  monthlyTds: number;
+}
+
+export type TaxCalculatorResultRecommended =
+  (typeof TaxCalculatorResultRecommended)[keyof typeof TaxCalculatorResultRecommended];
+
+export const TaxCalculatorResultRecommended = {
+  Old: "Old",
+  New: "New",
+} as const;
+
+export interface TaxCalculatorResult {
+  annualGross: number;
+  investments: TaxCalculatorInvestments;
+  investmentTotal: number;
+  oldRegime: TaxBreakdown;
+  newRegime: TaxBreakdown;
+  recommended: TaxCalculatorResultRecommended;
+  savings: number;
+}
+
 export interface PayrollSetting {
   id: number;
   settingKey: string;
@@ -3410,8 +3504,6 @@ export type GetBankTransferReportParams = {
   year: string;
   month: string;
 };
-
-export type GetForm16Report200 = { [key: string]: unknown };
 
 export type ListPerformanceCyclesParams = {
   status?: string;

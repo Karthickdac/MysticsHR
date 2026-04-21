@@ -4434,14 +4434,105 @@ export const GetBankTransferReportResponse = zod.object({
 });
 
 /**
- * @summary Form 16 generation for an employee FY
+ * @summary Form 16 data for an employee FY
  */
 export const GetForm16ReportParams = zod.object({
   employeeId: zod.coerce.number(),
   year: zod.coerce.number(),
 });
 
-export const GetForm16ReportResponse = zod.object({}).passthrough();
+export const GetForm16ReportResponse = zod.object({
+  employee: zod.object({
+    name: zod.string().optional(),
+    code: zod.string().nullish(),
+  }),
+  financialYear: zod.string(),
+  records: zod.array(
+    zod.object({
+      periodMonth: zod.number().nullish(),
+      periodYear: zod.number().nullish(),
+      grossEarnings: zod.string().nullish(),
+      tds: zod.string().nullish(),
+      taxRegime: zod.string().nullish(),
+      netPay: zod.string().nullish(),
+      basic: zod.string().nullish(),
+      pfEmployee: zod.string().nullish(),
+    }),
+  ),
+  summary: zod.object({
+    totalGross: zod.number().optional(),
+    totalTDS: zod.number().optional(),
+    totalPF: zod.number().optional(),
+    taxableIncome: zod.number().optional(),
+    regime: zod.string().optional(),
+  }),
+});
+
+/**
+ * @summary Download Form 16 PDF for an employee FY
+ */
+export const GetForm16PdfParams = zod.object({
+  employeeId: zod.coerce.number(),
+  year: zod.coerce.number(),
+});
+
+/**
+ * @summary Compare projected income tax under Old vs New regime
+ */
+export const CalculateTaxBody = zod.object({
+  annualGross: zod.number(),
+  investments: zod
+    .object({
+      "80C": zod.number().optional(),
+      "80D": zod.number().optional(),
+      "80CCD": zod.number().optional(),
+      HRA_EXEMPT: zod.number().optional(),
+      LTA: zod.number().optional(),
+      OTHER: zod.number().optional(),
+    })
+    .optional(),
+});
+
+export const CalculateTaxResponse = zod.object({
+  annualGross: zod.number(),
+  investments: zod.object({
+    "80C": zod.number().optional(),
+    "80D": zod.number().optional(),
+    "80CCD": zod.number().optional(),
+    HRA_EXEMPT: zod.number().optional(),
+    LTA: zod.number().optional(),
+    OTHER: zod.number().optional(),
+  }),
+  investmentTotal: zod.number(),
+  oldRegime: zod.object({
+    regime: zod.enum(["Old", "New"]),
+    grossIncome: zod.number(),
+    standardDeduction: zod.number(),
+    totalDeductions: zod.number(),
+    taxableIncome: zod.number(),
+    taxBeforeRebate: zod.number(),
+    rebate: zod.number(),
+    taxAfterRebate: zod.number(),
+    cess: zod.number(),
+    totalTaxAnnual: zod.number(),
+    monthlyTds: zod.number(),
+  }),
+  newRegime: zod.object({
+    regime: zod.enum(["Old", "New"]),
+    grossIncome: zod.number(),
+    standardDeduction: zod.number(),
+    totalDeductions: zod.number(),
+    taxableIncome: zod.number(),
+    taxBeforeRebate: zod.number(),
+    rebate: zod.number(),
+    taxAfterRebate: zod.number(),
+    cess: zod.number(),
+    totalTaxAnnual: zod.number(),
+    monthlyTds: zod.number(),
+  }),
+  recommended: zod.enum(["Old", "New"]),
+  savings: zod.number(),
+});
 
 /**
  * @summary List performance review cycles

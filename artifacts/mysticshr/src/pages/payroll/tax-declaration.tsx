@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useListTaxDeclarations, useCreateTaxDeclaration, getListTaxDeclarationsQueryKey,
+  useCalculateTax,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
@@ -13,11 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Banknote, Plus, CheckCircle2 } from "lucide-react";
+import { Banknote, Plus, CheckCircle2, Calculator, Download, FileText } from "lucide-react";
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function fmtINR(n: number | string | null | undefined): string {
+  if (n === null || n === undefined || n === "") return "₹0";
+  return `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
 const INVESTMENT_FIELDS = [
@@ -28,10 +34,28 @@ const INVESTMENT_FIELDS = [
   { key: "80CCD", label: "Section 80CCD(1B) NPS", max: 50000 },
 ];
 
+const CALC_FIELDS: Array<{ key: "80C" | "80D" | "80CCD" | "HRA_EXEMPT" | "LTA" | "OTHER"; label: string; hint?: string }> = [
+  { key: "80C", label: "Section 80C", hint: "Capped at ₹1.5L (PF, LIC, ELSS, PPF...)" },
+  { key: "80D", label: "Section 80D", hint: "Capped at ₹25K (medical insurance)" },
+  { key: "80CCD", label: "Section 80CCD(1B)", hint: "Capped at ₹50K (NPS)" },
+  { key: "HRA_EXEMPT", label: "HRA Exemption" },
+  { key: "LTA", label: "LTA" },
+  { key: "OTHER", label: "Other Deductions" },
+];
+
 function getCurrentFY() {
   const now = new Date();
   const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
   return `${year}-${String(year + 1).slice(2)}`;
+}
+
+function fyStartYear(fy: string): number {
+  return Number(fy.split("-")[0]);
+}
+
+function buildApiBase() {
+  const base = import.meta.env.BASE_URL ?? "/mysticshr/";
+  return base.endsWith("/") ? `${base}api` : `${base}/api`;
 }
 
 export default function TaxDeclarationPage() {
@@ -55,6 +79,52 @@ export default function TaxDeclarationPage() {
     declarationDate: new Date().toISOString().split("T")[0],
     investments: {} as Record<string, string>,
   });
+
+  // ─── Tax calculator state ────────────────────────────────────────────
+  const calcMutation = useCalculateTax();
+  const [calcGross, setCalcGross] = useState("");
+  const [calcInv, setCalcInv] = useState<Record<string, string>>({});
+
+  function handleCalculate() {
+    const annualGross = Number(calcGross);
+    if (!Number.isFinite(annualGross) || annualGross <= 0) return;
+    const investments: Record<string, number> = {};
+    for (const f of CALC_FIELDS) {
+      const v = Number(calcInv[f.key]);
+      if (Number.isFinite(v) && v > 0) investments[f.key] = v;
+    }
+    calcMutation.mutate({ data: { annualGross, investments } });
+  }
+
+  const calcResult = calcMutation.data;
+
+  // ─── Form 16 download ────────────────────────────────────────────────
+  // Available FY years are those with payroll history; we show the years from the declarations filter (employees pick year then download).
+  const FORM16_YEARS = useMemo(() => {
+    const startNow = fyStartYear(currentFY);
+    return [startNow - 2, startNow - 1, startNow].map(y => ({
+      year: y,
+      label: `${y}-${String(y + 1).slice(2)}`,
+    }));
+  }, [currentFY]);
+  const [form16Year, setForm16Year] = useState<number>(fyStartYear(currentFY) - 1);
+
+  function handleDownloadForm16() {
+    // Employees and HODs download their own Form 16; HR/payroll roles can specify any employee.
+    const isSelfServeRole = role === "employee" || role === "hod";
+    const empId = isSelfServeRole ? hrmsUser?.employeeId : isHr ? Number(form.employeeId || "0") : null;
+    if (!empId) {
+      setError("Employee ID is required to download Form 16.");
+      return;
+    }
+    const url = `${buildApiBase()}/payroll/reports/form-16/${empId}/${form16Year}/pdf`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Form16_FY${form16Year}-${String(form16Year + 1).slice(2)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
 
   async function handleSubmit() {
     setError(null);
@@ -83,12 +153,12 @@ export default function TaxDeclarationPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Income Tax Regime Declaration</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            {isEmployee ? "Declare your preferred income tax regime for TDS calculation." : "View and manage employee tax regime declarations."}
+            {isEmployee ? "Declare your preferred income tax regime, project your tax under both regimes, and download your Form 16." : "View and manage employee tax regime declarations."}
           </p>
         </div>
         <Button onClick={() => { setShowDeclare(true); setError(null); }}>
@@ -137,6 +207,148 @@ export default function TaxDeclarationPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ─── Interactive Tax Calculator ─────────────────────── */}
+      <Card className="border-blue-200">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calculator className="w-4 h-4 text-blue-600" /> Tax Calculator — Old vs New Regime
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Enter your hypothetical annual gross salary and proposed investments to see projected income tax under both regimes.
+            Investment caps (80C ₹1.5L, 80D ₹25K, 80CCD ₹50K) are applied automatically.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1 md:col-span-1">
+              <Label className="text-xs">Annual Gross Salary <span className="text-red-500">*</span></Label>
+              <Input
+                type="number"
+                placeholder="e.g. 1200000"
+                value={calcGross}
+                onChange={e => setCalcGross(e.target.value)}
+              />
+            </div>
+            {CALC_FIELDS.map(f => (
+              <div key={f.key} className="space-y-1">
+                <Label className="text-xs">{f.label}</Label>
+                <Input
+                  type="number"
+                  placeholder="₹0"
+                  value={calcInv[f.key] ?? ""}
+                  onChange={e => setCalcInv(s => ({ ...s, [f.key]: e.target.value }))}
+                />
+                {f.hint && <p className="text-[10px] text-muted-foreground">{f.hint}</p>}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 items-center">
+            <Button onClick={handleCalculate} disabled={!calcGross || calcMutation.isPending}>
+              {calcMutation.isPending ? "Calculating..." : "Calculate Tax"}
+            </Button>
+            {calcMutation.isError && (
+              <span className="text-sm text-red-600">{extractError(calcMutation.error, "Calculation failed")}</span>
+            )}
+          </div>
+
+          {calcResult && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              {/* Old regime */}
+              <Card className={`border-2 ${calcResult.recommended === "Old" ? "border-emerald-400 bg-emerald-50/50" : "border-purple-200"}`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center justify-between text-purple-800">
+                    Old Regime
+                    {calcResult.recommended === "Old" && <Badge className="bg-emerald-600 text-white">Recommended</Badge>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-1.5">
+                  <Row label="Gross Income" value={fmtINR(calcResult.oldRegime.grossIncome)} />
+                  <Row label="Standard Deduction" value={`− ${fmtINR(calcResult.oldRegime.standardDeduction)}`} />
+                  <Row label="Investment Deductions" value={`− ${fmtINR(calcResult.oldRegime.totalDeductions - calcResult.oldRegime.standardDeduction)}`} />
+                  <Row label="Taxable Income" value={fmtINR(calcResult.oldRegime.taxableIncome)} bold />
+                  <Row label="Tax Before Rebate" value={fmtINR(calcResult.oldRegime.taxBeforeRebate)} />
+                  <Row label="Rebate u/s 87A" value={`− ${fmtINR(calcResult.oldRegime.rebate)}`} />
+                  <Row label="Health & Edu Cess (4%)" value={`+ ${fmtINR(calcResult.oldRegime.cess)}`} />
+                  <div className="h-px bg-purple-200 my-2" />
+                  <Row label="Total Tax (Annual)" value={fmtINR(calcResult.oldRegime.totalTaxAnnual)} bold className="text-purple-800" />
+                  <Row label="Approx Monthly TDS" value={fmtINR(calcResult.oldRegime.monthlyTds)} />
+                </CardContent>
+              </Card>
+              {/* New regime */}
+              <Card className={`border-2 ${calcResult.recommended === "New" ? "border-emerald-400 bg-emerald-50/50" : "border-blue-200"}`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center justify-between text-blue-800">
+                    New Regime
+                    {calcResult.recommended === "New" && <Badge className="bg-emerald-600 text-white">Recommended</Badge>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs space-y-1.5">
+                  <Row label="Gross Income" value={fmtINR(calcResult.newRegime.grossIncome)} />
+                  <Row label="Standard Deduction" value={`− ${fmtINR(calcResult.newRegime.standardDeduction)}`} />
+                  <Row label="Investment Deductions" value="− ₹0 (not allowed)" />
+                  <Row label="Taxable Income" value={fmtINR(calcResult.newRegime.taxableIncome)} bold />
+                  <Row label="Tax Before Rebate" value={fmtINR(calcResult.newRegime.taxBeforeRebate)} />
+                  <Row label="Rebate u/s 87A" value={`− ${fmtINR(calcResult.newRegime.rebate)}`} />
+                  <Row label="Health & Edu Cess (4%)" value={`+ ${fmtINR(calcResult.newRegime.cess)}`} />
+                  <div className="h-px bg-blue-200 my-2" />
+                  <Row label="Total Tax (Annual)" value={fmtINR(calcResult.newRegime.totalTaxAnnual)} bold className="text-blue-800" />
+                  <Row label="Approx Monthly TDS" value={fmtINR(calcResult.newRegime.monthlyTds)} />
+                </CardContent>
+              </Card>
+              <div className="md:col-span-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-sm">
+                <span className="font-semibold text-emerald-900">{calcResult.recommended} Regime</span>
+                {calcResult.savings > 0 ? (
+                  <span className="text-emerald-800"> saves you approximately <span className="font-bold">{fmtINR(calcResult.savings)}</span> per year vs the {calcResult.recommended === "Old" ? "New" : "Old"} regime.</span>
+                ) : (
+                  <span className="text-emerald-800"> &mdash; both regimes produce the same tax.</span>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Estimates are projections based on FY 2024-25 slab rates and include 4% health &amp; education cess.</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ─── Form 16 Download ─────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="w-4 h-4 text-red-600" /> Download Form 16
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Annual TDS certificate compiled from your monthly payroll records for the selected financial year.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-3">
+          {role !== "employee" && role !== "hod" && (
+            <div className="space-y-1">
+              <Label className="text-xs">Employee ID</Label>
+              <Input
+                type="number"
+                placeholder="Employee DB ID"
+                className="w-40"
+                value={form.employeeId}
+                onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
+              />
+            </div>
+          )}
+          <div className="space-y-1">
+            <Label className="text-xs">Financial Year</Label>
+            <Select value={String(form16Year)} onValueChange={v => setForm16Year(Number(v))}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FORM16_YEARS.map(y => (
+                  <SelectItem key={y.year} value={String(y.year)}>FY {y.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleDownloadForm16} variant="outline">
+            <Download className="w-4 h-4 mr-1" />Download Form 16 PDF
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Declarations List */}
       {isLoading ? (
@@ -254,6 +466,15 @@ export default function TaxDeclarationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function Row({ label, value, bold, className }: { label: string; value: string; bold?: boolean; className?: string }) {
+  return (
+    <div className={`flex justify-between ${className ?? ""}`}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className={bold ? "font-semibold" : ""}>{value}</span>
     </div>
   );
 }

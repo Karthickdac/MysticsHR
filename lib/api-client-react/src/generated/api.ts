@@ -103,6 +103,7 @@ import type {
   FnfApproveBody,
   FnfApproveResult,
   FnfComputation,
+  Form16Report,
   GenerateDocumentBody,
   GetAttendanceParams,
   GetAttendanceRegularizationsParams,
@@ -120,7 +121,6 @@ import type {
   GetEsiReportParams,
   GetExitAlerts200,
   GetFnfSuggestion200,
-  GetForm16Report200,
   GetHeadcountReport200,
   GetHeadcountReportParams,
   GetHelpdeskSlaReport200,
@@ -256,6 +256,8 @@ import type {
   SubmitManagerEvaluationBody,
   SubmitPermissionBody,
   SubmitSelfAppraisalBody,
+  TaxCalculatorBody,
+  TaxCalculatorResult,
   TaxDeclaration,
   TestSmtpConfig200,
   TestSmtpConfigBody,
@@ -16680,7 +16682,7 @@ export function useGetBankTransferReport<
 }
 
 /**
- * @summary Form 16 generation for an employee FY
+ * @summary Form 16 data for an employee FY
  */
 export const getGetForm16ReportUrl = (employeeId: number, year: number) => {
   return `/api/payroll/reports/form-16/${employeeId}/${year}`;
@@ -16690,14 +16692,11 @@ export const getForm16Report = async (
   employeeId: number,
   year: number,
   options?: RequestInit,
-): Promise<GetForm16Report200> => {
-  return customFetch<GetForm16Report200>(
-    getGetForm16ReportUrl(employeeId, year),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
+): Promise<Form16Report> => {
+  return customFetch<Form16Report>(getGetForm16ReportUrl(employeeId, year), {
+    ...options,
+    method: "GET",
+  });
 };
 
 export const getGetForm16ReportQueryKey = (
@@ -16749,7 +16748,7 @@ export type GetForm16ReportQueryResult = NonNullable<
 export type GetForm16ReportQueryError = ErrorType<unknown>;
 
 /**
- * @summary Form 16 generation for an employee FY
+ * @summary Form 16 data for an employee FY
  */
 
 export function useGetForm16Report<
@@ -16779,6 +16778,183 @@ export function useGetForm16Report<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Download Form 16 PDF for an employee FY
+ */
+export const getGetForm16PdfUrl = (employeeId: number, year: number) => {
+  return `/api/payroll/reports/form-16/${employeeId}/${year}/pdf`;
+};
+
+export const getForm16Pdf = async (
+  employeeId: number,
+  year: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetForm16PdfUrl(employeeId, year), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetForm16PdfQueryKey = (employeeId: number, year: number) => {
+  return [`/api/payroll/reports/form-16/${employeeId}/${year}/pdf`] as const;
+};
+
+export const getGetForm16PdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getForm16Pdf>>,
+  TError = ErrorType<unknown>,
+>(
+  employeeId: number,
+  year: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getForm16Pdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetForm16PdfQueryKey(employeeId, year);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getForm16Pdf>>> = ({
+    signal,
+  }) => getForm16Pdf(employeeId, year, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(employeeId && year),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getForm16Pdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetForm16PdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getForm16Pdf>>
+>;
+export type GetForm16PdfQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Download Form 16 PDF for an employee FY
+ */
+
+export function useGetForm16Pdf<
+  TData = Awaited<ReturnType<typeof getForm16Pdf>>,
+  TError = ErrorType<unknown>,
+>(
+  employeeId: number,
+  year: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getForm16Pdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetForm16PdfQueryOptions(employeeId, year, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Compare projected income tax under Old vs New regime
+ */
+export const getCalculateTaxUrl = () => {
+  return `/api/payroll/tax-calculator`;
+};
+
+export const calculateTax = async (
+  taxCalculatorBody: TaxCalculatorBody,
+  options?: RequestInit,
+): Promise<TaxCalculatorResult> => {
+  return customFetch<TaxCalculatorResult>(getCalculateTaxUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(taxCalculatorBody),
+  });
+};
+
+export const getCalculateTaxMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof calculateTax>>,
+    TError,
+    { data: BodyType<TaxCalculatorBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof calculateTax>>,
+  TError,
+  { data: BodyType<TaxCalculatorBody> },
+  TContext
+> => {
+  const mutationKey = ["calculateTax"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof calculateTax>>,
+    { data: BodyType<TaxCalculatorBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return calculateTax(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CalculateTaxMutationResult = NonNullable<
+  Awaited<ReturnType<typeof calculateTax>>
+>;
+export type CalculateTaxMutationBody = BodyType<TaxCalculatorBody>;
+export type CalculateTaxMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Compare projected income tax under Old vs New regime
+ */
+export const useCalculateTax = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof calculateTax>>,
+    TError,
+    { data: BodyType<TaxCalculatorBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof calculateTax>>,
+  TError,
+  { data: BodyType<TaxCalculatorBody> },
+  TContext
+> => {
+  return useMutation(getCalculateTaxMutationOptions(options));
+};
 
 /**
  * @summary List performance review cycles

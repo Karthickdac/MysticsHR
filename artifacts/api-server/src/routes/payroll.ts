@@ -31,35 +31,100 @@ const ALL_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_
 // ─── TDS COMPUTATION ─────────────────────────────────────────────────────────
 // FY 2024-25 slab rates
 
+const NEW_REGIME_STD_DEDUCTION = 75000;
+const OLD_REGIME_STD_DEDUCTION = 50000;
+const HEALTH_AND_EDUCATION_CESS = 0.04;
+
+interface TaxBreakdown {
+  regime: "Old" | "New";
+  grossIncome: number;
+  standardDeduction: number;
+  totalDeductions: number;
+  taxableIncome: number;
+  taxBeforeRebate: number;
+  rebate: number;
+  taxAfterRebate: number;
+  cess: number;
+  totalTaxAnnual: number;
+  monthlyTds: number;
+}
+
+function applyOldRegimeSlabs(taxableIncome: number): number {
+  let tax = 0;
+  if (taxableIncome > 250000) tax += Math.min(taxableIncome - 250000, 250000) * 0.05;
+  if (taxableIncome > 500000) tax += Math.min(taxableIncome - 500000, 500000) * 0.20;
+  if (taxableIncome > 1000000) tax += (taxableIncome - 1000000) * 0.30;
+  return tax;
+}
+
+function applyNewRegimeSlabs(taxableIncome: number): number {
+  const slabs = [
+    { upto: 300000, rate: 0 },
+    { upto: 600000, rate: 0.05 },
+    { upto: 900000, rate: 0.10 },
+    { upto: 1200000, rate: 0.15 },
+    { upto: 1500000, rate: 0.20 },
+  ];
+  let tax = 0;
+  let prev = 0;
+  for (const slab of slabs) {
+    if (taxableIncome > slab.upto) { tax += (slab.upto - prev) * slab.rate; prev = slab.upto; }
+    else { tax += (taxableIncome - prev) * slab.rate; return tax; }
+  }
+  tax += (taxableIncome - 1500000) * 0.30;
+  return tax;
+}
+
+function computeTaxBreakdown(
+  annualGross: number,
+  regime: "Old" | "New",
+  investmentDeductions: number = 0,
+): TaxBreakdown {
+  const stdDeduction = regime === "New" ? NEW_REGIME_STD_DEDUCTION : OLD_REGIME_STD_DEDUCTION;
+  // Investments only reduce taxable income for the Old regime.
+  const otherDeductions = regime === "Old" ? Math.max(0, investmentDeductions) : 0;
+  const totalDeductions = stdDeduction + otherDeductions;
+  const taxableIncome = Math.max(0, annualGross - totalDeductions);
+
+  const taxBeforeRebate = regime === "New"
+    ? applyNewRegimeSlabs(taxableIncome)
+    : applyOldRegimeSlabs(taxableIncome);
+
+  // Rebate u/s 87A
+  const rebateLimit = regime === "New" ? 700000 : 500000;
+  const rebate = taxableIncome <= rebateLimit ? taxBeforeRebate : 0;
+  const taxAfterRebate = Math.max(0, taxBeforeRebate - rebate);
+  const cess = taxAfterRebate * HEALTH_AND_EDUCATION_CESS;
+  const totalTaxAnnual = Math.round(taxAfterRebate + cess);
+  const monthlyTds = Math.round(totalTaxAnnual / 12);
+
+  return {
+    regime,
+    grossIncome: Math.round(annualGross),
+    standardDeduction: stdDeduction,
+    totalDeductions,
+    taxableIncome: Math.round(taxableIncome),
+    taxBeforeRebate: Math.round(taxBeforeRebate),
+    rebate: Math.round(rebate),
+    taxAfterRebate: Math.round(taxAfterRebate),
+    cess: Math.round(cess),
+    totalTaxAnnual,
+    monthlyTds,
+  };
+}
+
 function computeTDS(annualGross: number, regime: "Old" | "New"): number {
+  // Preserves the previous behavior used in payroll runs (no cess applied; pre-task baseline).
   if (regime === "New") {
-    const stdDeduction = 75000;
+    const stdDeduction = NEW_REGIME_STD_DEDUCTION;
     const taxableIncome = Math.max(0, annualGross - stdDeduction);
-    if (taxableIncome <= 700000) return 0; // Rebate u/s 87A
-    let tax = 0;
-    const slabs = [
-      { upto: 300000, rate: 0 },
-      { upto: 600000, rate: 0.05 },
-      { upto: 900000, rate: 0.10 },
-      { upto: 1200000, rate: 0.15 },
-      { upto: 1500000, rate: 0.20 },
-    ];
-    let prev = 0;
-    for (const slab of slabs) {
-      if (taxableIncome > slab.upto) { tax += (slab.upto - prev) * slab.rate; prev = slab.upto; }
-      else { tax += (taxableIncome - prev) * slab.rate; return Math.round(tax / 12); }
-    }
-    tax += (taxableIncome - 1500000) * 0.30;
-    return Math.round(tax / 12);
+    if (taxableIncome <= 700000) return 0;
+    return Math.round(applyNewRegimeSlabs(taxableIncome) / 12);
   } else {
-    const stdDeduction = 50000;
+    const stdDeduction = OLD_REGIME_STD_DEDUCTION;
     const taxableIncome = Math.max(0, annualGross - stdDeduction);
-    if (taxableIncome <= 500000) return 0; // Rebate u/s 87A
-    let tax = 0;
-    if (taxableIncome > 250000) tax += Math.min(taxableIncome - 250000, 250000) * 0.05;
-    if (taxableIncome > 500000) tax += Math.min(taxableIncome - 500000, 500000) * 0.20;
-    if (taxableIncome > 1000000) tax += (taxableIncome - 1000000) * 0.30;
-    return Math.round(tax / 12);
+    if (taxableIncome <= 500000) return 0;
+    return Math.round(applyOldRegimeSlabs(taxableIncome) / 12);
   }
 }
 
@@ -1369,44 +1434,138 @@ router.get("/payroll/reports/bank-transfer", requireHrmsUser, requireRole(...PAY
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-router.get("/payroll/reports/form-16/:employeeId/:year", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+// Helper: ensure caller can access this employee's tax data
+async function assertCanAccessEmployeeTaxData(req: import("express").Request, employeeId: number): Promise<string | null> {
+  const u = req.hrmsUser!;
+  if (u.role === "employee" || u.role === "hod") {
+    const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+      .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+      .where(eq(hrmsUsersTable.id, u.id));
+    if (!emp || emp.id !== employeeId) return "Forbidden";
+  }
+  return null;
+}
+
+interface Form16Data {
+  employee: { name: string; code: string | null | undefined };
+  financialYear: string;
+  records: Array<{
+    periodMonth: number | null; periodYear: number | null;
+    grossEarnings: string | null; tds: string | null;
+    taxRegime: string | null; netPay: string | null;
+    basic: string | null; pfEmployee: string | null;
+  }>;
+  summary: { totalGross: number; totalTDS: number; totalPF: number; taxableIncome: number; regime: string };
+}
+
+async function loadForm16Data(empId: number, year: number): Promise<Form16Data | null> {
+  const records = await db.select({
+    periodMonth: payrollRunsTable.periodMonth,
+    periodYear: payrollRunsTable.periodYear,
+    grossEarnings: payrollRecordsTable.grossEarnings,
+    tds: payrollRecordsTable.tds,
+    taxRegime: payrollRecordsTable.taxRegime,
+    netPay: payrollRecordsTable.netPay,
+    basic: payrollRecordsTable.basic,
+    pfEmployee: payrollRecordsTable.pfEmployee,
+  }).from(payrollRecordsTable)
+    .leftJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
+    .where(and(
+      eq(payrollRecordsTable.employeeId, empId),
+      or(
+        and(eq(payrollRunsTable.periodYear, year), gte(payrollRunsTable.periodMonth, 4)),
+        and(eq(payrollRunsTable.periodYear, year + 1), lte(payrollRunsTable.periodMonth, 3)),
+      )
+    ))
+    .orderBy(asc(payrollRunsTable.periodYear), asc(payrollRunsTable.periodMonth));
+
+  const [emp] = await db.select({
+    name: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
+    code: employeesTable.employeeId,
+  }).from(employeesTable).where(eq(employeesTable.id, empId));
+  if (!emp) return null;
+
+  const totalGross = records.reduce((s, r) => s + Number(r.grossEarnings), 0);
+  const totalTDS = records.reduce((s, r) => s + Number(r.tds), 0);
+  const totalPF = records.reduce((s, r) => s + Number(r.pfEmployee), 0);
+  const regime = records[0]?.taxRegime ?? "New";
+  const stdDed = regime === "New" ? NEW_REGIME_STD_DEDUCTION : OLD_REGIME_STD_DEDUCTION;
+
+  return {
+    employee: emp,
+    financialYear: `${year}-${String(year + 1).slice(2)}`,
+    records,
+    summary: { totalGross, totalTDS, totalPF, taxableIncome: Math.max(0, totalGross - stdDed), regime },
+  };
+}
+
+router.get("/payroll/reports/form-16/:employeeId/:year", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const empId = Number(req.params.employeeId);
     const year = Number(req.params.year);
-    const records = await db.select({
-      periodMonth: payrollRunsTable.periodMonth,
-      periodYear: payrollRunsTable.periodYear,
-      grossEarnings: payrollRecordsTable.grossEarnings,
-      tds: payrollRecordsTable.tds,
-      taxRegime: payrollRecordsTable.taxRegime,
-      netPay: payrollRecordsTable.netPay,
-      basic: payrollRecordsTable.basic,
-      pfEmployee: payrollRecordsTable.pfEmployee,
-    }).from(payrollRecordsTable)
-      .leftJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(and(
-        eq(payrollRecordsTable.employeeId, empId),
-        or(
-          and(eq(payrollRunsTable.periodYear, year), gte(payrollRunsTable.periodMonth, 4)),
-          and(eq(payrollRunsTable.periodYear, year + 1), lte(payrollRunsTable.periodMonth, 3)),
-        )
-      ))
-      .orderBy(asc(payrollRunsTable.periodYear), asc(payrollRunsTable.periodMonth));
+    const forbidden = await assertCanAccessEmployeeTaxData(req, empId);
+    if (forbidden) { res.status(403).json({ error: forbidden }); return; }
+    const data = await loadForm16Data(empId, year);
+    if (!data) { res.status(404).json({ error: "Employee not found" }); return; }
+    res.json(data);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
 
-    const [emp] = await db.select({
-      name: sql<string>`${employeesTable.firstName} || ' ' || ${employeesTable.lastName}`,
-      code: employeesTable.employeeId,
-    }).from(employeesTable).where(eq(employeesTable.id, empId));
+// Form 16 PDF download
+router.get("/payroll/reports/form-16/:employeeId/:year/pdf", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const empId = Number(req.params.employeeId);
+    const year = Number(req.params.year);
+    const forbidden = await assertCanAccessEmployeeTaxData(req, empId);
+    if (forbidden) { res.status(403).json({ error: forbidden }); return; }
+    const data = await loadForm16Data(empId, year);
+    if (!data) { res.status(404).json({ error: "Employee not found" }); return; }
 
-    const totalGross = records.reduce((s, r) => s + Number(r.grossEarnings), 0);
-    const totalTDS = records.reduce((s, r) => s + Number(r.tds), 0);
-    const totalPF = records.reduce((s, r) => s + Number(r.pfEmployee), 0);
+    const pdfBytes = await generateForm16Pdf(data);
+    const safeName = (data.employee.name || "employee").replace(/\s+/g, "_");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Form16_${safeName}_FY${data.financialYear}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// Interactive tax calculator - compares Old vs New regime
+router.post("/payroll/tax-calculator", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const body = req.body as {
+      annualGross?: number;
+      investments?: Partial<Record<"80C" | "80D" | "80CCD" | "HRA_EXEMPT" | "LTA" | "OTHER", number>>;
+    };
+    const annualGross = Number(body.annualGross);
+    if (!Number.isFinite(annualGross) || annualGross < 0) {
+      res.status(400).json({ error: "annualGross must be a non-negative number" });
+      return;
+    }
+    const inv = body.investments ?? {};
+    // Cap each section at its statutory limit before summing
+    const capped = {
+      "80C": Math.min(Math.max(0, Number(inv["80C"]) || 0), 150000),
+      "80D": Math.min(Math.max(0, Number(inv["80D"]) || 0), 25000),
+      "80CCD": Math.min(Math.max(0, Number(inv["80CCD"]) || 0), 50000),
+      "HRA_EXEMPT": Math.max(0, Number(inv["HRA_EXEMPT"]) || 0),
+      "LTA": Math.max(0, Number(inv["LTA"]) || 0),
+      "OTHER": Math.max(0, Number(inv["OTHER"]) || 0),
+    };
+    const investmentTotal = Object.values(capped).reduce((s, v) => s + v, 0);
+
+    const oldRegime = computeTaxBreakdown(annualGross, "Old", investmentTotal);
+    const newRegime = computeTaxBreakdown(annualGross, "New", investmentTotal);
+    const recommended = oldRegime.totalTaxAnnual <= newRegime.totalTaxAnnual ? "Old" : "New";
+    const savings = Math.abs(oldRegime.totalTaxAnnual - newRegime.totalTaxAnnual);
 
     res.json({
-      employee: emp,
-      financialYear: `${year}-${String(year + 1).slice(2)}`,
-      records,
-      summary: { totalGross, totalTDS, totalPF, taxableIncome: totalGross - 75000, regime: records[0]?.taxRegime ?? "New" }
+      annualGross: Math.round(annualGross),
+      investments: capped,
+      investmentTotal,
+      oldRegime,
+      newRegime,
+      recommended,
+      savings,
     });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -1620,6 +1779,101 @@ async function generatePayslipPdf(data: PayslipData, monthName: string, year: nu
   page.drawRectangle({ x: margin, y: y - 40, width: 515, height: 45, color: navy });
   page.drawText("NET PAY (TAKE HOME)", { x: margin + 180, y: y - 16, size: 9, font: regular, color: rgb(0.75, 0.82, 0.9) });
   page.drawText(fmt(data.netPay), { x: margin + 170, y: y - 33, size: 18, font: bold, color: white });
+
+  return pdfDoc.save();
+}
+
+// ─── FORM 16 PDF GENERATOR ───────────────────────────────────────────────────
+
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+async function generateForm16Pdf(data: Form16Data): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]); // A4
+  const { height } = page.getSize();
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const navy = rgb(0.118, 0.176, 0.235);
+  const white = rgb(1, 1, 1);
+  const light = rgb(0.95, 0.97, 0.99);
+  const gray = rgb(0.39, 0.47, 0.56);
+  const margin = 40;
+
+  const fmt = (n: number | string | null | undefined) =>
+    `INR ${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+
+  // Header
+  page.drawRectangle({ x: 0, y: height - 80, width: 595, height: 80, color: navy });
+  page.drawText("Automystics Technologies", { x: margin, y: height - 35, size: 16, font: bold, color: white });
+  page.drawText(`Form 16 — Annual TDS Certificate (FY ${data.financialYear})`, { x: margin, y: height - 55, size: 11, font: regular, color: rgb(0.75, 0.82, 0.9) });
+  page.drawText(`Tax Regime: ${data.summary.regime}`, { x: margin, y: height - 72, size: 9, font: regular, color: rgb(0.75, 0.82, 0.9) });
+
+  let y = height - 100;
+
+  // Employee panel
+  page.drawRectangle({ x: 0, y: y - 40, width: 595, height: 45, color: light });
+  page.drawText("Employee Name", { x: margin, y: y - 18, size: 8, font: regular, color: gray });
+  page.drawText(String(data.employee.name).slice(0, 40), { x: margin, y: y - 32, size: 11, font: bold, color: navy });
+  page.drawText("Employee Code", { x: margin + 280, y: y - 18, size: 8, font: regular, color: gray });
+  page.drawText(String(data.employee.code ?? "—"), { x: margin + 280, y: y - 32, size: 11, font: bold, color: navy });
+
+  y -= 60;
+
+  // Monthly table header
+  page.drawRectangle({ x: margin, y: y - 18, width: 515, height: 20, color: rgb(0.94, 0.95, 0.97) });
+  page.drawText("Period", { x: margin + 6, y: y - 13, size: 9, font: bold, color: gray });
+  page.drawText("Gross Earnings", { x: margin + 110, y: y - 13, size: 9, font: bold, color: gray });
+  page.drawText("PF (Employee)", { x: margin + 230, y: y - 13, size: 9, font: bold, color: gray });
+  page.drawText("TDS Deducted", { x: margin + 340, y: y - 13, size: 9, font: bold, color: gray });
+  page.drawText("Net Pay", { x: margin + 445, y: y - 13, size: 9, font: bold, color: gray });
+  y -= 22;
+
+  if (data.records.length === 0) {
+    page.drawText("No payroll records found for this financial year.", { x: margin + 6, y: y - 10, size: 9, font: regular, color: gray });
+    y -= 20;
+  } else {
+    data.records.forEach((r, i) => {
+      if (i % 2 === 0) page.drawRectangle({ x: margin, y: y - 14, width: 515, height: 16, color: rgb(0.98, 0.99, 1) });
+      const monthLabel = `${MONTH_SHORT[((r.periodMonth ?? 1) - 1) % 12]} ${r.periodYear ?? ""}`;
+      page.drawText(monthLabel, { x: margin + 6, y: y - 10, size: 9, font: regular, color: navy });
+      page.drawText(fmt(r.grossEarnings), { x: margin + 110, y: y - 10, size: 9, font: regular, color: navy });
+      page.drawText(fmt(r.pfEmployee), { x: margin + 230, y: y - 10, size: 9, font: regular, color: navy });
+      page.drawText(fmt(r.tds), { x: margin + 340, y: y - 10, size: 9, font: regular, color: navy });
+      page.drawText(fmt(r.netPay), { x: margin + 445, y: y - 10, size: 9, font: regular, color: navy });
+      y -= 17;
+    });
+  }
+
+  // Totals
+  page.drawRectangle({ x: margin, y: y - 16, width: 515, height: 18, color: rgb(0.92, 0.94, 0.96) });
+  page.drawText("TOTAL (FY)", { x: margin + 6, y: y - 11, size: 9, font: bold, color: navy });
+  page.drawText(fmt(data.summary.totalGross), { x: margin + 110, y: y - 11, size: 9, font: bold, color: navy });
+  page.drawText(fmt(data.summary.totalPF), { x: margin + 230, y: y - 11, size: 9, font: bold, color: navy });
+  page.drawText(fmt(data.summary.totalTDS), { x: margin + 340, y: y - 11, size: 9, font: bold, color: navy });
+  y -= 30;
+
+  // Summary box
+  page.drawRectangle({ x: margin, y: y - 80, width: 515, height: 80, color: light });
+  page.drawText("Annual Summary", { x: margin + 12, y: y - 18, size: 10, font: bold, color: navy });
+  const stdDed = data.summary.regime === "New" ? NEW_REGIME_STD_DEDUCTION : OLD_REGIME_STD_DEDUCTION;
+  const lines: Array<[string, string]> = [
+    ["Gross Salary", fmt(data.summary.totalGross)],
+    ["Standard Deduction", fmt(stdDed)],
+    ["Taxable Income", fmt(data.summary.taxableIncome)],
+    ["Total TDS Deducted", fmt(data.summary.totalTDS)],
+  ];
+  lines.forEach((l, i) => {
+    page.drawText(l[0], { x: margin + 12, y: y - 36 - i * 13, size: 9, font: regular, color: gray });
+    page.drawText(l[1], { x: margin + 360, y: y - 36 - i * 13, size: 9, font: bold, color: navy });
+  });
+
+  y -= 100;
+  page.drawText("This is a system-generated TDS summary based on your monthly payroll records.", {
+    x: margin, y: y, size: 8, font: regular, color: gray,
+  });
+  page.drawText("Use it as a reference; the official Form 16 issued by your employer remains authoritative for tax filing.", {
+    x: margin, y: y - 12, size: 8, font: regular, color: gray,
+  });
 
   return pdfDoc.save();
 }

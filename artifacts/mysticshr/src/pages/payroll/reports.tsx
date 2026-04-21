@@ -311,7 +311,7 @@ export default function StatutoryReportsPage() {
           <CardContent className="p-6 text-center">
             <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="font-medium">Form 16 Generation</p>
-            <p className="text-sm text-muted-foreground mt-1">Form 16 is available per-employee via the employee profile page (year-end generation).</p>
+            <p className="text-sm text-muted-foreground mt-1">Form 16 PDFs are downloadable per-employee from the Tax Declaration page (employees can also self-download their own).</p>
           </CardContent>
         </Card>
       ) : fetched ? (
