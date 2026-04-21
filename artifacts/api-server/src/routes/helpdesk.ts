@@ -702,7 +702,10 @@ router.get("/helpdesk/sla-report.csv", requireHrmsUser, requireRole(...MANAGER_R
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${fileLabel}"`);
     res.send(lines.join("\r\n"));
-  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+  } catch (err) {
+    if (err instanceof BadDateParamError) { res.status(400).json({ error: err.message }); return; }
+    console.error(err); res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ─── TICKET ASSIGNMENTS ───────────────────────────────────────────────────────
