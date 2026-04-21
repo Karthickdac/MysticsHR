@@ -1281,6 +1281,79 @@ router.post("/leave/balances/carry-forward", requireHrmsUser, requireRole(...HR_
   }
 });
 
+router.get("/leave/accrual-history", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const { employeeId, year } = req.query as { employeeId?: string; year?: string };
+    const yearNum = year ? Number(year) : undefined;
+    if (year !== undefined && (!Number.isInteger(yearNum) || yearNum! < 2000 || yearNum! > 2100)) {
+      res.status(400).json({ error: "Invalid year" }); return;
+    }
+    const requestedEmpId = employeeId !== undefined && employeeId !== "" ? Number(employeeId) : undefined;
+    if (requestedEmpId !== undefined && !Number.isInteger(requestedEmpId)) {
+      res.status(400).json({ error: "Invalid employeeId" }); return;
+    }
+
+    // Authz scoping — produce a definitive employeeId filter (or 403).
+    let scopedEmpId: number | undefined;
+    let scopedDeptEmpIds: number[] | undefined;
+    if (req.hrmsUser!.role === "employee") {
+      const emp = await getEmployeeForUser(req.hrmsUser!.id);
+      if (!emp) { res.json([]); return; }
+      if (requestedEmpId !== undefined && requestedEmpId !== emp.id) {
+        res.status(403).json({ error: "Employees may only view their own accrual history" }); return;
+      }
+      scopedEmpId = emp.id;
+    } else if (req.hrmsUser!.role === "hod") {
+      const hodEmp = await getEmployeeForUser(req.hrmsUser!.id);
+      if (!hodEmp?.departmentId) { res.json([]); return; }
+      const deptEmps = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(and(eq(employeesTable.departmentId, hodEmp.departmentId), isNull(employeesTable.deletedAt)));
+      const deptEmpIds = deptEmps.map(e => e.id);
+      if (deptEmpIds.length === 0) { res.json([]); return; }
+      if (requestedEmpId !== undefined) {
+        if (!deptEmpIds.includes(requestedEmpId)) {
+          res.status(403).json({ error: "Employee is not in your department" }); return;
+        }
+        scopedEmpId = requestedEmpId;
+      } else {
+        scopedDeptEmpIds = deptEmpIds;
+      }
+    } else {
+      // HR roles — unrestricted; if no employeeId given, return across all.
+      if (requestedEmpId !== undefined) scopedEmpId = requestedEmpId;
+    }
+
+    const conds = [] as ReturnType<typeof eq>[];
+    if (scopedEmpId !== undefined) conds.push(eq(leaveAccrualHistoryTable.employeeId, scopedEmpId));
+    else if (scopedDeptEmpIds) conds.push(inArray(leaveAccrualHistoryTable.employeeId, scopedDeptEmpIds));
+    if (yearNum !== undefined) conds.push(eq(leaveAccrualHistoryTable.year, yearNum));
+
+    const rows = await db
+      .select({
+        id: leaveAccrualHistoryTable.id,
+        employeeId: leaveAccrualHistoryTable.employeeId,
+        leaveTypeId: leaveAccrualHistoryTable.leaveTypeId,
+        leaveTypeName: leaveTypesTable.name,
+        leaveTypeCode: leaveTypesTable.code,
+        year: leaveAccrualHistoryTable.year,
+        month: leaveAccrualHistoryTable.month,
+        accrualType: leaveAccrualHistoryTable.accrualType,
+        days: leaveAccrualHistoryTable.days,
+        notes: leaveAccrualHistoryTable.notes,
+        processedById: leaveAccrualHistoryTable.processedById,
+        processedByName: hrmsUsersTable.name,
+        createdAt: leaveAccrualHistoryTable.createdAt,
+      })
+      .from(leaveAccrualHistoryTable)
+      .innerJoin(leaveTypesTable, eq(leaveAccrualHistoryTable.leaveTypeId, leaveTypesTable.id))
+      .leftJoin(hrmsUsersTable, eq(leaveAccrualHistoryTable.processedById, hrmsUsersTable.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(leaveAccrualHistoryTable.createdAt));
+
+    res.json(rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 router.post("/leave/balances/accrue", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const { year, month, employeeId } = req.body as { year: number; month: number; employeeId?: number };

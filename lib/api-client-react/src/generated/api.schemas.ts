@@ -1654,6 +1654,28 @@ export interface LeaveBalance {
   updatedAt: string;
 }
 
+export interface LeaveAccrualHistoryEntry {
+  id: number;
+  employeeId: number;
+  leaveTypeId: number;
+  /** @nullable */
+  leaveTypeName?: string | null;
+  /** @nullable */
+  leaveTypeCode?: string | null;
+  year: number;
+  /** @nullable */
+  month?: number | null;
+  accrualType: string;
+  days: string;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  processedById?: number | null;
+  /** @nullable */
+  processedByName?: string | null;
+  createdAt: string;
+}
+
 export interface InitLeaveBalancesBody {
   year: number;
   /** @nullable */
@@ -3589,6 +3611,11 @@ export type CarryForwardLeaveBalances200 = {
   fromYear: number;
   toYear: number;
   message: string;
+};
+
+export type ListLeaveAccrualHistoryParams = {
+  employeeId?: number;
+  year?: number;
 };
 
 export type AccrueLeaveBalancesBody = {

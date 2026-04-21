@@ -172,6 +172,7 @@ import type {
   InterviewRound,
   IssuedDocument,
   JobRequisition,
+  LeaveAccrualHistoryEntry,
   LeaveActionBody,
   LeaveApplication,
   LeaveBackfillSummary,
@@ -189,6 +190,7 @@ import type {
   ListExitRequestsParams,
   ListHelpdeskTicketsParams,
   ListIssuedDocumentsParams,
+  ListLeaveAccrualHistoryParams,
   ListLeaveApplicationsParams,
   ListLeaveBalancesParams,
   ListLeaveTypesParams,
@@ -12874,6 +12876,110 @@ export const useCarryForwardLeaveBalances = <
 > => {
   return useMutation(getCarryForwardLeaveBalancesMutationOptions(options));
 };
+
+/**
+ * Returns rows from leave_accrual_history with leave type details and processed-by name. Employees see only their own; HODs see their department; HR sees all (or any employeeId).
+ * @summary List leave accrual / carry-forward history rows
+ */
+export const getListLeaveAccrualHistoryUrl = (
+  params?: ListLeaveAccrualHistoryParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/leave/accrual-history?${stringifiedParams}`
+    : `/api/leave/accrual-history`;
+};
+
+export const listLeaveAccrualHistory = async (
+  params?: ListLeaveAccrualHistoryParams,
+  options?: RequestInit,
+): Promise<LeaveAccrualHistoryEntry[]> => {
+  return customFetch<LeaveAccrualHistoryEntry[]>(
+    getListLeaveAccrualHistoryUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListLeaveAccrualHistoryQueryKey = (
+  params?: ListLeaveAccrualHistoryParams,
+) => {
+  return [`/api/leave/accrual-history`, ...(params ? [params] : [])] as const;
+};
+
+export const getListLeaveAccrualHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLeaveAccrualHistory>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveAccrualHistoryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveAccrualHistory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListLeaveAccrualHistoryQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLeaveAccrualHistory>>
+  > = ({ signal }) =>
+    listLeaveAccrualHistory(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLeaveAccrualHistory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLeaveAccrualHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLeaveAccrualHistory>>
+>;
+export type ListLeaveAccrualHistoryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List leave accrual / carry-forward history rows
+ */
+
+export function useListLeaveAccrualHistory<
+  TData = Awaited<ReturnType<typeof listLeaveAccrualHistory>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLeaveAccrualHistoryParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLeaveAccrualHistory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLeaveAccrualHistoryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Run periodic (monthly) leave accrual for all or one employee

@@ -3724,6 +3724,34 @@ export const CarryForwardLeaveBalancesResponse = zod.object({
 });
 
 /**
+ * Returns rows from leave_accrual_history with leave type details and processed-by name. Employees see only their own; HODs see their department; HR sees all (or any employeeId).
+ * @summary List leave accrual / carry-forward history rows
+ */
+export const ListLeaveAccrualHistoryQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  year: zod.coerce.number().optional(),
+});
+
+export const ListLeaveAccrualHistoryResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  year: zod.number(),
+  month: zod.number().nullish(),
+  accrualType: zod.string(),
+  days: zod.string(),
+  notes: zod.string().nullish(),
+  processedById: zod.number().nullish(),
+  processedByName: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListLeaveAccrualHistoryResponse = zod.array(
+  ListLeaveAccrualHistoryResponseItem,
+);
+
+/**
  * @summary Run periodic (monthly) leave accrual for all or one employee
  */
 export const accrueLeaveBalancesBodyMonthMax = 12;

@@ -3,6 +3,7 @@ import {
   useListLeaveTypes,
   useListLeaveApplications,
   useListLeaveBalances,
+  useListLeaveAccrualHistory,
   useSubmitLeaveApplication,
   useCancelLeaveApplication,
   getListLeaveApplicationsQueryKey,
@@ -48,6 +49,7 @@ export default function LeavePage() {
   const { data: leaveTypes } = useListLeaveTypes({ isActive: true });
   const { data: applications, isLoading } = useListLeaveApplications({});
   const { data: balances } = useListLeaveBalances({ year });
+  const { data: accrualHistory } = useListLeaveAccrualHistory({ year });
 
   const submitMutation = useSubmitLeaveApplication();
   const cancelMutation = useCancelLeaveApplication();
@@ -196,6 +198,78 @@ export default function LeavePage() {
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* Accrual & Carry-Forward History */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Accrual &amp; Carry-Forward History — {year}
+        </h2>
+        {!accrualHistory ? (
+          <div className="text-sm text-gray-400">Loading history...</div>
+        ) : accrualHistory.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 border rounded-lg bg-gray-50/50 text-sm">
+            No accrual or carry-forward entries for {year} yet.
+          </div>
+        ) : (
+          <Card className="border shadow-none">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-medium">Date</th>
+                      <th className="text-left px-4 py-2 font-medium">Leave Type</th>
+                      <th className="text-left px-4 py-2 font-medium">Type</th>
+                      <th className="text-right px-4 py-2 font-medium">Days</th>
+                      <th className="text-left px-4 py-2 font-medium">Notes</th>
+                      <th className="text-left px-4 py-2 font-medium">Processed By</th>
+                      {!["employee"].includes(role) && (
+                        <th className="text-left px-4 py-2 font-medium">Employee&nbsp;ID</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accrualHistory.slice(0, 200).map((h) => {
+                      const isCF = h.accrualType === "Carry Forward";
+                      return (
+                        <tr key={h.id} className="border-t">
+                          <td className="px-4 py-2 text-gray-600 whitespace-nowrap">{fmtDate(h.createdAt)}</td>
+                          <td className="px-4 py-2">{h.leaveTypeName ?? h.leaveTypeCode}</td>
+                          <td className="px-4 py-2">
+                            <Badge
+                              variant="outline"
+                              className={
+                                isCF
+                                  ? "text-indigo-700 border-indigo-200 bg-indigo-50"
+                                  : "text-gray-600 border-gray-200"
+                              }
+                            >
+                              {h.accrualType}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-2 text-right font-medium text-gray-800">{h.days}</td>
+                          <td className="px-4 py-2 text-gray-500 max-w-xs truncate" title={h.notes ?? undefined}>
+                            {h.notes ?? "—"}
+                          </td>
+                          <td className="px-4 py-2 text-gray-500">{h.processedByName ?? "System"}</td>
+                          {!["employee"].includes(role) && (
+                            <td className="px-4 py-2 text-gray-500">{h.employeeId}</td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {accrualHistory.length > 200 && (
+                <div className="px-4 py-2 text-xs text-gray-400 border-t">
+                  Showing 200 most recent of {accrualHistory.length} entries.
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
 

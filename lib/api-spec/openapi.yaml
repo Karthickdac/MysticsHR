@@ -2780,6 +2780,25 @@ paths:
                   toYear: { type: integer }
                   message: { type: string }
 
+  /leave/accrual-history:
+    get:
+      operationId: listLeaveAccrualHistory
+      tags: [Leave]
+      summary: List leave accrual / carry-forward history rows
+      description: Returns rows from leave_accrual_history with leave type details and processed-by name. Employees see only their own; HODs see their department; HR sees all (or any employeeId).
+      parameters:
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: year, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Accrual history rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaveAccrualHistoryEntry"
+
   /leave/balances/accrue:
     post:
       operationId: accrueLeaveBalances
@@ -7596,6 +7615,24 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, employeeId, leaveTypeId, year, allocated, used, pending, carryForward, available, createdAt, updatedAt]
+
+    LeaveAccrualHistoryEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        leaveTypeId: { type: integer }
+        leaveTypeName: { type: ["string", "null"] }
+        leaveTypeCode: { type: ["string", "null"] }
+        year: { type: integer }
+        month: { type: ["integer", "null"] }
+        accrualType: { type: string }
+        days: { type: string }
+        notes: { type: ["string", "null"] }
+        processedById: { type: ["integer", "null"] }
+        processedByName: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, employeeId, leaveTypeId, year, accrualType, days, createdAt]
 
     InitLeaveBalancesBody:
       type: object
