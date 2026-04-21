@@ -625,27 +625,35 @@ async function computeSlaReport(from?: Date, to?: Date) {
   };
 }
 
-function parseDateParam(v: unknown): Date | undefined {
-  if (typeof v !== "string" || !v) return undefined;
+class BadDateParamError extends Error {
+  constructor(public readonly param: string) { super(`Invalid date for query param '${param}'`); }
+}
+function parseDateParam(v: unknown, name: string): Date | undefined {
+  if (v === undefined || v === null || v === "") return undefined;
+  if (typeof v !== "string") throw new BadDateParamError(name);
   const d = new Date(v);
-  return isNaN(d.getTime()) ? undefined : d;
+  if (isNaN(d.getTime())) throw new BadDateParamError(name);
+  return d;
 }
 
 router.get("/helpdesk/sla-report", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
-    const from = parseDateParam(req.query.from);
-    const to = parseDateParam(req.query.to);
+    const from = parseDateParam(req.query.from, "from");
+    const to = parseDateParam(req.query.to, "to");
     const report = await computeSlaReport(from, to);
     const { tickets: _omit, ...payload } = report; // strip ticket list from JSON response
     res.json(payload);
-  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+  } catch (err) {
+    if (err instanceof BadDateParamError) { res.status(400).json({ error: err.message }); return; }
+    console.error(err); res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // CSV export of SLA report — one row per ticket within the optional date range
 router.get("/helpdesk/sla-report.csv", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
-    const from = parseDateParam(req.query.from);
-    const to = parseDateParam(req.query.to);
+    const from = parseDateParam(req.query.from, "from");
+    const to = parseDateParam(req.query.to, "to");
     const report = await computeSlaReport(from, to);
 
     const escape = (v: unknown) => {
