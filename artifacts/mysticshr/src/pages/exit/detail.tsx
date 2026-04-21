@@ -9,6 +9,7 @@ import {
   useApproveFnf,
   useGetExitInterview,
   useSubmitExitInterview,
+  useListIssuedDocuments,
   getListExitRequestsQueryKey,
   type UpdateExitRequestBody,
   type UpdateClearanceTaskBody,
@@ -30,6 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, User, Calendar, ClipboardList, DollarSign,
   MessageSquare, CheckCircle2, Clock, XCircle, Building2, AlertTriangle,
+  FileText, Download,
 } from "lucide-react";
 
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
@@ -66,6 +68,19 @@ export default function ExitDetailPage() {
   const { data: exitReq, isLoading } = useGetExitRequest(id);
   const { data: fnf } = useGetFnfComputation(id);
   const { data: interview } = useGetExitInterview(id);
+  const { data: issuedDocsAll = [] } = useListIssuedDocuments(
+    exitReq ? { employeeId: exitReq.employeeId } : {},
+  );
+  // Documents auto-issued on FnF approval are Relieving Letter / Experience Certificate.
+  // Show those (plus any other docs HR has issued for this employee while the exit is in progress).
+  const exitDocs = issuedDocsAll.filter(d =>
+    d.documentType === "Relieving Letter" || d.documentType === "Experience Certificate"
+  );
+
+  function downloadDoc(docId: number) {
+    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+    window.open(`${base}/api/documents/issued/${docId}/download`, "_blank");
+  }
 
   const updateExit = useUpdateExitRequest();
   const updateTask = useUpdateClearanceTask();
@@ -351,6 +366,54 @@ export default function ExitDetailPage() {
                     )}
                   </div>
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Issued Documents (Relieving Letter & Experience Certificate) */}
+      {(exitDocs.length > 0 || exitReq.status === "FnF Approved" || exitReq.status === "Separated") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              Relieving Documents
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {exitDocs.length === 0 ? (
+              <div className="text-center py-6 text-gray-400">
+                <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Documents will be issued automatically once Full &amp; Final settlement is fully approved.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {exitDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between border rounded-lg p-3 hover:bg-gray-50"
+                    data-testid={`row-exit-doc-${doc.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-50 rounded-lg">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">{doc.documentType}</div>
+                        <div className="text-xs text-gray-500">
+                          {doc.filename ?? "—"}
+                          {doc.generatedAt ? ` · Issued ${new Date(doc.generatedAt).toLocaleDateString("en-IN")}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => downloadDoc(doc.id)}
+                      data-testid={`button-download-doc-${doc.id}`}>
+                      <Download className="w-3 h-3 mr-1" />
+                      PDF
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
