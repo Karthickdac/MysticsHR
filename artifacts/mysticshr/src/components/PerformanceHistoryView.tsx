@@ -8,6 +8,8 @@ import {
   getListSelfAppraisalsQueryKey,
   useListManagerEvaluations,
   getListManagerEvaluationsQueryKey,
+  useGetCycleAverages,
+  getGetCycleAveragesQueryKey,
   type PerformanceCycle,
   type PerformanceGoal,
   type SelfAppraisal,
@@ -15,7 +17,12 @@ import {
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { History, Trophy, Target, TrendingUp } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { History, Trophy, Target, TrendingUp, Users } from "lucide-react";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -24,6 +31,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
   type TooltipProps,
 } from "recharts";
 
@@ -48,9 +56,13 @@ type TrendPoint = {
   endDate: string | null;
   outcomeLabel: string | null;
   finalScore: number;
+  peerAverage: number | null;
+  peerSampleSize: number | null;
 };
 
-function PerformanceTrendTooltip({ active, payload }: TooltipProps<number, string>) {
+function PerformanceTrendTooltip({
+  active, payload, comparisonLabel,
+}: TooltipProps<number, string> & { comparisonLabel: string }) {
   if (!active || !payload || payload.length === 0) return null;
   const p = payload[0]?.payload as TrendPoint | undefined;
   if (!p) return null;
@@ -63,6 +75,13 @@ function PerformanceTrendTooltip({ active, payload }: TooltipProps<number, strin
       <p>
         Final score: <span className="font-semibold">{p.finalScore.toFixed(2)}</span>
       </p>
+      {p.peerAverage !== null && (
+        <p>
+          {comparisonLabel}:{" "}
+          <span className="font-semibold">{p.peerAverage.toFixed(2)}</span>
+          <span className="text-muted-foreground"> (n={p.peerSampleSize})</span>
+        </p>
+      )}
       {p.outcomeLabel && (
         <p className="text-muted-foreground">Outcome: {p.outcomeLabel}</p>
       )}
@@ -70,7 +89,9 @@ function PerformanceTrendTooltip({ active, payload }: TooltipProps<number, strin
   );
 }
 
-function PerformanceTrendChart({ data }: { data: TrendPoint[] }) {
+function PerformanceTrendChart({
+  data, showComparison, comparisonLabel,
+}: { data: TrendPoint[]; showComparison: boolean; comparisonLabel: string }) {
   if (data.length === 0) {
     return (
       <Card>
@@ -86,11 +107,14 @@ function PerformanceTrendChart({ data }: { data: TrendPoint[] }) {
     );
   }
 
-  const scores = data.map(d => d.finalScore);
+  const scores = data.flatMap(d =>
+    showComparison && d.peerAverage !== null ? [d.finalScore, d.peerAverage] : [d.finalScore]
+  );
   const min = Math.min(...scores);
   const max = Math.max(...scores);
   const yMin = Math.max(0, Math.floor((min - 0.5) * 10) / 10);
   const yMax = Math.ceil((max + 0.5) * 10) / 10;
+  const hasAnyComparison = showComparison && data.some(d => d.peerAverage !== null);
 
   return (
     <Card>
@@ -100,6 +124,9 @@ function PerformanceTrendChart({ data }: { data: TrendPoint[] }) {
         </CardTitle>
         <p className="text-xs text-muted-foreground">
           Final score across {data.length} closed {data.length === 1 ? "cycle" : "cycles"}, oldest to newest.
+          {showComparison && !hasAnyComparison && (
+            <> · Not enough peer data yet to draw a comparison line.</>
+          )}
         </p>
       </CardHeader>
       <CardContent className="pt-2">
@@ -121,9 +148,11 @@ function PerformanceTrendChart({ data }: { data: TrendPoint[] }) {
                 width={40}
                 allowDecimals
               />
-              <Tooltip content={<PerformanceTrendTooltip />} />
+              <Tooltip content={<PerformanceTrendTooltip comparisonLabel={comparisonLabel} />} />
+              {hasAnyComparison && <Legend wrapperStyle={{ fontSize: 11 }} />}
               <Line
                 type="monotone"
+                name="Final score"
                 dataKey="finalScore"
                 stroke="hsl(var(--primary))"
                 strokeWidth={2}
@@ -131,6 +160,20 @@ function PerformanceTrendChart({ data }: { data: TrendPoint[] }) {
                 activeDot={{ r: 6 }}
                 isAnimationActive={false}
               />
+              {hasAnyComparison && (
+                <Line
+                  type="monotone"
+                  name={comparisonLabel}
+                  dataKey="peerAverage"
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={{ r: 3, fill: "hsl(var(--muted-foreground))" }}
+                  activeDot={{ r: 5 }}
+                  connectNulls
+                  isAnimationActive={false}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -251,9 +294,27 @@ export default function PerformanceHistoryView({
   employeeId: number | undefined;
   enabled?: boolean;
 }) {
+  const { role } = useCurrentHrmsUser();
+  const isHrRole = role === "super_admin" || role === "hr_manager" || role === "hr_executive";
+  const isHodRole = role === "hod";
+  const canCompare = isHrRole || isHodRole;
+
+  // HOD can only see department averages; HR can choose either scope.
+  const [showComparison, setShowComparison] = useState(false);
+  const [scope, setScope] = useState<"department" | "company">("department");
+  const effectiveScope: "department" | "company" = isHodRole ? "department" : scope;
+
   const { data: cycles = [], isLoading: cyclesLoading } = useListPerformanceCycles({ status: "Closed" });
   const params = employeeId ? { employeeId } : undefined;
   const queryEnabled = enabled && !!employeeId;
+
+  const averageParams = employeeId ? { employeeId, scope: effectiveScope } : { employeeId: 0, scope: effectiveScope };
+  const { data: cycleAverages = [] } = useGetCycleAverages(averageParams, {
+    query: {
+      enabled: queryEnabled && canCompare && showComparison,
+      queryKey: getGetCycleAveragesQueryKey(averageParams),
+    },
+  });
 
   const { data: outcomes = [], isLoading: outcomesLoading, error: outcomesError } = useListAppraisalOutcomes(
     params,
@@ -284,6 +345,7 @@ export default function PerformanceHistoryView({
     .sort((a, b) => (b.endDate ?? "").localeCompare(a.endDate ?? ""));
 
   const outcomeByCycle = new Map(outcomes.map(o => [o.cycleId, o]));
+  const averageByCycle = new Map(cycleAverages.map(a => [a.cycleId, a]));
 
   const trendData = closedCycles
     .slice()
@@ -291,6 +353,7 @@ export default function PerformanceHistoryView({
     .map(c => {
       const o = outcomeByCycle.get(c.id);
       const score = o?.finalScore != null ? Number(o.finalScore) : NaN;
+      const avg = averageByCycle.get(c.id);
       return {
         cycleId: c.id,
         title: c.title,
@@ -298,9 +361,13 @@ export default function PerformanceHistoryView({
         endDate: c.endDate,
         outcomeLabel: o?.outcomLabel ?? null,
         finalScore: Number.isFinite(score) ? score : null,
+        peerAverage: avg ? avg.averageFinalScore : null,
+        peerSampleSize: avg ? avg.sampleSize : null,
       };
     })
     .filter(d => d.finalScore !== null) as TrendPoint[];
+
+  const comparisonLabel = effectiveScope === "company" ? "Company average" : "Department average";
 
   if (!employeeId) {
     return (
@@ -339,7 +406,45 @@ export default function PerformanceHistoryView({
 
   return (
     <div className="space-y-4">
-      <PerformanceTrendChart data={trendData} />
+      {canCompare && trendData.length > 0 && (
+        <Card>
+          <CardContent className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <Label htmlFor="compare-peers" className="text-sm font-medium cursor-pointer">
+                Compare with peer averages
+              </Label>
+              <Switch
+                id="compare-peers"
+                checked={showComparison}
+                onCheckedChange={setShowComparison}
+              />
+            </div>
+            {showComparison && isHrRole && (
+              <ToggleGroup
+                type="single"
+                size="sm"
+                value={scope}
+                onValueChange={(v) => { if (v === "department" || v === "company") setScope(v); }}
+                className="border rounded-md"
+              >
+                <ToggleGroupItem value="department" className="text-xs px-3">Department</ToggleGroupItem>
+                <ToggleGroupItem value="company" className="text-xs px-3">Company</ToggleGroupItem>
+              </ToggleGroup>
+            )}
+            {showComparison && (
+              <p className="text-xs text-muted-foreground">
+                Aggregated peer scores; the employee's own score is excluded and cycles with fewer than two peers are hidden.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      <PerformanceTrendChart
+        data={trendData}
+        showComparison={canCompare && showComparison}
+        comparisonLabel={comparisonLabel}
+      />
       {closedCycles.map(cycle => {
         const cycleGoals = goals.filter(g => g.cycleId === cycle.id);
         const cycleGoalIds = new Set(cycleGoals.map(g => g.id));

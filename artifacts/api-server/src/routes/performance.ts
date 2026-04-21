@@ -624,6 +624,93 @@ router.get("/performance/calibration/:cycleId", requireHrmsUser, requireRole(...
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// ─── CYCLE AVERAGES (PEER COMPARISON) ────────────────────────────────────────
+//
+// Returns aggregate final scores per cycle for cycles in which the target
+// employee has a finalized outcome. The target employee's own score is
+// excluded from the average so the comparison line truly represents peers.
+// Cycles with fewer than 2 peer outcomes are omitted from the response to
+// avoid de-anonymizing individuals.
+router.get("/performance/cycle-averages", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const { employeeId, scope: scopeRaw } = req.query as { employeeId?: string; scope?: string };
+    if (!employeeId) { res.status(400).json({ error: "employeeId is required" }); return; }
+    const targetId = Number(employeeId);
+    if (!Number.isFinite(targetId)) { res.status(400).json({ error: "employeeId must be numeric" }); return; }
+
+    const scope: "department" | "company" = scopeRaw === "company" ? "company" : "department";
+    const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
+
+    // Look up target employee (need departmentId for department scope)
+    const [targetEmp] = await db.select({ id: employeesTable.id, departmentId: employeesTable.departmentId, managerId: employeesTable.managerId })
+      .from(employeesTable).where(eq(employeesTable.id, targetId));
+    if (!targetEmp) { res.status(404).json({ error: "Employee not found" }); return; }
+
+    // HOD restrictions: only department scope, only for direct reports
+    if (!isHrRole) {
+      if (scope === "company") { res.status(403).json({ error: "Company averages are restricted to HR" }); return; }
+      const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!hodEmp || targetEmp.managerId !== hodEmp.id) {
+        res.status(403).json({ error: "You can only view averages for your direct reports" });
+        return;
+      }
+    }
+
+    if (scope === "department" && !targetEmp.departmentId) {
+      res.json([]); return;
+    }
+
+    // Build the peer pool: employees whose outcomes count toward the average.
+    const peerConds = [];
+    if (scope === "department") {
+      peerConds.push(eq(employeesTable.departmentId, targetEmp.departmentId!));
+    }
+    const peerEmployees = await db.select({ id: employeesTable.id })
+      .from(employeesTable)
+      .where(peerConds.length ? and(...peerConds) : undefined);
+    const peerIds = peerEmployees.map(e => e.id).filter(id => id !== targetId);
+    if (peerIds.length === 0) { res.json([]); return; }
+
+    // Cycles where the target employee has a finalized outcome.
+    const targetOutcomes = await db.select({ cycleId: appraisalOutcomesTable.cycleId })
+      .from(appraisalOutcomesTable)
+      .where(and(
+        eq(appraisalOutcomesTable.employeeId, targetId),
+        sql`${appraisalOutcomesTable.finalScore} is not null`,
+      ));
+    const cycleIds = [...new Set(targetOutcomes.map(o => o.cycleId))];
+    if (cycleIds.length === 0) { res.json([]); return; }
+
+    // Peer outcomes for those cycles. Aggregate at the DB level — only the
+    // average and count are returned (no per-employee scores leave the server).
+    const rows = await db.select({
+      cycleId: appraisalOutcomesTable.cycleId,
+      avgScore: sql<string>`avg(${appraisalOutcomesTable.finalScore}::numeric)`,
+      sampleSize: sql<number>`count(*)::int`,
+    }).from(appraisalOutcomesTable)
+      .where(and(
+        inArray(appraisalOutcomesTable.cycleId, cycleIds),
+        inArray(appraisalOutcomesTable.employeeId, peerIds),
+        sql`${appraisalOutcomesTable.finalScore} is not null`,
+      ))
+      .groupBy(appraisalOutcomesTable.cycleId);
+
+    const result = rows
+      .filter(r => Number(r.sampleSize) >= 2)
+      .map(r => ({
+        cycleId: r.cycleId,
+        scope,
+        averageFinalScore: Math.round(Number(r.avgScore) * 100) / 100,
+        sampleSize: Number(r.sampleSize),
+      }));
+
+    res.json(result);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 // ─── APPRAISAL OUTCOMES ───────────────────────────────────────────────────────
 
 router.get("/performance/outcomes", requireHrmsUser, requireRole(...PERF_ROLES), async (req, res) => {

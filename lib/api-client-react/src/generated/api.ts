@@ -86,6 +86,7 @@ import type {
   CreateTaxDeclarationBody,
   CreateTicketAssignmentBody,
   CreateUserBody,
+  CycleAverage,
   DashboardAnalytics,
   DashboardKpis,
   Department,
@@ -120,6 +121,7 @@ import type {
   GetAttritionReport200,
   GetAttritionReportParams,
   GetBankTransferReportParams,
+  GetCycleAveragesParams,
   GetDashboardRecentActivityParams,
   GetEmployeeDirectoryReport200,
   GetEmployeeDirectoryReportParams,
@@ -19096,6 +19098,107 @@ export function useGetCalibrationView<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetCalibrationViewQueryOptions(cycleId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns the average final score across cycles in which the target employee has a finalized outcome. The target employee's own score is excluded from the average. Cycles with fewer than 2 peers are omitted to avoid de-anonymizing individuals. HR roles may request company-wide or department averages; HOD users may only request department averages and only for their direct reports.
+ * @summary Aggregate final scores per cycle for peer comparison (HR/HOD only)
+ */
+export const getGetCycleAveragesUrl = (params: GetCycleAveragesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/performance/cycle-averages?${stringifiedParams}`
+    : `/api/performance/cycle-averages`;
+};
+
+export const getCycleAverages = async (
+  params: GetCycleAveragesParams,
+  options?: RequestInit,
+): Promise<CycleAverage[]> => {
+  return customFetch<CycleAverage[]>(getGetCycleAveragesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCycleAveragesQueryKey = (
+  params?: GetCycleAveragesParams,
+) => {
+  return [
+    `/api/performance/cycle-averages`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetCycleAveragesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCycleAverages>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetCycleAveragesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCycleAverages>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCycleAveragesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCycleAverages>>
+  > = ({ signal }) => getCycleAverages(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCycleAverages>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCycleAveragesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCycleAverages>>
+>;
+export type GetCycleAveragesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Aggregate final scores per cycle for peer comparison (HR/HOD only)
+ */
+
+export function useGetCycleAverages<
+  TData = Awaited<ReturnType<typeof getCycleAverages>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetCycleAveragesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCycleAverages>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCycleAveragesQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

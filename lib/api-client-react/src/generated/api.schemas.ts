@@ -2467,6 +2467,21 @@ export interface AppraisalOutcome {
   calculatedAt: string;
 }
 
+export type CycleAverageScope =
+  (typeof CycleAverageScope)[keyof typeof CycleAverageScope];
+
+export const CycleAverageScope = {
+  department: "department",
+  company: "company",
+} as const;
+
+export interface CycleAverage {
+  cycleId: number;
+  scope: CycleAverageScope;
+  averageFinalScore: number;
+  sampleSize: number;
+}
+
 export interface EssProfile {
   employeeId: number;
   name: string;
@@ -3923,6 +3938,19 @@ export type ListManagerEvaluationsParams = {
   cycleId?: number;
   employeeId?: number;
 };
+
+export type GetCycleAveragesParams = {
+  employeeId: number;
+  scope?: GetCycleAveragesScope;
+};
+
+export type GetCycleAveragesScope =
+  (typeof GetCycleAveragesScope)[keyof typeof GetCycleAveragesScope];
+
+export const GetCycleAveragesScope = {
+  department: "department",
+  company: "company",
+} as const;
 
 export type ListAppraisalOutcomesParams = {
   cycleId?: number;

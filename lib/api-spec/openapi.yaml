@@ -4245,6 +4245,36 @@ paths:
                 items:
                   $ref: "#/components/schemas/CalibrationRecord"
 
+  /performance/cycle-averages:
+    get:
+      operationId: getCycleAverages
+      tags: [performance]
+      summary: Aggregate final scores per cycle for peer comparison (HR/HOD only)
+      description: >-
+        Returns the average final score across cycles in which the target
+        employee has a finalized outcome. The target employee's own score is
+        excluded from the average. Cycles with fewer than 2 peers are omitted
+        to avoid de-anonymizing individuals. HR roles may request company-wide
+        or department averages; HOD users may only request department averages
+        and only for their direct reports.
+      parameters:
+        - { name: employeeId, in: query, required: true, schema: { type: integer } }
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [department, company]
+            default: department
+      responses:
+        "200":
+          description: Aggregate scores per cycle
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CycleAverage"
+
   /performance/outcomes:
     get:
       operationId: listAppraisalOutcomes
@@ -8480,6 +8510,17 @@ components:
         normalizedScore: { type: ['string', 'null'] }
         calculatedAt: { type: string, format: date-time }
       required: [id, cycleId, employeeId, calculatedAt]
+
+    CycleAverage:
+      type: object
+      properties:
+        cycleId: { type: integer }
+        scope:
+          type: string
+          enum: [department, company]
+        averageFinalScore: { type: number }
+        sampleSize: { type: integer }
+      required: [cycleId, scope, averageFinalScore, sampleSize]
 
     EssProfile:
       type: object
