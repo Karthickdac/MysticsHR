@@ -665,12 +665,16 @@ router.get("/helpdesk/sla-report.csv", requireHrmsUser, requireRole(...MANAGER_R
     const lines = [header.join(",")];
 
     const now = new Date();
+    const isBreached = (t: typeof helpdeskTicketsTable.$inferSelect) => {
+      if (!t.slaDeadline) return false;
+      if (["Resolved", "Closed"].includes(t.status)) {
+        const completedAt = t.resolvedAt ?? t.closedAt;
+        return !!completedAt && new Date(completedAt) > new Date(t.slaDeadline);
+      }
+      return new Date(t.slaDeadline) < now;
+    };
     for (const t of report.tickets) {
-      const breached = t.slaDeadline
-        ? (["Resolved", "Closed"].includes(t.status)
-            ? (t.resolvedAt ? new Date(t.resolvedAt) > new Date(t.slaDeadline) : false)
-            : new Date(t.slaDeadline) < now)
-        : false;
+      const breached = isBreached(t);
       const resolutionHours = t.resolvedAt && t.createdAt
         ? Math.round(((new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000) * 10) / 10
         : "";

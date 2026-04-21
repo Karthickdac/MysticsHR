@@ -32,7 +32,12 @@ function fmtDateInput(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-export default function SlaReportPage() {
+/**
+ * Reusable body of the SLA report (filters + KPIs + breakdowns + CSV export button).
+ * Used by both the standalone /helpdesk/sla-report page and the "Reports" tab on the
+ * Helpdesk page.
+ */
+export function SlaReportContent() {
   const { getToken } = useAuth();
   const [preset, setPreset] = useState<RangePreset>("all");
   const [customFrom, setCustomFrom] = useState<string>("");
@@ -99,15 +104,8 @@ export default function SlaReportPage() {
     h == null ? "—" : h < 24 ? `${h}h` : `${Math.round((h / 24) * 10) / 10}d`;
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3">
-        <Link href="/helpdesk">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">SLA Report</h1>
-          <p className="text-sm text-muted-foreground">Helpdesk performance and SLA compliance overview</p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-end">
         <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={downloading || isLoading}>
           <Download className="h-4 w-4 mr-2" />
           {downloading ? "Downloading…" : "Export CSV"}
@@ -261,6 +259,23 @@ export default function SlaReportPage() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+export default function SlaReportPage() {
+  return (
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-center gap-3">
+        <Link href="/helpdesk">
+          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+        </Link>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold">SLA Report</h1>
+          <p className="text-sm text-muted-foreground">Helpdesk performance and SLA compliance overview</p>
+        </div>
+      </div>
+      <SlaReportContent />
     </div>
   );
 }

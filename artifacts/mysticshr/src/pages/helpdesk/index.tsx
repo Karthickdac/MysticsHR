@@ -17,8 +17,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Ticket, AlertTriangle, Clock, CheckCircle2, BarChart3 } from "lucide-react";
+import { SlaReportContent } from "./sla-report";
 
 const CATEGORIES = ["IT", "HR", "Finance", "Payroll", "Admin", "Other"] as const;
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
@@ -207,14 +209,6 @@ export default function HelpdeskPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isManager && (
-            <Link href="/helpdesk/sla-report">
-              <Button variant="outline" size="sm">
-                <BarChart3 className="w-4 h-4 mr-2" />
-                SLA Report
-              </Button>
-            </Link>
-          )}
           <Button onClick={() => setShowCreate(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Raise Ticket
@@ -222,14 +216,59 @@ export default function HelpdeskPage() {
         </div>
       </div>
 
-      {isManager && <SlaReport />}
+      {isManager ? (
+        <Tabs defaultValue="tickets" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="tickets">
+              <Ticket className="w-4 h-4 mr-2" />
+              Tickets
+            </TabsTrigger>
+            <TabsTrigger value="reports">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Reports
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Filters (manager only) */}
-      {isManager && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <TabsContent value="tickets" className="space-y-6">
+            <SlaReport />
+            <ManagerTicketsBody
+              filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+              filterCategory={filterCategory} setFilterCategory={setFilterCategory}
+              filterPriority={filterPriority} setFilterPriority={setFilterPriority}
+              tickets={tickets} isLoading={isLoading}
+            />
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <SlaReportContent />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <EmployeeTicketsBody tickets={tickets} isLoading={isLoading} />
+      )}
+
+      <CreateTicketModal open={showCreate} onClose={() => setShowCreate(false)} />
+    </div>
+  );
+}
+
+function ManagerTicketsBody({
+  filterStatus, setFilterStatus,
+  filterCategory, setFilterCategory,
+  filterPriority, setFilterPriority,
+  tickets, isLoading,
+}: {
+  filterStatus: string; setFilterStatus: (v: string) => void;
+  filterCategory: string; setFilterCategory: (v: string) => void;
+  filterPriority: string; setFilterPriority: (v: string) => void;
+  tickets: HelpdeskTicket[]; isLoading: boolean;
+}) {
+  return (
+    <>
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
@@ -250,39 +289,45 @@ export default function HelpdeskPage() {
                   {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={() => { setFilterStatus("all"); setFilterCategory("all"); setFilterPriority("all"); }}>
-                Clear
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tickets list */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Ticket className="w-4 h-4" />
-            {isManager ? `All Tickets (${tickets.length})` : `My Tickets (${tickets.length})`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
-          ) : tickets.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Ticket className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p>No tickets found</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {tickets.map(t => <TicketRow key={t.id} ticket={t} />)}
-            </div>
-          )}
+            <Button variant="outline" onClick={() => { setFilterStatus("all"); setFilterCategory("all"); setFilterPriority("all"); }}>
+              Clear
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      <CreateTicketModal open={showCreate} onClose={() => setShowCreate(false)} />
-    </div>
+      <TicketsList tickets={tickets} isLoading={isLoading} title={`All Tickets (${tickets.length})`} />
+    </>
+  );
+}
+
+function EmployeeTicketsBody({ tickets, isLoading }: { tickets: HelpdeskTicket[]; isLoading: boolean }) {
+  return <TicketsList tickets={tickets} isLoading={isLoading} title={`My Tickets (${tickets.length})`} />;
+}
+
+function TicketsList({ tickets, isLoading, title }: { tickets: HelpdeskTicket[]; isLoading: boolean; title: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Ticket className="w-4 h-4" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        ) : tickets.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Ticket className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p>No tickets found</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {tickets.map(t => <TicketRow key={t.id} ticket={t} />)}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
