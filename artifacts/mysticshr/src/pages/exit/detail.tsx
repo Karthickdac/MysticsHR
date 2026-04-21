@@ -68,13 +68,11 @@ export default function ExitDetailPage() {
   const { data: exitReq, isLoading } = useGetExitRequest(id);
   const { data: fnf } = useGetFnfComputation(id);
   const { data: interview } = useGetExitInterview(id);
-  const { data: issuedDocsAll = [] } = useListIssuedDocuments(
-    exitReq ? { employeeId: exitReq.employeeId } : {},
-  );
-  // Documents auto-issued on FnF approval are Relieving Letter / Experience Certificate.
-  // Show those (plus any other docs HR has issued for this employee while the exit is in progress).
-  const exitDocs = issuedDocsAll.filter(d =>
-    d.documentType === "Relieving Letter" || d.documentType === "Experience Certificate"
+  // Only fetch issued documents once we know the employee, to avoid an unfiltered fetch
+  // (HR users would otherwise briefly see all employees' docs before the exit request loads).
+  const { data: exitDocs = [] } = useListIssuedDocuments(
+    { employeeId: exitReq?.employeeId ?? 0 },
+    { query: { enabled: !!exitReq?.employeeId, queryKey: ["exit-issued-docs", exitReq?.employeeId] } },
   );
 
   function downloadDoc(docId: number) {
@@ -372,14 +370,17 @@ export default function ExitDetailPage() {
         </Card>
       )}
 
-      {/* Issued Documents (Relieving Letter & Experience Certificate) */}
+      {/* Issued Documents — relieving letter, experience certificate, and any other HR-issued docs */}
       {(exitDocs.length > 0 || exitReq.status === "FnF Approved" || exitReq.status === "Separated") && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-blue-600" />
-              Relieving Documents
+              Issued Documents
             </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Relieving letter and experience certificate are auto-issued on FnF approval. HR may also issue additional documents (offer letter, salary certificate, etc.) for this employee.
+            </p>
           </CardHeader>
           <CardContent>
             {exitDocs.length === 0 ? (
