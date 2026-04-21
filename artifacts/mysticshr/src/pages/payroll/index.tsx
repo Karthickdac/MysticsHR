@@ -178,6 +178,48 @@ function DepartmentDrilldownDialog({
 
 type PeriodPreset = "last12" | "currentFy" | "previousFy" | "custom";
 
+// localStorage persistence for the dashboard analytics controls. We validate
+// every field on load so a corrupted or stale payload (e.g. an old preset name
+// that no longer exists) silently falls back to defaults rather than crashing
+// the dashboard. The custom range is only honoured when both bounds are set.
+const PAYROLL_CONTROLS_STORAGE_KEY = "mysticshr.payroll.analyticsControls.v1";
+type PersistedAnalyticsControls = {
+  preset: PeriodPreset;
+  custom: { from: string; to: string };
+  compare: boolean;
+};
+const VALID_PRESETS: PeriodPreset[] = ["last12", "currentFy", "previousFy", "custom"];
+const MONTH_RE = /^\d{4}-\d{2}$/;
+function loadAnalyticsControls(defaultRange: { from: string; to: string }): PersistedAnalyticsControls {
+  const fallback: PersistedAnalyticsControls = { preset: "last12", custom: defaultRange, compare: false };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(PAYROLL_CONTROLS_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<PersistedAnalyticsControls> | null;
+    if (!parsed || typeof parsed !== "object") return fallback;
+    const preset = VALID_PRESETS.includes(parsed.preset as PeriodPreset)
+      ? (parsed.preset as PeriodPreset) : fallback.preset;
+    const customFrom = typeof parsed.custom?.from === "string" && MONTH_RE.test(parsed.custom.from)
+      ? parsed.custom.from : defaultRange.from;
+    const customTo = typeof parsed.custom?.to === "string" && MONTH_RE.test(parsed.custom.to)
+      ? parsed.custom.to : defaultRange.to;
+    const compare = parsed.compare === true;
+    return { preset, custom: { from: customFrom, to: customTo }, compare };
+  } catch {
+    return fallback;
+  }
+}
+function saveAnalyticsControls(controls: PersistedAnalyticsControls): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PAYROLL_CONTROLS_STORAGE_KEY, JSON.stringify(controls));
+  } catch {
+    // Quota exceeded / disabled storage — silently ignore; the dashboard
+    // continues to work, the choice just won't survive a reload.
+  }
+}
+
 // Resolves a period preset to a (from, to) YYYY-MM tuple. Indian FY runs Apr–Mar.
 function resolvePeriod(preset: PeriodPreset, custom: { from: string; to: string }, now = new Date()): { from: string; to: string } {
   const fmt = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}`;
@@ -199,6 +241,7 @@ function resolvePeriod(preset: PeriodPreset, custom: { from: string; to: string 
 
 function PayrollAnalyticsControls({
   preset, setPreset, custom, setCustom, compare, setCompare, financialYear, rangeError,
+  isCustomized, onReset,
 }: {
   preset: PeriodPreset;
   setPreset: (p: PeriodPreset) => void;
@@ -208,6 +251,8 @@ function PayrollAnalyticsControls({
   setCompare: (v: boolean) => void;
   financialYear: string;
   rangeError: string | null;
+  isCustomized: boolean;
+  onReset: () => void;
 }) {
   return (
     <Card>
@@ -232,15 +277,27 @@ function PayrollAnalyticsControls({
               <Input type="month" value={custom.to} onChange={e => setCustom({ ...custom, to: e.target.value })} className="h-8 w-36" />
             </div>
           )}
-          <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto select-none">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-primary"
-              checked={compare}
-              onChange={e => setCompare(e.target.checked)}
-            />
-            Compare with previous year
-          </label>
+          <div className="flex items-center gap-3 ml-auto">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={compare}
+                onChange={e => setCompare(e.target.checked)}
+              />
+              Compare with previous year
+            </label>
+            {isCustomized && (
+              <button
+                type="button"
+                onClick={onReset}
+                className="text-xs text-primary hover:underline"
+                title="Restore the default period and toggles"
+              >
+                Reset to defaults
+              </button>
+            )}
+          </div>
         </div>
         {rangeError && (
           <div className="text-xs text-red-600">{rangeError}</div>
@@ -649,11 +706,26 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   // Period & YoY controls drive the analytics query. Defaults match the legacy
   // behaviour (last 12 months, no overlay) so the dashboard looks unchanged on
-  // first load.
+  // first load. The user's last selection is persisted in localStorage and
+  // rehydrated on mount — bad/missing payloads silently fall back to defaults.
   const defaultRange = resolvePeriod("last12", { from: "", to: "" }, now);
-  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("last12");
-  const [customRange, setCustomRange] = useState<{ from: string; to: string }>(defaultRange);
-  const [compareYoY, setCompareYoY] = useState(false);
+  const initialControls = loadAnalyticsControls(defaultRange);
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>(initialControls.preset);
+  const [customRange, setCustomRange] = useState<{ from: string; to: string }>(initialControls.custom);
+  const [compareYoY, setCompareYoY] = useState(initialControls.compare);
+  // Persist any change. Skipped on the first synchronous render because we
+  // already loaded from storage above; useEffect runs after commit so this
+  // simply mirrors current state back out.
+  useEffect(() => {
+    saveAnalyticsControls({ preset: periodPreset, custom: customRange, compare: compareYoY });
+  }, [periodPreset, customRange, compareYoY]);
+  const isControlsCustomized = periodPreset !== "last12" || compareYoY
+    || customRange.from !== defaultRange.from || customRange.to !== defaultRange.to;
+  const handleResetControls = () => {
+    setPeriodPreset("last12");
+    setCustomRange(defaultRange);
+    setCompareYoY(false);
+  };
   const resolvedRange = resolvePeriod(periodPreset, customRange, now);
   // Validate the custom range client-side so we don't fire a request that the
   // backend will reject; surface the error inline beside the controls so HR can
@@ -832,6 +904,8 @@ function AdminPayrollDashboard({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         setCompare={setCompareYoY}
         financialYear={fyLabel}
         rangeError={rangeError}
+        isCustomized={isControlsCustomized}
+        onReset={handleResetControls}
       />
       <PayrollAnalyticsSection analytics={analytics} runs={runs} deptPeriod={deptPeriod} setDeptPeriod={setDeptPeriod} />
 
