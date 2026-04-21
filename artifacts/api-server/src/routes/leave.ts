@@ -4,6 +4,7 @@ import { dispatchNotification } from "../lib/notification-service";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { checkPayrollLock } from "../lib/payroll-lock";
+import { runCarryForwardForYear } from "../lib/carry-forward";
 import {
   applyLeaveToAttendance,
   revertLeaveFromAttendance,
@@ -1246,107 +1247,30 @@ router.post("/leave/balances/carry-forward", requireHrmsUser, requireRole(...HR_
     if (!year || year < 2000 || year > 2100) {
       res.status(400).json({ error: "Valid year is required" }); return;
     }
-    const nextYear = year + 1;
 
     // Lock check on both source and target year (current month boundary)
     const lockSrc = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance", year, 12);
     if (lockSrc) { res.status(422).json({ error: lockSrc }); return; }
-    const lockDst = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance", nextYear, 1);
+    const lockDst = await checkPayrollLock(req.hrmsUser!.id, "edit_leave_balance", year + 1, 1);
     if (lockDst) { res.status(422).json({ error: lockDst }); return; }
 
-    const leaveTypes = await db.select().from(leaveTypesTable).where(eq(leaveTypesTable.isActive, true));
-    const emps = await db.select({ id: employeesTable.id }).from(employeesTable)
-      .where(and(isNull(employeesTable.deletedAt), employeeId ? eq(employeesTable.id, employeeId) : undefined));
-
-    let processed = 0;
-    let carriedForwardCount = 0;
-    let totalDaysCarried = 0;
-
-    for (const emp of emps) {
-      for (const lt of leaveTypes) {
-        // Skip if already carried forward for this employee/type/year (idempotent)
-        const already = await db.select({ id: leaveAccrualHistoryTable.id }).from(leaveAccrualHistoryTable).where(
-          and(
-            eq(leaveAccrualHistoryTable.employeeId, emp.id),
-            eq(leaveAccrualHistoryTable.leaveTypeId, lt.id),
-            eq(leaveAccrualHistoryTable.year, nextYear),
-            sql`${leaveAccrualHistoryTable.accrualType} = 'Carry Forward'`,
-          )
-        );
-        if (already.length > 0) continue;
-
-        // Compute remaining from current year balance
-        const [srcBal] = await db.select().from(leaveBalancesTable).where(and(
-          eq(leaveBalancesTable.employeeId, emp.id),
-          eq(leaveBalancesTable.leaveTypeId, lt.id),
-          eq(leaveBalancesTable.year, year),
-        ));
-        const allocated = parseFloat((srcBal?.allocated as string) ?? "0");
-        const carryForward = parseFloat((srcBal?.carryForward as string) ?? "0");
-        const used = parseFloat((srcBal?.used as string) ?? "0");
-        const pending = parseFloat((srcBal?.pending as string) ?? "0");
-        const remaining = Math.max(0, allocated + carryForward - used - pending);
-
-        let cf = 0;
-        if (lt.carryForwardEnabled) {
-          const cap = lt.carryForwardMax != null ? parseFloat(lt.carryForwardMax as string) : Infinity;
-          cf = Math.min(remaining, cap);
-        }
-
-        const annualQuota = parseFloat((lt.annualQuota as string) ?? "0");
-
-        await db.transaction(async (tx) => {
-          const [existing] = await tx.select().from(leaveBalancesTable).where(and(
-            eq(leaveBalancesTable.employeeId, emp.id),
-            eq(leaveBalancesTable.leaveTypeId, lt.id),
-            eq(leaveBalancesTable.year, nextYear),
-          ));
-          if (existing) {
-            await tx.update(leaveBalancesTable).set({
-              allocated: annualQuota.toFixed(1),
-              used: "0",
-              pending: "0",
-              carryForward: cf.toFixed(1),
-              updatedAt: new Date(),
-            }).where(eq(leaveBalancesTable.id, existing.id));
-          } else {
-            await tx.insert(leaveBalancesTable).values({
-              employeeId: emp.id,
-              leaveTypeId: lt.id,
-              year: nextYear,
-              allocated: annualQuota.toFixed(1),
-              used: "0",
-              pending: "0",
-              carryForward: cf.toFixed(1),
-            });
-          }
-          await tx.insert(leaveAccrualHistoryTable).values({
-            employeeId: emp.id,
-            leaveTypeId: lt.id,
-            year: nextYear,
-            accrualType: "Carry Forward",
-            days: cf.toFixed(1),
-            notes: lt.carryForwardEnabled
-              ? `Carried forward ${cf.toFixed(1)} of ${remaining.toFixed(1)} remaining day(s) from ${year}${lt.carryForwardMax != null ? ` (cap ${lt.carryForwardMax})` : ""}; new-year quota ${annualQuota.toFixed(1)}`
-              : `Carry-forward disabled for ${lt.name}; reset balances and allocated new-year quota ${annualQuota.toFixed(1)}`,
-            processedById: req.hrmsUser.id,
-          });
-        });
-
-        processed++;
-        if (cf > 0) { carriedForwardCount++; totalDaysCarried += cf; }
-      }
-    }
+    const summary = await runCarryForwardForYear(year, {
+      employeeId,
+      processedById: req.hrmsUser!.id,
+    });
 
     await logAudit({
       user: req.hrmsUser, action: "CARRY_FORWARD_LEAVE_BALANCES", module: "Leave",
-      newValue: `${year}->${nextYear}: processed=${processed}, carried=${carriedForwardCount}, days=${totalDaysCarried.toFixed(1)}`,
+      newValue: `${summary.fromYear}->${summary.toYear}: processed=${summary.processed}, carried=${summary.carriedForwardCount}, days=${summary.totalDaysCarried.toFixed(1)}`,
       ipAddress: req.ip,
     });
     res.json({
-      processed, carriedForwardCount, totalDaysCarried: totalDaysCarried.toFixed(1),
-      fromYear: year, toYear: nextYear,
-      message: `Processed ${processed} balance(s); carried forward ${totalDaysCarried.toFixed(1)} day(s) for ${carriedForwardCount} record(s) from ${year} to ${nextYear}`,
+      processed: summary.processed,
+      carriedForwardCount: summary.carriedForwardCount,
+      totalDaysCarried: summary.totalDaysCarried.toFixed(1),
+      fromYear: summary.fromYear,
+      toYear: summary.toYear,
+      message: `Processed ${summary.processed} balance(s); carried forward ${summary.totalDaysCarried.toFixed(1)} day(s) for ${summary.carriedForwardCount} record(s) from ${summary.fromYear} to ${summary.toYear}`,
     });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

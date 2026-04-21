@@ -27,6 +27,7 @@ import {
 import { eq, and, gte, lte, isNotNull, ne, sql, lt, count, inArray } from "drizzle-orm";
 import { generateTablePdf } from "./pdf";
 import { logger } from "./logger";
+import { runYearEndCarryForwardJob, maybeRunYearEndCarryForwardCatchUp } from "./carry-forward";
 
 // ─── SMTP transport (optional — only sends if SMTP_HOST is configured) ────────
 function createTransport() {
@@ -1016,7 +1017,17 @@ export function startScheduler(_port: number) {
   cron.schedule("0 10 * * *", () => {
     void remindPreOnboardingPending();
   });
+  // At 02:00 on Jan 1 (server local time) — auto year-end leave carry-forward
+  // for the just-finished year. Idempotent — safe even if HR also triggered
+  // it manually, and a manual re-run remains available as a fallback.
+  cron.schedule("0 2 1 1 *", () => {
+    void runYearEndCarryForwardJob();
+  });
   // Run once 5s after startup to catch any overdue schedules
   setTimeout(() => void runSchedulerTick(), 5_000);
+  // Catch-up: if we boot during January and the year-end carry-forward
+  // hasn't been recorded for this year (e.g. service was down at 02:00
+  // on Jan 1), run it now. Idempotent and advisory-locked.
+  setTimeout(() => void maybeRunYearEndCarryForwardCatchUp(), 10_000);
   logger.info("[scheduler] started — runs every hour at :00 + notification jobs");
 }
