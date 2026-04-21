@@ -19293,7 +19293,7 @@ export function useGetCalibrationView<
 }
 
 /**
- * Returns the average final score across cycles in which the target employee has a finalized outcome. The target employee's own score is excluded from the average. Cycles with fewer than 2 peers are omitted to avoid de-anonymizing individuals. HR roles may request company-wide or department averages; HOD users may only request department averages and only for their direct reports.
+ * Returns the average final score across cycles in which the target employee has a finalized outcome. The target employee's own score is excluded from the average. Cycles with fewer than 2 peers are omitted to avoid de-anonymizing individuals. HR roles may request department, designation, or company-wide averages; HOD users may only request department averages and only for their direct reports.
  * @summary Aggregate final scores per cycle for peer comparison (HR/HOD only)
  */
 export const getGetCycleAveragesUrl = (params: GetCycleAveragesParams) => {
