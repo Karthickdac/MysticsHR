@@ -132,6 +132,7 @@ import type {
   GetHelpdeskSlaReportCsvParams,
   GetHelpdeskSlaReportParams,
   GetLeaveCalendarParams,
+  GetLeaveUsageTrendParams,
   GetLeaveUtilizationReport200,
   GetLeaveUtilizationReportParams,
   GetMyAttendanceTodayParams,
@@ -180,6 +181,7 @@ import type {
   LeaveCalendarEntry,
   LeavePolicy,
   LeaveType,
+  LeaveUsageTrend,
   ListAppraisalOutcomesParams,
   ListAuditLogsParams,
   ListBlackoutDatesParams,
@@ -12973,6 +12975,104 @@ export function useListLeaveAccrualHistory<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListLeaveAccrualHistoryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns leave-days used per leave type for the last N years (default 3, max 10) for the requesting employee (or any employee for HR; same-department for HOD).
+ * @summary Year-over-year leave usage trend for one employee
+ */
+export const getGetLeaveUsageTrendUrl = (params?: GetLeaveUsageTrendParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/leave/usage-trend?${stringifiedParams}`
+    : `/api/leave/usage-trend`;
+};
+
+export const getLeaveUsageTrend = async (
+  params?: GetLeaveUsageTrendParams,
+  options?: RequestInit,
+): Promise<LeaveUsageTrend> => {
+  return customFetch<LeaveUsageTrend>(getGetLeaveUsageTrendUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLeaveUsageTrendQueryKey = (
+  params?: GetLeaveUsageTrendParams,
+) => {
+  return [`/api/leave/usage-trend`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetLeaveUsageTrendQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLeaveUsageTrend>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetLeaveUsageTrendParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveUsageTrend>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetLeaveUsageTrendQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLeaveUsageTrend>>
+  > = ({ signal }) => getLeaveUsageTrend(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLeaveUsageTrend>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLeaveUsageTrendQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLeaveUsageTrend>>
+>;
+export type GetLeaveUsageTrendQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Year-over-year leave usage trend for one employee
+ */
+
+export function useGetLeaveUsageTrend<
+  TData = Awaited<ReturnType<typeof getLeaveUsageTrend>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetLeaveUsageTrendParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeaveUsageTrend>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLeaveUsageTrendQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

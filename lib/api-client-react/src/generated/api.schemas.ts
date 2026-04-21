@@ -1676,6 +1676,22 @@ export interface LeaveAccrualHistoryEntry {
   createdAt: string;
 }
 
+export type LeaveUsageTrendByLeaveTypeItemUsageByYear = {
+  [key: string]: number;
+};
+
+export type LeaveUsageTrendByLeaveTypeItem = {
+  leaveTypeId: number;
+  leaveTypeName: string;
+  leaveTypeCode: string;
+  usageByYear: LeaveUsageTrendByLeaveTypeItemUsageByYear;
+};
+
+export interface LeaveUsageTrend {
+  years: number[];
+  byLeaveType: LeaveUsageTrendByLeaveTypeItem[];
+}
+
 export interface InitLeaveBalancesBody {
   year: number;
   /** @nullable */
@@ -3616,6 +3632,15 @@ export type CarryForwardLeaveBalances200 = {
 export type ListLeaveAccrualHistoryParams = {
   employeeId?: number;
   year?: number;
+};
+
+export type GetLeaveUsageTrendParams = {
+  employeeId?: number;
+  /**
+   * @minimum 1
+   * @maximum 10
+   */
+  years?: number;
 };
 
 export type AccrueLeaveBalancesBody = {

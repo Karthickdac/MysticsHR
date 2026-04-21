@@ -1354,6 +1354,88 @@ router.get("/leave/accrual-history", requireHrmsUser, requireRole(...ALL_ROLES),
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+router.get("/leave/usage-trend", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const { employeeId, years } = req.query as { employeeId?: string; years?: string };
+    const yearsBack = Math.min(Math.max(Number(years ?? 3) || 3, 1), 10);
+    const requestedEmpId = employeeId !== undefined && employeeId !== "" ? Number(employeeId) : undefined;
+    if (requestedEmpId !== undefined && !Number.isInteger(requestedEmpId)) {
+      res.status(400).json({ error: "Invalid employeeId" }); return;
+    }
+
+    // Authz: same scoping as /leave/accrual-history.
+    let scopedEmpId: number | undefined;
+    if (req.hrmsUser!.role === "employee") {
+      const emp = await getEmployeeForUser(req.hrmsUser!.id);
+      if (!emp) { res.json({ years: [], byLeaveType: [] }); return; }
+      if (requestedEmpId !== undefined && requestedEmpId !== emp.id) {
+        res.status(403).json({ error: "Employees may only view their own usage trend" }); return;
+      }
+      scopedEmpId = emp.id;
+    } else if (req.hrmsUser!.role === "hod") {
+      const hodEmp = await getEmployeeForUser(req.hrmsUser!.id);
+      if (!hodEmp?.departmentId) { res.json({ years: [], byLeaveType: [] }); return; }
+      if (requestedEmpId === undefined) {
+        res.status(400).json({ error: "employeeId is required for HOD" }); return;
+      }
+      const [reqEmp] = await db.select({ departmentId: employeesTable.departmentId })
+        .from(employeesTable).where(eq(employeesTable.id, requestedEmpId));
+      if (!reqEmp || reqEmp.departmentId !== hodEmp.departmentId) {
+        res.status(403).json({ error: "Employee is not in your department" }); return;
+      }
+      scopedEmpId = requestedEmpId;
+    } else {
+      // HR roles must specify employeeId for a per-person trend.
+      if (requestedEmpId === undefined) {
+        res.status(400).json({ error: "employeeId is required" }); return;
+      }
+      scopedEmpId = requestedEmpId;
+    }
+
+    const currentYear = new Date().getFullYear();
+    const fromYear = currentYear - yearsBack + 1;
+
+    const rows = await db
+      .select({
+        year: leaveBalancesTable.year,
+        leaveTypeId: leaveBalancesTable.leaveTypeId,
+        leaveTypeName: leaveTypesTable.name,
+        leaveTypeCode: leaveTypesTable.code,
+        used: leaveBalancesTable.used,
+      })
+      .from(leaveBalancesTable)
+      .innerJoin(leaveTypesTable, eq(leaveBalancesTable.leaveTypeId, leaveTypesTable.id))
+      .where(and(
+        eq(leaveBalancesTable.employeeId, scopedEmpId!),
+        gte(leaveBalancesTable.year, fromYear),
+        lte(leaveBalancesTable.year, currentYear),
+      ))
+      .orderBy(leaveBalancesTable.year, leaveTypesTable.name);
+
+    const yearList: number[] = [];
+    for (let y = fromYear; y <= currentYear; y++) yearList.push(y);
+
+    // Pivot: one row per leave type with usage per year.
+    const typeMap = new Map<number, { leaveTypeId: number; leaveTypeName: string; leaveTypeCode: string; usageByYear: Record<string, number> }>();
+    for (const r of rows) {
+      let bucket = typeMap.get(r.leaveTypeId);
+      if (!bucket) {
+        bucket = {
+          leaveTypeId: r.leaveTypeId,
+          leaveTypeName: r.leaveTypeName ?? r.leaveTypeCode ?? `Type ${r.leaveTypeId}`,
+          leaveTypeCode: r.leaveTypeCode ?? "",
+          usageByYear: {},
+        };
+        for (const y of yearList) bucket.usageByYear[String(y)] = 0;
+        typeMap.set(r.leaveTypeId, bucket);
+      }
+      bucket.usageByYear[String(r.year)] = parseFloat(r.used as string);
+    }
+
+    res.json({ years: yearList, byLeaveType: Array.from(typeMap.values()) });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 router.post("/leave/balances/accrue", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const { year, month, employeeId } = req.body as { year: number; month: number; employeeId?: number };

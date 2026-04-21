@@ -2799,6 +2799,23 @@ paths:
                 items:
                   $ref: "#/components/schemas/LeaveAccrualHistoryEntry"
 
+  /leave/usage-trend:
+    get:
+      operationId: getLeaveUsageTrend
+      tags: [Leave]
+      summary: Year-over-year leave usage trend for one employee
+      description: Returns leave-days used per leave type for the last N years (default 3, max 10) for the requesting employee (or any employee for HR; same-department for HOD).
+      parameters:
+        - { name: employeeId, in: query, schema: { type: integer } }
+        - { name: years, in: query, schema: { type: integer, minimum: 1, maximum: 10, default: 3 } }
+      responses:
+        "200":
+          description: Trend pivot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveUsageTrend"
+
   /leave/balances/accrue:
     post:
       operationId: accrueLeaveBalances
@@ -7633,6 +7650,26 @@ components:
         processedByName: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
       required: [id, employeeId, leaveTypeId, year, accrualType, days, createdAt]
+
+    LeaveUsageTrend:
+      type: object
+      properties:
+        years:
+          type: array
+          items: { type: integer }
+        byLeaveType:
+          type: array
+          items:
+            type: object
+            properties:
+              leaveTypeId: { type: integer }
+              leaveTypeName: { type: string }
+              leaveTypeCode: { type: string }
+              usageByYear:
+                type: object
+                additionalProperties: { type: number }
+            required: [leaveTypeId, leaveTypeName, leaveTypeCode, usageByYear]
+      required: [years, byLeaveType]
 
     InitLeaveBalancesBody:
       type: object

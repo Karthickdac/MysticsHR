@@ -4,6 +4,7 @@ import {
   useListLeaveApplications,
   useListLeaveBalances,
   useListLeaveAccrualHistory,
+  useGetLeaveUsageTrend,
   useSubmitLeaveApplication,
   useCancelLeaveApplication,
   getListLeaveApplicationsQueryKey,
@@ -20,6 +21,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Calendar, AlertCircle, ArrowRight } from "lucide-react";
+import {
+  ResponsiveContainer as RCResponsiveContainer,
+  BarChart as RCBarChart,
+  Bar as RCBar,
+  XAxis as RCXAxis,
+  YAxis as RCYAxis,
+  Tooltip as RCTooltip,
+  Legend as RCLegend,
+  CartesianGrid as RCCartesianGrid,
+} from "recharts";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 import { Link } from "wouter";
 
@@ -286,6 +297,9 @@ export default function LeavePage() {
         )}
       </div>
 
+      {/* Year-over-Year Usage Trend */}
+      <LeaveUsageTrendChart isEmployee={role === "employee"} />
+
       {/* My Applications */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -427,5 +441,61 @@ export default function LeavePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function LeaveUsageTrendChart({ isEmployee }: { isEmployee: boolean }) {
+  const { data } = useGetLeaveUsageTrend({ years: 3 }, { query: { enabled: isEmployee } });
+
+  if (!isEmployee) return null;
+  if (!data || data.byLeaveType.length === 0 || data.years.length === 0) {
+    return (
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Leave Usage Trend ({data?.years.length ? `${data.years[0]}–${data.years[data.years.length - 1]}` : "last 3 years"})
+        </h2>
+        <div className="text-center py-6 text-gray-400 border rounded-lg bg-gray-50/50 text-sm">
+          No leave usage in the last 3 years yet.
+        </div>
+      </div>
+    );
+  }
+
+  // Pivot to recharts: one row per leave type, one bar per year.
+  const chartData = data.byLeaveType.map((t) => {
+    const row: Record<string, string | number> = { name: t.leaveTypeName };
+    for (const y of data.years) row[String(y)] = t.usageByYear[String(y)] ?? 0;
+    return row;
+  });
+
+  const yearColors = ["#c7d2fe", "#818cf8", "#4f46e5"]; // last → current
+  const startColorIdx = Math.max(0, yearColors.length - data.years.length);
+
+  return (
+    <div>
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        Leave Usage Trend ({data.years[0]}–{data.years[data.years.length - 1]})
+      </h2>
+      <div className="border rounded-lg p-4 bg-white">
+        <LazyTrendChart data={chartData} years={data.years} colors={yearColors.slice(startColorIdx)} />
+      </div>
+    </div>
+  );
+}
+
+function LazyTrendChart({ data, years, colors }: { data: Array<Record<string, string | number>>; years: number[]; colors: string[] }) {
+  return (
+    <RCResponsiveContainer width="100%" height={260}>
+      <RCBarChart data={data} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+        <RCCartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <RCXAxis dataKey="name" tick={{ fontSize: 12 }} />
+        <RCYAxis tick={{ fontSize: 12 }} label={{ value: "Days used", angle: -90, position: "insideLeft", style: { fontSize: 11, fill: "#64748b" } }} />
+        <RCTooltip />
+        <RCLegend wrapperStyle={{ fontSize: 12 }} />
+        {years.map((y, i) => (
+          <RCBar key={y} dataKey={String(y)} fill={colors[i] ?? "#4f46e5"} radius={[4, 4, 0, 0]} />
+        ))}
+      </RCBarChart>
+    </RCResponsiveContainer>
   );
 }

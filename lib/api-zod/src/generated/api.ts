@@ -3752,6 +3752,34 @@ export const ListLeaveAccrualHistoryResponse = zod.array(
 );
 
 /**
+ * Returns leave-days used per leave type for the last N years (default 3, max 10) for the requesting employee (or any employee for HR; same-department for HOD).
+ * @summary Year-over-year leave usage trend for one employee
+ */
+export const getLeaveUsageTrendQueryYearsDefault = 3;
+export const getLeaveUsageTrendQueryYearsMax = 10;
+
+export const GetLeaveUsageTrendQueryParams = zod.object({
+  employeeId: zod.coerce.number().optional(),
+  years: zod.coerce
+    .number()
+    .min(1)
+    .max(getLeaveUsageTrendQueryYearsMax)
+    .default(getLeaveUsageTrendQueryYearsDefault),
+});
+
+export const GetLeaveUsageTrendResponse = zod.object({
+  years: zod.array(zod.number()),
+  byLeaveType: zod.array(
+    zod.object({
+      leaveTypeId: zod.number(),
+      leaveTypeName: zod.string(),
+      leaveTypeCode: zod.string(),
+      usageByYear: zod.record(zod.string(), zod.number()),
+    }),
+  ),
+});
+
+/**
  * @summary Run periodic (monthly) leave accrual for all or one employee
  */
 export const accrueLeaveBalancesBodyMonthMax = 12;
