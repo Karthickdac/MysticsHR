@@ -135,23 +135,38 @@ export async function cleanupOrphanedAttachments(
     return result;
   }
 
+  // Build all path variants under which an attachment row may have been
+  // persisted. `normalizeObjectEntityPath()` historically can emit either
+  // `/objects/uploads/<id>` (canonical) or `/objects//uploads/<id>`
+  // (when PRIVATE_OBJECT_DIR has a trailing slash). We must consider a
+  // file "known" if EITHER form exists in `ticket_attachments`, otherwise
+  // we would incorrectly delete a live attachment.
+  function pathVariants(canonical: string): string[] {
+    const doubled = canonical.replace("/objects/uploads/", "/objects//uploads/");
+    return canonical === doubled ? [canonical] : [canonical, doubled];
+  }
+
   // Find which candidate paths have matching DB rows (in chunks for safety).
-  const knownPaths = new Set<string>();
-  for (const group of chunk(candidates, DB_LOOKUP_CHUNK)) {
-    const paths = group.map((c) => c.objectPath);
+  // We query the union of all variants and then mark the canonical form known
+  // when ANY of its variants is found in the DB.
+  const knownVariants = new Set<string>();
+  const allLookupPaths = candidates.flatMap((c) => pathVariants(c.objectPath));
+  for (const group of chunk(allLookupPaths, DB_LOOKUP_CHUNK)) {
     try {
       const rows = await db
         .select({ objectPath: ticketAttachmentsTable.objectPath })
         .from(ticketAttachmentsTable)
-        .where(inArray(ticketAttachmentsTable.objectPath, paths));
-      for (const r of rows) knownPaths.add(r.objectPath);
+        .where(inArray(ticketAttachmentsTable.objectPath, group));
+      for (const r of rows) knownVariants.add(r.objectPath);
     } catch (err) {
       logger.error({ err }, "[orphan-cleanup] DB lookup failed; aborting to avoid false positives");
       return result;
     }
   }
 
-  const orphans = candidates.filter((c) => !knownPaths.has(c.objectPath));
+  const orphans = candidates.filter(
+    (c) => !pathVariants(c.objectPath).some((v) => knownVariants.has(v)),
+  );
   result.orphans = orphans.length;
 
   for (const orphan of orphans) {
