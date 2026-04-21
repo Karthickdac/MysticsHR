@@ -250,6 +250,59 @@ function PayrollAnalyticsControls({
   );
 }
 
+// Custom tooltip for the YoY-enabled monthly trend chart. Shows each metric's
+// current value alongside the prior-year value and the % delta. The variance
+// row is suppressed for any metric whose prior value is missing — partial
+// overlaps shouldn't show "+∞%" or misleading "+100%" numbers.
+type YoYTooltipPayloadItem = {
+  dataKey?: string | number;
+  payload?: {
+    label?: string;
+    totalGross?: number; totalNet?: number; totalDeductions?: number;
+    priorTotalGross?: number | null; priorTotalNet?: number | null; priorTotalDeductions?: number | null;
+  };
+};
+function YoYTrendTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: YoYTooltipPayloadItem[];
+  label?: string | number;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  // All series share the same datum, so just read the first.
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  const rows: Array<{ key: string; name: string; color: string; cur: number | undefined; prior: number | null | undefined }> = [
+    { key: "gross", name: "Gross", color: "#6366f1", cur: d.totalGross, prior: d.priorTotalGross },
+    { key: "net", name: "Net", color: "#10b981", cur: d.totalNet, prior: d.priorTotalNet },
+    { key: "deductions", name: "Deductions", color: "#ef4444", cur: d.totalDeductions, prior: d.priorTotalDeductions },
+  ];
+  return (
+    <div className="rounded-md border bg-popover text-popover-foreground shadow-md text-xs p-2 min-w-[180px]">
+      <div className="font-medium mb-1">{label}</div>
+      {rows.map(r => {
+        const hasPrior = r.prior != null && r.cur != null;
+        const pct = hasPrior && r.prior !== 0 ? ((r.cur! - r.prior!) / r.prior!) * 100 : null;
+        const pctText = pct == null ? null : `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+        const pctClass = pct == null ? "" : (pct >= 0 ? "text-emerald-600" : "text-red-600");
+        return (
+          <div key={r.key} className="flex items-center justify-between gap-3 py-0.5">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-sm" style={{ background: r.color }} />
+              {r.name}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="font-medium">{r.cur != null ? compactInr(r.cur) : "—"}</span>
+              {hasPrior && pctText && (
+                <span className={pctClass}>{pctText}</span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function PayrollAnalyticsSection({
   analytics, runs, deptPeriod, setDeptPeriod, navigateOverride,
 }: {
@@ -344,6 +397,45 @@ export function PayrollAnalyticsSection({
     ? `${analytics.windowFrom} → ${analytics.windowTo}`
     : "selected period";
 
+  // Aggregate window-over-prior-window variance for the KPI strip. Only counts
+  // months that have BOTH current and prior values, so partially-overlapping
+  // windows (e.g. only 6 of 12 months have last-year data) don't artificially
+  // skew the comparison. Headcount uses the average across paired months — sum
+  // doesn't make sense for a per-month snapshot — and we round to whole people.
+  const aggregateVariance = (() => {
+    if (!showPrior) return null;
+    let curGross = 0, priorGross = 0, curNet = 0, priorNet = 0;
+    let curEmp = 0, priorEmp = 0, paired = 0;
+    for (const p of trend as Array<{
+      totalGross: number; totalNet: number; employees: number;
+      priorTotalGross?: number | null; priorTotalNet?: number | null; priorEmployees?: number | null;
+    }>) {
+      if (p.priorTotalGross == null || p.priorTotalNet == null || p.priorEmployees == null) continue;
+      curGross += p.totalGross; priorGross += p.priorTotalGross;
+      curNet += p.totalNet; priorNet += p.priorTotalNet;
+      curEmp += p.employees; priorEmp += p.priorEmployees;
+      paired += 1;
+    }
+    if (paired === 0) return null;
+    const pct = (cur: number, prior: number) => prior === 0 ? null : ((cur - prior) / prior) * 100;
+    return {
+      paired,
+      gross: { cur: curGross, prior: priorGross, pct: pct(curGross, priorGross) },
+      net: { cur: curNet, prior: priorNet, pct: pct(curNet, priorNet) },
+      headcount: {
+        cur: Math.round(curEmp / paired),
+        prior: Math.round(priorEmp / paired),
+        pct: pct(curEmp, priorEmp),
+      },
+    };
+  })();
+  const fmtPct = (p: number | null) => p == null ? "—" : `${p >= 0 ? "+" : ""}${p.toFixed(1)}%`;
+  const pctColor = (p: number | null, invert = false) => {
+    if (p == null) return "text-muted-foreground";
+    const up = p >= 0;
+    return up === !invert ? "text-emerald-600" : "text-red-600";
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="lg:col-span-2">
@@ -354,6 +446,26 @@ export function PayrollAnalyticsSection({
           </div>
         </CardHeader>
         <CardContent>
+          {aggregateVariance && (
+            <div
+              data-testid="yoy-kpi-strip"
+              className="grid grid-cols-3 gap-2 mb-3 pb-3 border-b"
+            >
+              {[
+                { label: "Total Gross", v: aggregateVariance.gross, fmtVal: (n: number) => compactInr(n), invertColor: false },
+                { label: "Total Net", v: aggregateVariance.net, fmtVal: (n: number) => compactInr(n), invertColor: false },
+                { label: "Avg Headcount", v: aggregateVariance.headcount, fmtVal: (n: number) => `${n}`, invertColor: false },
+              ].map(item => (
+                <div key={item.label} className="px-1">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{item.label}</p>
+                  <p className="text-base font-semibold leading-tight">{item.fmtVal(item.v.cur)}</p>
+                  <p className={`text-xs leading-tight ${pctColor(item.v.pct, item.invertColor)}`}>
+                    {fmtPct(item.v.pct)} <span className="text-muted-foreground">vs prev yr ({item.fmtVal(item.v.prior)})</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
           {trend.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">No finalized runs in the selected window.</div>
           ) : (
@@ -362,7 +474,10 @@ export function PayrollAnalyticsSection({
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={compactInr} tick={{ fontSize: 12 }} width={70} />
-                <Tooltip formatter={(v: number) => compactInr(Number(v))} />
+                <Tooltip
+                  content={showPrior ? <YoYTrendTooltip /> : undefined}
+                  formatter={showPrior ? undefined : (v: number) => compactInr(Number(v))}
+                />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="totalGross" name="Gross" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
                 <Line type="monotone" dataKey="totalNet" name="Net" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
