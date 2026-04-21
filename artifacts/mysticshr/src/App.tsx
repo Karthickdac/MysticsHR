@@ -142,6 +142,19 @@ function SignInPage() {
   );
 }
 
+function LogoutPage() {
+  const { signOut } = useClerk();
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    void signOut(() => setLocation("/"));
+  }, [signOut, setLocation]);
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-muted/30 px-4">
+      <p className="text-sm text-muted-foreground">Signing you out…</p>
+    </div>
+  );
+}
+
 function SignUpPage() {
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-muted/30 px-4">
@@ -261,6 +274,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/" component={HomeRedirect} />
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/logout" component={LogoutPage} />
 
           <Route path="/dashboard">
             <ProtectedRoute><DashboardPage /></ProtectedRoute>
