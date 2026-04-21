@@ -5195,41 +5195,51 @@ export const CreateTicketAssignmentBody = zod.object({
 });
 
 /**
- * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
+ * @summary SLA breach and resolution report
  */
 export const GetHelpdeskSlaReportQueryParams = zod.object({
-  fromDate: zod.coerce.string().optional(),
-  toDate: zod.coerce.string().optional(),
-  departmentId: zod.coerce.number().optional(),
+  from: zod
+    .date()
+    .optional()
+    .describe("Optional inclusive lower bound on ticket createdAt"),
+  to: zod
+    .date()
+    .optional()
+    .describe("Optional inclusive upper bound on ticket createdAt"),
 });
 
 export const GetHelpdeskSlaReportResponse = zod.object({
-  data: zod.array(zod.object({}).passthrough()).optional(),
-  total: zod.number().optional(),
-  totalTickets: zod.number().optional(),
-  openTickets: zod.number().optional(),
-  resolvedTickets: zod.number().optional(),
-  slaBreachedCount: zod.number().optional(),
+  totalTickets: zod.number(),
+  openTickets: zod.number(),
+  resolvedTickets: zod.number(),
+  slaBreachedCount: zod.number(),
   avgResolutionHours: zod.number().nullish(),
-  byPriority: zod
-    .array(
-      zod.object({
-        priority: zod.string().optional(),
-        total: zod.number().optional(),
-        breached: zod.number().optional(),
-        avgResolutionHours: zod.number().nullish(),
-      }),
-    )
-    .optional(),
-  byCategory: zod
-    .array(
-      zod.object({
-        category: zod.string().optional(),
-        total: zod.number().optional(),
-        breached: zod.number().optional(),
-      }),
-    )
-    .optional(),
+  rangeFrom: zod.coerce.date().nullish(),
+  rangeTo: zod.coerce.date().nullish(),
+  byPriority: zod.array(
+    zod.object({
+      priority: zod.string(),
+      count: zod.number(),
+      breached: zod.number(),
+      avgResolutionHours: zod.number().nullish(),
+    }),
+  ),
+  byCategory: zod.array(
+    zod.object({
+      category: zod.string(),
+      count: zod.number(),
+      breached: zod.number().optional(),
+      avgResolutionHours: zod.number().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary SLA report CSV export (one row per ticket)
+ */
+export const GetHelpdeskSlaReportCsvQueryParams = zod.object({
+  from: zod.date().optional(),
+  to: zod.date().optional(),
 });
 
 /**
@@ -6300,6 +6310,44 @@ export const GetPermissionUsageReportQueryParams = zod.object({
 export const GetPermissionUsageReportResponse = zod.object({
   data: zod.array(zod.object({}).passthrough()).optional(),
   total: zod.number().optional(),
+});
+
+/**
+ * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
+ */
+export const GetReportsHelpdeskSlaQueryParams = zod.object({
+  fromDate: zod.coerce.string().optional(),
+  toDate: zod.coerce.string().optional(),
+  departmentId: zod.coerce.number().optional(),
+});
+
+export const GetReportsHelpdeskSlaResponse = zod.object({
+  data: zod.array(zod.object({}).passthrough()).optional(),
+  total: zod.number().optional(),
+  totalTickets: zod.number().optional(),
+  openTickets: zod.number().optional(),
+  resolvedTickets: zod.number().optional(),
+  slaBreachedCount: zod.number().optional(),
+  avgResolutionHours: zod.number().nullish(),
+  byPriority: zod
+    .array(
+      zod.object({
+        priority: zod.string().optional(),
+        total: zod.number().optional(),
+        breached: zod.number().optional(),
+        avgResolutionHours: zod.number().nullish(),
+      }),
+    )
+    .optional(),
+  byCategory: zod
+    .array(
+      zod.object({
+        category: zod.string().optional(),
+        total: zod.number().optional(),
+        breached: zod.number().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**

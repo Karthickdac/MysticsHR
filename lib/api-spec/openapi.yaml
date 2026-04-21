@@ -4342,6 +4342,17 @@ paths:
       operationId: getHelpdeskSlaReport
       tags: [helpdesk]
       summary: SLA breach and resolution report
+      parameters:
+        - in: query
+          name: from
+          required: false
+          schema: { type: string, format: date-time }
+          description: Optional inclusive lower bound on ticket createdAt
+        - in: query
+          name: to
+          required: false
+          schema: { type: string, format: date-time }
+          description: Optional inclusive upper bound on ticket createdAt
       responses:
         "200":
           description: SLA report data
@@ -4349,6 +4360,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HelpdeskSlaReport"
+
+  /helpdesk/sla-report.csv:
+    get:
+      operationId: getHelpdeskSlaReportCsv
+      tags: [helpdesk]
+      summary: SLA report CSV export (one row per ticket)
+      parameters:
+        - in: query
+          name: from
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: false
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema: { type: string }
 
   /helpdesk/sla-check:
     post:
@@ -5137,7 +5169,7 @@ paths:
 
   /reports/helpdesk-sla:
     get:
-      operationId: getHelpdeskSlaReport
+      operationId: getReportsHelpdeskSla
       tags: [reports]
       summary: Helpdesk ticket SLA breach analysis with avg resolution time by priority
       parameters:
@@ -8157,6 +8189,8 @@ components:
         resolvedTickets: { type: integer }
         slaBreachedCount: { type: integer }
         avgResolutionHours: { type: ['number', 'null'] }
+        rangeFrom: { type: ['string', 'null'], format: date-time }
+        rangeTo: { type: ['string', 'null'], format: date-time }
         byPriority:
           type: array
           items:
@@ -8165,6 +8199,7 @@ components:
               priority: { type: string }
               count: { type: integer }
               breached: { type: integer }
+              avgResolutionHours: { type: ['number', 'null'] }
             required: [priority, count, breached]
         byCategory:
           type: array
@@ -8173,6 +8208,8 @@ components:
             properties:
               category: { type: string }
               count: { type: integer }
+              breached: { type: integer }
+              avgResolutionHours: { type: ['number', 'null'] }
             required: [category, count]
       required: [totalTickets, openTickets, resolvedTickets, slaBreachedCount, byPriority, byCategory]
 

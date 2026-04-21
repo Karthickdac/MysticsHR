@@ -2533,11 +2533,16 @@ export type HelpdeskSlaReportByPriorityItem = {
   priority: string;
   count: number;
   breached: number;
+  /** @nullable */
+  avgResolutionHours?: number | null;
 };
 
 export type HelpdeskSlaReportByCategoryItem = {
   category: string;
   count: number;
+  breached?: number;
+  /** @nullable */
+  avgResolutionHours?: number | null;
 };
 
 export interface HelpdeskSlaReport {
@@ -2547,6 +2552,10 @@ export interface HelpdeskSlaReport {
   slaBreachedCount: number;
   /** @nullable */
   avgResolutionHours?: number | null;
+  /** @nullable */
+  rangeFrom?: string | null;
+  /** @nullable */
+  rangeTo?: string | null;
   byPriority: HelpdeskSlaReportByPriorityItem[];
   byCategory: HelpdeskSlaReportByCategoryItem[];
 }
@@ -3589,6 +3598,22 @@ export type ListHelpdeskTicketsParams = {
   assignedTo?: number;
 };
 
+export type GetHelpdeskSlaReportParams = {
+  /**
+   * Optional inclusive lower bound on ticket createdAt
+   */
+  from?: string;
+  /**
+   * Optional inclusive upper bound on ticket createdAt
+   */
+  to?: string;
+};
+
+export type GetHelpdeskSlaReportCsvParams = {
+  from?: string;
+  to?: string;
+};
+
 export type RunHelpdeskSlaCheck200 = {
   escalated: number;
 };
@@ -3816,37 +3841,37 @@ export type GetPermissionUsageReport200 = {
   total?: number;
 };
 
-export type GetHelpdeskSlaReportParams = {
+export type GetReportsHelpdeskSlaParams = {
   fromDate?: string;
   toDate?: string;
   departmentId?: number;
 };
 
-export type GetHelpdeskSlaReport200DataItem = { [key: string]: unknown };
+export type GetReportsHelpdeskSla200DataItem = { [key: string]: unknown };
 
-export type GetHelpdeskSlaReport200ByPriorityItem = {
+export type GetReportsHelpdeskSla200ByPriorityItem = {
   priority?: string;
   total?: number;
   breached?: number;
   avgResolutionHours?: number | null;
 };
 
-export type GetHelpdeskSlaReport200ByCategoryItem = {
+export type GetReportsHelpdeskSla200ByCategoryItem = {
   category?: string;
   total?: number;
   breached?: number;
 };
 
-export type GetHelpdeskSlaReport200 = {
-  data?: GetHelpdeskSlaReport200DataItem[];
+export type GetReportsHelpdeskSla200 = {
+  data?: GetReportsHelpdeskSla200DataItem[];
   total?: number;
   totalTickets?: number;
   openTickets?: number;
   resolvedTickets?: number;
   slaBreachedCount?: number;
   avgResolutionHours?: number | null;
-  byPriority?: GetHelpdeskSlaReport200ByPriorityItem[];
-  byCategory?: GetHelpdeskSlaReport200ByCategoryItem[];
+  byPriority?: GetReportsHelpdeskSla200ByPriorityItem[];
+  byCategory?: GetReportsHelpdeskSla200ByCategoryItem[];
 };
 
 export type GetStatutoryComplianceReportParams = {

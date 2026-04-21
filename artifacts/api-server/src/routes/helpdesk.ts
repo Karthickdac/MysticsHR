@@ -545,48 +545,151 @@ router.post("/helpdesk/sla-check", requireHrmsUser, requireRole(...MANAGER_ROLES
 });
 
 // ─── SLA REPORT ───────────────────────────────────────────────────────────────
-router.get("/helpdesk/sla-report", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
-  try {
-    const all = await db.select().from(helpdeskTicketsTable).orderBy(desc(helpdeskTicketsTable.createdAt));
+// Compute SLA report data, optionally filtered by createdAt date range [from, to].
+async function computeSlaReport(from?: Date, to?: Date) {
+  const all = await db.select().from(helpdeskTicketsTable).orderBy(desc(helpdeskTicketsTable.createdAt));
 
-    const now = new Date();
-    const totalTickets = all.length;
-    const openTickets = all.filter(t => !["Resolved", "Closed"].includes(t.status)).length;
-    const resolvedTickets = all.filter(t => ["Resolved", "Closed"].includes(t.status)).length;
+  // Filter by createdAt range (inclusive)
+  const inRange = all.filter(t => {
+    if (!t.createdAt) return false;
+    const c = new Date(t.createdAt).getTime();
+    if (from && c < from.getTime()) return false;
+    if (to && c > to.getTime()) return false;
+    return true;
+  });
 
-    const slaBreachedCount = all.filter(t =>
-      t.slaDeadline && new Date(t.slaDeadline) < now && !["Resolved", "Closed"].includes(t.status)
-    ).length;
+  const now = new Date();
+  const totalTickets = inRange.length;
+  const openTickets = inRange.filter(t => !["Resolved", "Closed"].includes(t.status)).length;
+  const resolvedTickets = inRange.filter(t => ["Resolved", "Closed"].includes(t.status)).length;
 
-    const resolvedWithTime = all.filter(t => t.resolvedAt && t.createdAt);
-    const avgResolutionHours = resolvedWithTime.length > 0
-      ? resolvedWithTime.reduce((sum, t) => {
-          const diff = new Date(t.resolvedAt!).getTime() - new Date(t.createdAt).getTime();
-          return sum + diff / (1000 * 60 * 60);
-        }, 0) / resolvedWithTime.length
-      : null;
+  const isBreached = (t: typeof helpdeskTicketsTable.$inferSelect) => {
+    if (!t.slaDeadline) return false;
+    if (["Resolved", "Closed"].includes(t.status)) {
+      // Historical breach: completion (resolved or closed) happened after the SLA deadline
+      const completedAt = t.resolvedAt ?? t.closedAt;
+      return !!completedAt && new Date(completedAt) > new Date(t.slaDeadline);
+    }
+    return new Date(t.slaDeadline) < now;
+  };
+  const slaBreachedCount = inRange.filter(isBreached).length;
 
-    const priorityMap: Record<string, { count: number; breached: number }> = {};
-    const categoryMap: Record<string, number> = {};
+  const resolvedWithTime = inRange.filter(t => t.resolvedAt && t.createdAt);
+  const avgResolutionHours = resolvedWithTime.length > 0
+    ? resolvedWithTime.reduce((sum, t) => {
+        const diff = new Date(t.resolvedAt!).getTime() - new Date(t.createdAt).getTime();
+        return sum + diff / (1000 * 60 * 60);
+      }, 0) / resolvedWithTime.length
+    : null;
 
-    for (const t of all) {
-      if (!priorityMap[t.priority]) priorityMap[t.priority] = { count: 0, breached: 0 };
-      priorityMap[t.priority].count++;
-      if (t.slaDeadline && new Date(t.slaDeadline) < now && !["Resolved", "Closed"].includes(t.status)) {
-        priorityMap[t.priority].breached++;
-      }
-      categoryMap[t.category] = (categoryMap[t.category] ?? 0) + 1;
+  const priorityMap: Record<string, { count: number; breached: number; resolvedSumHrs: number; resolvedCount: number }> = {};
+  const categoryMap: Record<string, { count: number; breached: number; resolvedSumHrs: number; resolvedCount: number }> = {};
+
+  for (const t of inRange) {
+    if (!priorityMap[t.priority]) priorityMap[t.priority] = { count: 0, breached: 0, resolvedSumHrs: 0, resolvedCount: 0 };
+    priorityMap[t.priority].count++;
+    if (isBreached(t)) priorityMap[t.priority].breached++;
+    if (t.resolvedAt && t.createdAt) {
+      priorityMap[t.priority].resolvedSumHrs += (new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000;
+      priorityMap[t.priority].resolvedCount++;
     }
 
-    res.json({
-      totalTickets,
-      openTickets,
-      resolvedTickets,
-      slaBreachedCount,
-      avgResolutionHours: avgResolutionHours !== null ? Math.round(avgResolutionHours * 10) / 10 : null,
-      byPriority: Object.entries(priorityMap).map(([priority, v]) => ({ priority, ...v })),
-      byCategory: Object.entries(categoryMap).map(([category, count]) => ({ category, count })),
-    });
+    if (!categoryMap[t.category]) categoryMap[t.category] = { count: 0, breached: 0, resolvedSumHrs: 0, resolvedCount: 0 };
+    categoryMap[t.category].count++;
+    if (isBreached(t)) categoryMap[t.category].breached++;
+    if (t.resolvedAt && t.createdAt) {
+      categoryMap[t.category].resolvedSumHrs += (new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000;
+      categoryMap[t.category].resolvedCount++;
+    }
+  }
+
+  const round1 = (n: number | null) => n === null ? null : Math.round(n * 10) / 10;
+
+  return {
+    totalTickets,
+    openTickets,
+    resolvedTickets,
+    slaBreachedCount,
+    avgResolutionHours: round1(avgResolutionHours),
+    byPriority: Object.entries(priorityMap).map(([priority, v]) => ({
+      priority, count: v.count, breached: v.breached,
+      avgResolutionHours: v.resolvedCount > 0 ? round1(v.resolvedSumHrs / v.resolvedCount) : null,
+    })),
+    byCategory: Object.entries(categoryMap).map(([category, v]) => ({
+      category, count: v.count, breached: v.breached,
+      avgResolutionHours: v.resolvedCount > 0 ? round1(v.resolvedSumHrs / v.resolvedCount) : null,
+    })),
+    rangeFrom: from?.toISOString() ?? null,
+    rangeTo: to?.toISOString() ?? null,
+    tickets: inRange, // used by CSV exporter; not serialised by JSON endpoint
+  };
+}
+
+function parseDateParam(v: unknown): Date | undefined {
+  if (typeof v !== "string" || !v) return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
+router.get("/helpdesk/sla-report", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const from = parseDateParam(req.query.from);
+    const to = parseDateParam(req.query.to);
+    const report = await computeSlaReport(from, to);
+    const { tickets: _omit, ...payload } = report; // strip ticket list from JSON response
+    res.json(payload);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// CSV export of SLA report — one row per ticket within the optional date range
+router.get("/helpdesk/sla-report.csv", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const from = parseDateParam(req.query.from);
+    const to = parseDateParam(req.query.to);
+    const report = await computeSlaReport(from, to);
+
+    const escape = (v: unknown) => {
+      if (v === null || v === undefined) return "";
+      let s = String(v);
+      // Neutralise spreadsheet formula injection: prefix dangerous leading chars with a single quote
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const header = [
+      "Ticket ID", "Subject", "Category", "Priority", "Status",
+      "Raised By Employee ID", "Assigned To User ID",
+      "Created At", "SLA Deadline", "Resolved At", "Closed At",
+      "SLA Breached", "Resolution Hours",
+    ];
+    const lines = [header.join(",")];
+
+    const now = new Date();
+    for (const t of report.tickets) {
+      const breached = t.slaDeadline
+        ? (["Resolved", "Closed"].includes(t.status)
+            ? (t.resolvedAt ? new Date(t.resolvedAt) > new Date(t.slaDeadline) : false)
+            : new Date(t.slaDeadline) < now)
+        : false;
+      const resolutionHours = t.resolvedAt && t.createdAt
+        ? Math.round(((new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000) * 10) / 10
+        : "";
+      lines.push([
+        t.id, t.subject, t.category, t.priority, t.status,
+        t.raisedByEmployeeId ?? "", t.assignedToUserId ?? "",
+        t.createdAt ? new Date(t.createdAt).toISOString() : "",
+        t.slaDeadline ? new Date(t.slaDeadline).toISOString() : "",
+        t.resolvedAt ? new Date(t.resolvedAt).toISOString() : "",
+        t.closedAt ? new Date(t.closedAt).toISOString() : "",
+        breached ? "Yes" : "No",
+        resolutionHours,
+      ].map(escape).join(","));
+    }
+
+    const fileLabel = `helpdesk-sla-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileLabel}"`);
+    res.send(lines.join("\r\n"));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

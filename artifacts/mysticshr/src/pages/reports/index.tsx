@@ -10,7 +10,7 @@ import {
   useGetRecruitmentPipelineReport,
   useGetPermissionUsageReport,
   useGetStatutoryComplianceReport,
-  useGetHelpdeskSlaReport,
+  useGetReportsHelpdeskSla,
   useListReportSchedules,
   useCreateReportSchedule,
   useDeleteReportSchedule,
@@ -32,7 +32,7 @@ import {
   getGetRecruitmentPipelineReportQueryKey,
   getGetPermissionUsageReportQueryKey,
   getGetStatutoryComplianceReportQueryKey,
-  getGetHelpdeskSlaReportQueryKey,
+  getGetReportsHelpdeskSlaQueryKey,
   type CreateReportScheduleBody,
   type ReportSchedule,
   type SavedReportTemplate,
@@ -47,7 +47,7 @@ import {
   type GetRecruitmentPipelineReportParams,
   type GetPermissionUsageReportParams,
   type GetStatutoryComplianceReportParams,
-  type GetHelpdeskSlaReportParams,
+  type GetReportsHelpdeskSlaParams,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -374,7 +374,7 @@ function ReportCatalog() {
     year: filters.year ?? String(new Date().getFullYear()),
     departmentId: toNum(filters.departmentId),
   };
-  const helpdeskSlaParams: GetHelpdeskSlaReportParams = {
+  const helpdeskSlaParams: GetReportsHelpdeskSlaParams = {
     ...dateFilters(filters, { fromDate: monthStart, toDate: today }),
     departmentId: toNum(filters.departmentId),
   };
@@ -389,7 +389,7 @@ function ReportCatalog() {
   const recQuery = useGetRecruitmentPipelineReport(selected === "recruitment-pipeline" ? recParams : undefined, { query: { enabled: selected === "recruitment-pipeline", queryKey: getGetRecruitmentPipelineReportQueryKey(recParams) } });
   const permQuery = useGetPermissionUsageReport(selected === "permission-usage" ? permParams : undefined, { query: { enabled: selected === "permission-usage", queryKey: getGetPermissionUsageReportQueryKey(permParams) } });
   const statQuery = useGetStatutoryComplianceReport(selected === "statutory-compliance" ? statParams : undefined, { query: { enabled: selected === "statutory-compliance", queryKey: getGetStatutoryComplianceReportQueryKey(statParams) } });
-  const helpdeskSlaQuery = useGetHelpdeskSlaReport(selected === "helpdesk-sla" ? helpdeskSlaParams : undefined, { query: { enabled: selected === "helpdesk-sla", queryKey: getGetHelpdeskSlaReportQueryKey(helpdeskSlaParams) } });
+  const helpdeskSlaQuery = useGetReportsHelpdeskSla(selected === "helpdesk-sla" ? helpdeskSlaParams : undefined, { query: { enabled: selected === "helpdesk-sla", queryKey: getGetReportsHelpdeskSlaQueryKey(helpdeskSlaParams) } });
 
   const queryMap: Record<ReportType, { data?: { data?: object[]; total?: number }; isLoading?: boolean }> = {
     "employee-directory": empDirQuery,

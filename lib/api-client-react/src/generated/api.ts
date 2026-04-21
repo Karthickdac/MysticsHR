@@ -124,7 +124,7 @@ import type {
   GetFnfSuggestion200,
   GetHeadcountReport200,
   GetHeadcountReportParams,
-  GetHelpdeskSlaReport200,
+  GetHelpdeskSlaReportCsvParams,
   GetHelpdeskSlaReportParams,
   GetLeaveCalendarParams,
   GetLeaveUtilizationReport200,
@@ -142,6 +142,8 @@ import type {
   GetPtReportParams,
   GetRecruitmentPipelineReport200,
   GetRecruitmentPipelineReportParams,
+  GetReportsHelpdeskSla200,
+  GetReportsHelpdeskSlaParams,
   GetShiftSwapsParams,
   GetShiftsCalendarParams,
   GetShiftsTemplatesParams,
@@ -153,6 +155,7 @@ import type {
   GoalProgressBody,
   HeadcountByDepartment,
   HealthStatus,
+  HelpdeskSlaReport,
   HelpdeskTicket,
   HelpdeskTicketDetail,
   HrmsUser,
@@ -19616,7 +19619,7 @@ export const useCreateTicketAssignment = <
 };
 
 /**
- * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
+ * @summary SLA breach and resolution report
  */
 export const getGetHelpdeskSlaReportUrl = (
   params?: GetHelpdeskSlaReportParams,
@@ -19632,27 +19635,24 @@ export const getGetHelpdeskSlaReportUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/reports/helpdesk-sla?${stringifiedParams}`
-    : `/api/reports/helpdesk-sla`;
+    ? `/api/helpdesk/sla-report?${stringifiedParams}`
+    : `/api/helpdesk/sla-report`;
 };
 
 export const getHelpdeskSlaReport = async (
   params?: GetHelpdeskSlaReportParams,
   options?: RequestInit,
-): Promise<GetHelpdeskSlaReport200> => {
-  return customFetch<GetHelpdeskSlaReport200>(
-    getGetHelpdeskSlaReportUrl(params),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
+): Promise<HelpdeskSlaReport> => {
+  return customFetch<HelpdeskSlaReport>(getGetHelpdeskSlaReportUrl(params), {
+    ...options,
+    method: "GET",
+  });
 };
 
 export const getGetHelpdeskSlaReportQueryKey = (
   params?: GetHelpdeskSlaReportParams,
 ) => {
-  return [`/api/reports/helpdesk-sla`, ...(params ? [params] : [])] as const;
+  return [`/api/helpdesk/sla-report`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetHelpdeskSlaReportQueryOptions = <
@@ -19692,7 +19692,7 @@ export type GetHelpdeskSlaReportQueryResult = NonNullable<
 export type GetHelpdeskSlaReportQueryError = ErrorType<unknown>;
 
 /**
- * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
+ * @summary SLA breach and resolution report
  */
 
 export function useGetHelpdeskSlaReport<
@@ -19710,6 +19710,106 @@ export function useGetHelpdeskSlaReport<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetHelpdeskSlaReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary SLA report CSV export (one row per ticket)
+ */
+export const getGetHelpdeskSlaReportCsvUrl = (
+  params?: GetHelpdeskSlaReportCsvParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/helpdesk/sla-report.csv?${stringifiedParams}`
+    : `/api/helpdesk/sla-report.csv`;
+};
+
+export const getHelpdeskSlaReportCsv = async (
+  params?: GetHelpdeskSlaReportCsvParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getGetHelpdeskSlaReportCsvUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetHelpdeskSlaReportCsvQueryKey = (
+  params?: GetHelpdeskSlaReportCsvParams,
+) => {
+  return [`/api/helpdesk/sla-report.csv`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetHelpdeskSlaReportCsvQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHelpdeskSlaReportCsv>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetHelpdeskSlaReportCsvParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHelpdeskSlaReportCsv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetHelpdeskSlaReportCsvQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getHelpdeskSlaReportCsv>>
+  > = ({ signal }) =>
+    getHelpdeskSlaReportCsv(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHelpdeskSlaReportCsv>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHelpdeskSlaReportCsvQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getHelpdeskSlaReportCsv>>
+>;
+export type GetHelpdeskSlaReportCsvQueryError = ErrorType<unknown>;
+
+/**
+ * @summary SLA report CSV export (one row per ticket)
+ */
+
+export function useGetHelpdeskSlaReportCsv<
+  TData = Awaited<ReturnType<typeof getHelpdeskSlaReportCsv>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetHelpdeskSlaReportCsvParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHelpdeskSlaReportCsv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHelpdeskSlaReportCsvQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -23426,6 +23526,109 @@ export function useGetPermissionUsageReport<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetPermissionUsageReportQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
+ */
+export const getGetReportsHelpdeskSlaUrl = (
+  params?: GetReportsHelpdeskSlaParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/helpdesk-sla?${stringifiedParams}`
+    : `/api/reports/helpdesk-sla`;
+};
+
+export const getReportsHelpdeskSla = async (
+  params?: GetReportsHelpdeskSlaParams,
+  options?: RequestInit,
+): Promise<GetReportsHelpdeskSla200> => {
+  return customFetch<GetReportsHelpdeskSla200>(
+    getGetReportsHelpdeskSlaUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetReportsHelpdeskSlaQueryKey = (
+  params?: GetReportsHelpdeskSlaParams,
+) => {
+  return [`/api/reports/helpdesk-sla`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetReportsHelpdeskSlaQueryOptions = <
+  TData = Awaited<ReturnType<typeof getReportsHelpdeskSla>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetReportsHelpdeskSlaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReportsHelpdeskSla>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetReportsHelpdeskSlaQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getReportsHelpdeskSla>>
+  > = ({ signal }) =>
+    getReportsHelpdeskSla(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getReportsHelpdeskSla>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetReportsHelpdeskSlaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getReportsHelpdeskSla>>
+>;
+export type GetReportsHelpdeskSlaQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Helpdesk ticket SLA breach analysis with avg resolution time by priority
+ */
+
+export function useGetReportsHelpdeskSla<
+  TData = Awaited<ReturnType<typeof getReportsHelpdeskSla>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetReportsHelpdeskSlaParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReportsHelpdeskSla>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetReportsHelpdeskSlaQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
