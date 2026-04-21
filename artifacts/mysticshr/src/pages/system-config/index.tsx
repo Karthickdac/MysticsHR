@@ -31,6 +31,7 @@ import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, 
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@clerk/react";
+import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -1132,6 +1133,8 @@ function StorageCleanupTab() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SystemConfigPage() {
+  const { role } = useCurrentHrmsUser();
+  const isSuperAdmin = role === "super_admin";
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -1151,7 +1154,7 @@ export default function SystemConfigPage() {
             <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
             <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
             <TabsTrigger value="leave-blackouts">Leave Blackouts</TabsTrigger>
-            <TabsTrigger value="storage-cleanup">Storage Cleanup</TabsTrigger>
+            {isSuperAdmin && <TabsTrigger value="storage-cleanup">Storage Cleanup</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="org" className="mt-4"><OrgProfileTab /></TabsContent>
@@ -1163,7 +1166,9 @@ export default function SystemConfigPage() {
           <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
           <TabsContent value="custom-fields" className="mt-4"><CustomEmployeeFieldsTab /></TabsContent>
           <TabsContent value="leave-blackouts" className="mt-4"><LeaveBlackoutsTab /></TabsContent>
-          <TabsContent value="storage-cleanup" className="mt-4"><StorageCleanupTab /></TabsContent>
+          {isSuperAdmin && (
+            <TabsContent value="storage-cleanup" className="mt-4"><StorageCleanupTab /></TabsContent>
+          )}
         </Tabs>
       </div>
     </MainLayout>
