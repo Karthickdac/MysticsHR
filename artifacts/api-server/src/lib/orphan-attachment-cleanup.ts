@@ -1,8 +1,41 @@
 import { inArray, eq } from "drizzle-orm";
+import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ticketAttachmentsTable, storageCleanupRunsTable } from "@workspace/db/schema";
 import { db } from "./db";
 import { logger } from "./logger";
 import { objectStorageClient } from "./objectStorage";
+
+/**
+ * Registry of DB tables/columns that may reference an object-storage path
+ * produced by the presigned-upload flow (paths shaped like
+ * `/objects/uploads/<id>`). The orphan cleanup considers a stored file to
+ * be "in use" when ANY of these sources contains a matching path, so all of
+ * them must be checked before a file is deleted.
+ *
+ * To add a new module that stores presigned-upload paths:
+ *   1. Add a `text("object_path")` (or similar) column to that module's
+ *      schema and persist `objectStorageService.normalizeObjectEntityPath()`
+ *      output into it.
+ *   2. Append a new entry to this array with a stable `name` for logs.
+ * The cleanup will then automatically protect those rows from deletion.
+ */
+type TrackedSource = {
+  /** Stable, log-friendly identifier (e.g. "ticket_attachments"). */
+  name: string;
+  table: PgTable;
+  column: AnyPgColumn;
+};
+
+export const TRACKED_OBJECT_PATH_SOURCES: ReadonlyArray<TrackedSource> = [
+  {
+    name: "ticket_attachments",
+    table: ticketAttachmentsTable,
+    column: ticketAttachmentsTable.objectPath,
+  },
+  // Future modules (document requests, onboarding documents, candidate
+  // resumes, payslips, …) should append entries here as they adopt the
+  // presigned-upload flow.
+];
 
 export interface OrphanCleanupResult {
   scanned: number;
@@ -68,7 +101,8 @@ function chunk<T>(arr: T[], size: number): T[][] {
 /**
  * Find and delete object-storage files under PRIVATE_OBJECT_DIR/uploads/ that:
  *   - are older than `ageDays` (default 7), AND
- *   - have no matching `ticket_attachments.object_path` row.
+ *   - have no matching row in ANY table listed in
+ *     `TRACKED_OBJECT_PATH_SOURCES`.
  *
  * Files newer than the age threshold are skipped to avoid racing with
  * in-flight uploads or attachments that haven't been linked yet.
@@ -180,34 +214,54 @@ export async function cleanupOrphanedAttachments(
     return result;
   }
 
-  // Build all path variants under which an attachment row may have been
-  // persisted. `normalizeObjectEntityPath()` historically can emit either
+  // Build all path variants under which a row may have been persisted.
+  // `normalizeObjectEntityPath()` historically can emit either
   // `/objects/uploads/<id>` (canonical) or `/objects//uploads/<id>`
   // (when PRIVATE_OBJECT_DIR has a trailing slash). We must consider a
-  // file "known" if EITHER form exists in `ticket_attachments`, otherwise
+  // file "known" if EITHER form exists in any tracked table, otherwise
   // we would incorrectly delete a live attachment.
   function pathVariants(canonical: string): string[] {
     const doubled = canonical.replace("/objects/uploads/", "/objects//uploads/");
     return canonical === doubled ? [canonical] : [canonical, doubled];
   }
 
-  // Find which candidate paths have matching DB rows (in chunks for safety).
-  // We query the union of all variants and then mark the canonical form known
-  // when ANY of its variants is found in the DB.
+  // Find which candidate paths have matching DB rows across every tracked
+  // source. We query the union of all variants per source, in chunks, and
+  // mark the canonical form known when ANY variant is found in ANY source.
+  // If any source's lookup fails we abort the whole run instead of
+  // proceeding — partial knowledge could lead to false positives where a
+  // live file is deleted because a different table that did reference it
+  // was unreachable.
   const knownVariants = new Set<string>();
   const allLookupPaths = candidates.flatMap((c) => pathVariants(c.objectPath));
-  for (const group of chunk(allLookupPaths, DB_LOOKUP_CHUNK)) {
-    try {
-      const rows = await db
-        .select({ objectPath: ticketAttachmentsTable.objectPath })
-        .from(ticketAttachmentsTable)
-        .where(inArray(ticketAttachmentsTable.objectPath, group));
-      for (const r of rows) knownVariants.add(r.objectPath);
-    } catch (err) {
-      logger.error({ err }, "[orphan-cleanup] DB lookup failed; aborting to avoid false positives");
-      await persist("DB lookup failed; aborted to avoid false positives");
-      return result;
+  for (const source of TRACKED_OBJECT_PATH_SOURCES) {
+    let sourceMatches = 0;
+    for (const group of chunk(allLookupPaths, DB_LOOKUP_CHUNK)) {
+      try {
+        const rows = await db
+          .select({ objectPath: source.column })
+          .from(source.table)
+          .where(inArray(source.column, group));
+        for (const r of rows) {
+          const v = r.objectPath as string | null;
+          if (v) {
+            knownVariants.add(v);
+            sourceMatches += 1;
+          }
+        }
+      } catch (err) {
+        logger.error(
+          { err, source: source.name },
+          "[orphan-cleanup] DB lookup failed; aborting to avoid false positives",
+        );
+        await persist(`DB lookup failed for ${source.name}; aborted to avoid false positives`);
+        return result;
+      }
     }
+    logger.debug(
+      { source: source.name, matched: sourceMatches },
+      "[orphan-cleanup] tracked source scanned",
+    );
   }
 
   const orphans = candidates.filter(
