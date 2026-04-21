@@ -4182,6 +4182,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/EssDashboard"
 
+  /my-preferences/notifications:
+    get:
+      operationId: getMyNotificationPreferences
+      tags: [ess]
+      summary: Get the caller's notification preferences for every event type
+      responses:
+        "200":
+          description: Notification preferences keyed by event type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyNotificationPreferences"
+    put:
+      operationId: updateMyNotificationPreferences
+      tags: [ess]
+      summary: Update the caller's notification preferences (upsert per event)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyNotificationPreferencesBody"
+      responses:
+        "200":
+          description: Update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  count: { type: integer }
+                required: [success, count]
+
   # ──────────────────────────────────────────────
   # HELPDESK
   # ──────────────────────────────────────────────
@@ -8135,6 +8169,40 @@ components:
         emergencyContactPhone: { type: ['string', 'null'] }
         emergencyContactRelation: { type: ['string', 'null'] }
       required: [employeeId, name, email]
+
+    NotificationPreferenceItem:
+      type: object
+      properties:
+        eventType: { type: string }
+        label: { type: string }
+        description: { type: string }
+        module: { type: string }
+        emailEnabled: { type: boolean }
+        whatsappEnabled: { type: boolean }
+      required: [eventType, label, description, module, emailEnabled, whatsappEnabled]
+
+    MyNotificationPreferences:
+      type: object
+      properties:
+        employeeId: { type: ['integer', 'null'] }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/NotificationPreferenceItem" }
+      required: [items]
+
+    UpdateMyNotificationPreferencesBody:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              eventType: { type: string }
+              emailEnabled: { type: boolean }
+              whatsappEnabled: { type: boolean }
+            required: [eventType, emailEnabled, whatsappEnabled]
+      required: [items]
 
     UpdateEssProfileBody:
       type: object

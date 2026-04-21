@@ -30,10 +30,18 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 import {
   User, FileText, Calendar, Clock, Target, Wallet, Home, Phone, AlertCircle,
-  ChevronRight, CheckCircle2, Eye, Download, LifeBuoy, Plus, Ticket, Send,
+  ChevronRight, CheckCircle2, Eye, Download, LifeBuoy, Plus, Ticket, Send, Bell,
 } from "lucide-react";
+import {
+  useGetMyNotificationPreferences,
+  useUpdateMyNotificationPreferences,
+  getGetMyNotificationPreferencesQueryKey,
+  type NotificationPreferenceItem,
+} from "@workspace/api-client-react";
 
 type LeaveBalanceItem = {
   leaveTypeName: string;
@@ -374,6 +382,122 @@ const ESS_MODULES = [
   },
 ];
 
+function NotificationPreferencesPanel() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { data, isLoading } = useGetMyNotificationPreferences();
+  const update = useUpdateMyNotificationPreferences();
+  const [draft, setDraft] = useState<NotificationPreferenceItem[] | null>(null);
+
+  useEffect(() => {
+    if (data?.items) setDraft(data.items);
+  }, [data]);
+
+  const items = draft ?? [];
+  const isDirty = !!data?.items && draft !== null && JSON.stringify(draft) !== JSON.stringify(data.items);
+
+  function setItem(eventType: string, patch: Partial<Pick<NotificationPreferenceItem, "emailEnabled" | "whatsappEnabled">>) {
+    setDraft((prev) => prev?.map((it) => (it.eventType === eventType ? { ...it, ...patch } : it)) ?? null);
+  }
+
+  function setAll(field: "emailEnabled" | "whatsappEnabled", value: boolean) {
+    setDraft((prev) => prev?.map((it) => ({ ...it, [field]: value })) ?? null);
+  }
+
+  function handleSave() {
+    if (!draft) return;
+    update.mutate(
+      { data: { items: draft.map((it) => ({ eventType: it.eventType, emailEnabled: it.emailEnabled, whatsappEnabled: it.whatsappEnabled })) } },
+      {
+        onSuccess: () => {
+          toast({ title: "Preferences saved", description: "Your notification choices have been updated." });
+          qc.invalidateQueries({ queryKey: getGetMyNotificationPreferencesQueryKey() });
+        },
+        onError: (e: unknown) => {
+          const msg = e instanceof Error ? e.message : "Could not save preferences";
+          toast({ title: "Save failed", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  }
+
+  function handleReset() {
+    if (data?.items) setDraft(data.items);
+  }
+
+  // Group by module for display.
+  const grouped: Record<string, NotificationPreferenceItem[]> = {};
+  for (const it of items) {
+    const k = it.module || "Other";
+    (grouped[k] ??= []).push(it);
+  }
+
+  if (isLoading) return <Card><CardContent className="p-6 text-sm text-muted-foreground">Loading your notification preferences…</CardContent></Card>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bell className="w-5 h-5 text-primary" /> Notification Preferences
+        </CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Choose which notifications you want to receive by email or WhatsApp. Critical alerts cannot be turned off elsewhere — these toggles only affect this list.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex flex-wrap items-center gap-2 pb-4 border-b">
+          <span className="text-sm font-medium mr-2">Quick actions:</span>
+          <Button size="sm" variant="outline" onClick={() => setAll("emailEnabled", true)}>Enable all email</Button>
+          <Button size="sm" variant="outline" onClick={() => setAll("emailEnabled", false)}>Disable all email</Button>
+          <Button size="sm" variant="outline" onClick={() => setAll("whatsappEnabled", true)}>Enable all WhatsApp</Button>
+          <Button size="sm" variant="outline" onClick={() => setAll("whatsappEnabled", false)}>Disable all WhatsApp</Button>
+        </div>
+
+        {Object.entries(grouped).map(([mod, list]) => (
+          <div key={mod} className="space-y-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{mod}</h3>
+            <div className="space-y-2">
+              {list.map((it) => (
+                <div key={it.eventType} className="flex items-start justify-between gap-4 rounded-md border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{it.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{it.description}</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <label className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">Email</span>
+                      <Switch
+                        checked={it.emailEnabled}
+                        onCheckedChange={(v) => setItem(it.eventType, { emailEnabled: v })}
+                        aria-label={`Email notifications for ${it.label}`}
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">WhatsApp</span>
+                      <Switch
+                        checked={it.whatsappEnabled}
+                        onCheckedChange={(v) => setItem(it.eventType, { whatsappEnabled: v })}
+                        aria-label={`WhatsApp notifications for ${it.label}`}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div className="flex items-center justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={handleReset} disabled={!isDirty || update.isPending}>Reset</Button>
+          <Button onClick={handleSave} disabled={!isDirty || update.isPending}>
+            {update.isPending ? "Saving…" : "Save preferences"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function EssPortalPage() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showDashboardTicket, setShowDashboardTicket] = useState(false);
@@ -384,7 +508,7 @@ export default function EssPortalPage() {
     profile?.employeeId ? { employeeId: profile.employeeId } : {}
   );
 
-  const validTabs = ["dashboard", "profile", "services", "documents", "helpdesk"];
+  const validTabs = ["dashboard", "profile", "services", "documents", "helpdesk", "notifications"];
   const tabFromUrl = new URLSearchParams(search).get("tab");
   const urlTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "dashboard";
   const [activeTab, setActiveTab] = useState(urlTab);
@@ -423,6 +547,7 @@ export default function EssPortalPage() {
           <TabsTrigger value="documents">My Documents</TabsTrigger>
           <TabsTrigger value="helpdesk">Helpdesk</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
@@ -773,6 +898,10 @@ export default function EssPortalPage() {
               </Card>
             </Link>
           </div>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-4">
+          <NotificationPreferencesPanel />
         </TabsContent>
       </Tabs>
 

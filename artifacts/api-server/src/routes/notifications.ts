@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { db } from "../lib/db";
-import { notificationLogsTable, notificationTemplatesTable } from "@workspace/db/schema";
+import { notificationLogsTable, notificationTemplatesTable, notificationPreferencesTable } from "@workspace/db/schema";
 import { eq, and, desc, count, ilike, or } from "drizzle-orm";
 import { requireHrmsUser, requireRole } from "../lib/auth";
+import { NOTIFICATION_EVENT_TYPES, NOTIFICATION_EVENT_TYPE_SET } from "../lib/notification-service";
 import nodemailer from "nodemailer";
 
 const router = Router();
 
 const HR_ROLES = ["super_admin", "hr_manager"] as const;
 const SUPER_ADMIN = ["super_admin"] as const;
+const ALL_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] as const;
 
 // ─── Notification Templates ───────────────────────────────────────────────────
 
@@ -142,6 +144,81 @@ router.post("/notifications/test-whatsapp", requireHrmsUser, requireRole(...SUPE
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ success: false, error: msg });
+  }
+});
+
+// ─── My Notification Preferences (ESS) ────────────────────────────────────────
+
+/** GET /my-preferences/notifications
+ * Returns the master event-type registry overlaid with the caller's stored
+ * preferences. Missing entries default to { emailEnabled: true, whatsappEnabled: true }
+ * so the UI can render every event consistently. */
+router.get("/my-preferences/notifications", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const employeeId = u.employeeId;
+    const stored = employeeId
+      ? await db.select().from(notificationPreferencesTable).where(eq(notificationPreferencesTable.employeeId, employeeId))
+      : [];
+    const byEvent = new Map(stored.map((s) => [s.eventType, s]));
+    const items = NOTIFICATION_EVENT_TYPES.map((meta) => {
+      const row = byEvent.get(meta.eventType);
+      return {
+        eventType: meta.eventType,
+        label: meta.label,
+        description: meta.description,
+        module: meta.module,
+        emailEnabled: row?.emailEnabled ?? true,
+        whatsappEnabled: row?.whatsappEnabled ?? true,
+      };
+    });
+    res.json({ employeeId: employeeId ?? null, items });
+  } catch (e) {
+    console.error("[my-preferences/notifications GET]", e);
+    res.status(500).json({ error: "Failed to load notification preferences" });
+  }
+});
+
+/** PUT /my-preferences/notifications
+ * Body: { items: [{ eventType, emailEnabled, whatsappEnabled }, ...] }
+ * Upserts each row for the caller's employee. Unknown event types are rejected. */
+router.put("/my-preferences/notifications", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res): Promise<void> => {
+  try {
+    const u = req.hrmsUser!;
+    const employeeId = u.employeeId;
+    if (!employeeId) {
+      res.status(400).json({ error: "Your account is not linked to an employee record. Contact HR." });
+      return;
+    }
+    const body = req.body as { items?: Array<{ eventType?: string; emailEnabled?: boolean; whatsappEnabled?: boolean }> };
+    const items = Array.isArray(body?.items) ? body.items : [];
+    if (items.length === 0) { res.status(400).json({ error: "items[] is required" }); return; }
+
+    for (const it of items) {
+      const eventType = String(it.eventType ?? "").trim();
+      if (!eventType || !NOTIFICATION_EVENT_TYPE_SET.has(eventType)) {
+        res.status(400).json({ error: `Unknown eventType: ${eventType || "(empty)"}` });
+        return;
+      }
+      const emailEnabled = it.emailEnabled !== false; // default true
+      const whatsappEnabled = it.whatsappEnabled !== false;
+
+      const [existing] = await db.select({ id: notificationPreferencesTable.id })
+        .from(notificationPreferencesTable)
+        .where(and(eq(notificationPreferencesTable.employeeId, employeeId), eq(notificationPreferencesTable.eventType, eventType)))
+        .limit(1);
+      if (existing) {
+        await db.update(notificationPreferencesTable)
+          .set({ emailEnabled, whatsappEnabled, updatedAt: new Date() })
+          .where(eq(notificationPreferencesTable.id, existing.id));
+      } else {
+        await db.insert(notificationPreferencesTable).values({ employeeId, eventType, emailEnabled, whatsappEnabled });
+      }
+    }
+    res.json({ success: true, count: items.length });
+  } catch (e) {
+    console.error("[my-preferences/notifications PUT]", e);
+    res.status(500).json({ error: "Failed to update notification preferences" });
   }
 });
 

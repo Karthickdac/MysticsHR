@@ -208,6 +208,7 @@ import type {
   ManagerEvaluation,
   MoveCandidateStageBody,
   MyAttendanceToday,
+  MyNotificationPreferences,
   NotificationTemplate,
   OfferLetter,
   OnboardingChecklist,
@@ -287,6 +288,8 @@ import type {
   UpdateInterviewBody,
   UpdateLeavePolicyBody,
   UpdateLoanBody,
+  UpdateMyNotificationPreferences200,
+  UpdateMyNotificationPreferencesBody,
   UpdateNotificationTemplateBody,
   UpdateOfferBody,
   UpdatePreOnboardingDocumentBody,
@@ -18985,6 +18988,178 @@ export function useGetEssDashboard<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get the caller's notification preferences for every event type
+ */
+export const getGetMyNotificationPreferencesUrl = () => {
+  return `/api/my-preferences/notifications`;
+};
+
+export const getMyNotificationPreferences = async (
+  options?: RequestInit,
+): Promise<MyNotificationPreferences> => {
+  return customFetch<MyNotificationPreferences>(
+    getGetMyNotificationPreferencesUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetMyNotificationPreferencesQueryKey = () => {
+  return [`/api/my-preferences/notifications`] as const;
+};
+
+export const getGetMyNotificationPreferencesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyNotificationPreferences>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyNotificationPreferences>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMyNotificationPreferencesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMyNotificationPreferences>>
+  > = ({ signal }) =>
+    getMyNotificationPreferences({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyNotificationPreferences>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyNotificationPreferencesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyNotificationPreferences>>
+>;
+export type GetMyNotificationPreferencesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the caller's notification preferences for every event type
+ */
+
+export function useGetMyNotificationPreferences<
+  TData = Awaited<ReturnType<typeof getMyNotificationPreferences>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyNotificationPreferences>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyNotificationPreferencesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update the caller's notification preferences (upsert per event)
+ */
+export const getUpdateMyNotificationPreferencesUrl = () => {
+  return `/api/my-preferences/notifications`;
+};
+
+export const updateMyNotificationPreferences = async (
+  updateMyNotificationPreferencesBody: UpdateMyNotificationPreferencesBody,
+  options?: RequestInit,
+): Promise<UpdateMyNotificationPreferences200> => {
+  return customFetch<UpdateMyNotificationPreferences200>(
+    getUpdateMyNotificationPreferencesUrl(),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateMyNotificationPreferencesBody),
+    },
+  );
+};
+
+export const getUpdateMyNotificationPreferencesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyNotificationPreferences>>,
+    TError,
+    { data: BodyType<UpdateMyNotificationPreferencesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMyNotificationPreferences>>,
+  TError,
+  { data: BodyType<UpdateMyNotificationPreferencesBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMyNotificationPreferences"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMyNotificationPreferences>>,
+    { data: BodyType<UpdateMyNotificationPreferencesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateMyNotificationPreferences(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMyNotificationPreferencesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMyNotificationPreferences>>
+>;
+export type UpdateMyNotificationPreferencesMutationBody =
+  BodyType<UpdateMyNotificationPreferencesBody>;
+export type UpdateMyNotificationPreferencesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update the caller's notification preferences (upsert per event)
+ */
+export const useUpdateMyNotificationPreferences = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyNotificationPreferences>>,
+    TError,
+    { data: BodyType<UpdateMyNotificationPreferencesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMyNotificationPreferences>>,
+  TError,
+  { data: BodyType<UpdateMyNotificationPreferencesBody> },
+  TContext
+> => {
+  return useMutation(
+    getUpdateMyNotificationPreferencesMutationOptions(options),
+  );
+};
 
 /**
  * @summary List helpdesk tickets (scoped by role)

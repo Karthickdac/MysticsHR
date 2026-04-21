@@ -2369,6 +2369,31 @@ export interface EssProfile {
   emergencyContactRelation?: string | null;
 }
 
+export interface NotificationPreferenceItem {
+  eventType: string;
+  label: string;
+  description: string;
+  module: string;
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
+}
+
+export interface MyNotificationPreferences {
+  /** @nullable */
+  employeeId?: number | null;
+  items: NotificationPreferenceItem[];
+}
+
+export type UpdateMyNotificationPreferencesBodyItemsItem = {
+  eventType: string;
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
+};
+
+export interface UpdateMyNotificationPreferencesBody {
+  items: UpdateMyNotificationPreferencesBodyItemsItem[];
+}
+
 export interface UpdateEssProfileBody {
   /** @nullable */
   phone?: string | null;
@@ -3675,6 +3700,11 @@ export type ComputeAppraisalOutcomesBodyCalibrationNotes = {
 export type ComputeAppraisalOutcomesBody = {
   cycleId: number;
   calibrationNotes?: ComputeAppraisalOutcomesBodyCalibrationNotes;
+};
+
+export type UpdateMyNotificationPreferences200 = {
+  success: boolean;
+  count: number;
 };
 
 export type ListHelpdeskTicketsParams = {

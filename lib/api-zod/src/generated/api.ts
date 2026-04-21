@@ -5020,6 +5020,41 @@ export const GetEssDashboardResponse = zod.object({
 });
 
 /**
+ * @summary Get the caller's notification preferences for every event type
+ */
+export const GetMyNotificationPreferencesResponse = zod.object({
+  employeeId: zod.number().nullish(),
+  items: zod.array(
+    zod.object({
+      eventType: zod.string(),
+      label: zod.string(),
+      description: zod.string(),
+      module: zod.string(),
+      emailEnabled: zod.boolean(),
+      whatsappEnabled: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update the caller's notification preferences (upsert per event)
+ */
+export const UpdateMyNotificationPreferencesBody = zod.object({
+  items: zod.array(
+    zod.object({
+      eventType: zod.string(),
+      emailEnabled: zod.boolean(),
+      whatsappEnabled: zod.boolean(),
+    }),
+  ),
+});
+
+export const UpdateMyNotificationPreferencesResponse = zod.object({
+  success: zod.boolean(),
+  count: zod.number(),
+});
+
+/**
  * @summary List helpdesk tickets (scoped by role)
  */
 export const ListHelpdeskTicketsQueryParams = zod.object({

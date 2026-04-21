@@ -1,7 +1,50 @@
 import nodemailer from "nodemailer";
 import { db } from "./db";
-import { notificationLogsTable, notificationTemplatesTable, systemSettingsTable, employeesTable, candidatesTable } from "@workspace/db/schema";
+import { notificationLogsTable, notificationTemplatesTable, notificationPreferencesTable, systemSettingsTable, employeesTable, candidatesTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
+
+/**
+ * Master registry of notification event types employees can opt in/out of.
+ * Keep in sync with the keys in `getDefaultSubject` / `getDefaultEmailBody` /
+ * `getDefaultWhatsAppMsg` below. Grouped + labeled for the ESS preferences UI.
+ */
+export const NOTIFICATION_EVENT_TYPES: ReadonlyArray<{
+  eventType: string;
+  label: string;
+  description: string;
+  module: string;
+}> = [
+  { eventType: "leave_submitted", label: "Leave application submitted (for approvers)", description: "When a team member submits a leave request that needs your approval.", module: "Leave" },
+  { eventType: "leave_approved", label: "Your leave was approved", description: "When your leave request is approved.", module: "Leave" },
+  { eventType: "leave_rejected", label: "Your leave was rejected", description: "When your leave request is not approved.", module: "Leave" },
+  { eventType: "payslip_published", label: "Your payslip is ready", description: "When a new payslip is published for you.", module: "Payroll" },
+  { eventType: "payroll_locked", label: "Payroll locked", description: "When a payroll period is locked.", module: "Payroll" },
+  { eventType: "payroll_run_pending_approval", label: "Payroll run pending approval", description: "When a payroll run is computed and awaits your approval.", module: "Payroll" },
+  { eventType: "offer_letter_issued", label: "Offer letter issued", description: "When a new offer letter is issued to you.", module: "Recruitment" },
+  { eventType: "onboarding_access", label: "Pre-onboarding portal access", description: "When your pre-onboarding portal is activated.", module: "Onboarding" },
+  { eventType: "onboarding_doc_pending", label: "Pre-onboarding documents pending", description: "Reminders to complete pre-onboarding documents.", module: "Onboarding" },
+  { eventType: "document_issued", label: "A document was issued to you", description: "When HR issues a document (payslip, certificate, etc.) to you.", module: "Documents" },
+  { eventType: "helpdesk_ticket_raised", label: "Helpdesk ticket assigned to you", description: "When a helpdesk ticket is assigned to you to resolve.", module: "Helpdesk" },
+  { eventType: "helpdesk_ticket_created", label: "New helpdesk ticket created (for HR/agents)", description: "When a new helpdesk ticket is raised.", module: "Helpdesk" },
+  { eventType: "helpdesk_status_changed", label: "Your helpdesk ticket status changed", description: "When the status of one of your helpdesk tickets changes.", module: "Helpdesk" },
+  { eventType: "helpdesk_comment_added", label: "New comment on your helpdesk ticket", description: "When someone comments on a helpdesk ticket you're involved in.", module: "Helpdesk" },
+  { eventType: "helpdesk_sla_breach", label: "Helpdesk SLA breach alert", description: "When a helpdesk ticket breaches its SLA.", module: "Helpdesk" },
+  { eventType: "exit_clearance_completed", label: "Exit clearance completed (for HR)", description: "When an employee's exit clearance is fully completed.", module: "Exit" },
+  { eventType: "exit_clearance_done", label: "Your exit clearance is complete", description: "When your own exit clearance is complete.", module: "Exit" },
+  { eventType: "exit_initiated", label: "Your exit request was processed", description: "When your exit request status is updated.", module: "Exit" },
+  { eventType: "exit_request_rejected", label: "Your exit request was not approved", description: "When your exit request is rejected.", module: "Exit" },
+  { eventType: "exit_clearance_task_assigned", label: "Exit clearance task assigned to you", description: "When an exit clearance task is assigned to you.", module: "Exit" },
+  { eventType: "fnf_pending_approval", label: "Full & Final settlement pending approval", description: "When an FnF is computed and awaits your approval.", module: "Exit" },
+  { eventType: "fnf_approved", label: "Your Full & Final was approved", description: "When your FnF settlement is approved.", module: "Exit" },
+  { eventType: "id_card_generated", label: "ID card ready", description: "When your ID card is generated.", module: "Documents" },
+  { eventType: "no_sign_in", label: "No sign-in detected today", description: "Daily attendance reminder if you haven't signed in.", module: "Attendance" },
+  { eventType: "no_sign_out", label: "No sign-out detected today", description: "Daily attendance reminder if you haven't signed out.", module: "Attendance" },
+  { eventType: "overtime_alert", label: "Overtime threshold exceeded", description: "When your hours today exceed the overtime threshold.", module: "Attendance" },
+  { eventType: "consecutive_absence", label: "Consecutive absence alert", description: "When you've been absent multiple consecutive days.", module: "Attendance" },
+];
+
+/** Set of all known event types — fast O(1) lookup. */
+export const NOTIFICATION_EVENT_TYPE_SET: ReadonlySet<string> = new Set(NOTIFICATION_EVENT_TYPES.map((e) => e.eventType));
 
 interface SendEmailOptions {
   to: string;
@@ -263,6 +306,31 @@ async function resolveCandidatePhone(candidateId?: number | null): Promise<strin
   return row?.phone ?? undefined;
 }
 
+/**
+ * Resolve which channels are allowed for a given employee + event. Defaults to
+ * { email: true, whatsapp: true } when the employee has no stored preference
+ * row (opt-out model). Unknown employeeId returns the default (no filtering).
+ */
+async function getEmployeePreference(employeeId: number | null | undefined, eventType: string): Promise<{ email: boolean; whatsapp: boolean }> {
+  if (!employeeId) return { email: true, whatsapp: true };
+  const [row] = await db.select({
+    emailEnabled: notificationPreferencesTable.emailEnabled,
+    whatsappEnabled: notificationPreferencesTable.whatsappEnabled,
+  }).from(notificationPreferencesTable)
+    .where(and(eq(notificationPreferencesTable.employeeId, employeeId), eq(notificationPreferencesTable.eventType, eventType)))
+    .limit(1);
+  if (!row) return { email: true, whatsapp: true };
+  return { email: row.emailEnabled, whatsapp: row.whatsappEnabled };
+}
+
+/** Look up an employee row id from their work email — used when the dispatcher
+ * caller didn't supply `recipientEmployeeDbId`. Returns null if no match. */
+async function resolveEmployeeIdByEmail(email?: string | null): Promise<number | null> {
+  if (!email) return null;
+  const [row] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.email, email)).limit(1);
+  return row?.id ?? null;
+}
+
 export async function dispatchNotification(params: {
   eventType: string;
   module: string;
@@ -289,7 +357,15 @@ export async function dispatchNotification(params: {
     // Default to true so WhatsApp fires for all events (if credentials are configured)
     const shouldWA = tpl ? (tpl.channel === "whatsapp" || tpl.channel === "both") : true;
 
-    if (params.recipientEmail && shouldEmail) {
+    // Per-employee opt-out: if the recipient is an employee, respect their
+    // notification preferences for this event. Defaults to enabled when no
+    // explicit preference row exists. Skipped for non-employee recipients
+    // (e.g. external candidate emails).
+    const recipientEmpId = params.recipientEmployeeDbId
+      ?? await resolveEmployeeIdByEmail(params.recipientEmail);
+    const prefs = await getEmployeePreference(recipientEmpId, params.eventType);
+
+    if (params.recipientEmail && shouldEmail && prefs.email) {
       const subject = tpl?.emailSubject ? interpolate(tpl.emailSubject, vars) : getDefaultSubject(params.eventType);
       const html = tpl?.emailBody ? interpolate(tpl.emailBody, vars) : getDefaultEmailBody(params.eventType, vars);
       await sendEmail({
@@ -305,10 +381,11 @@ export async function dispatchNotification(params: {
       });
     }
 
-    if (shouldWA) {
-      // Resolve phone: explicit > employee lookup > candidate lookup
+    if (shouldWA && prefs.whatsapp) {
+      // Resolve phone: explicit > employee lookup (using resolved id, which
+      // also covers the email-only fallback path) > candidate lookup
       const phone = params.recipientPhone
-        ?? await resolveEmployeePhone(params.recipientEmployeeDbId)
+        ?? await resolveEmployeePhone(recipientEmpId)
         ?? await resolveCandidatePhone(params.recipientCandidateId);
       if (phone) {
         const msg = tpl?.whatsappTemplate ? interpolate(tpl.whatsappTemplate, vars) : getDefaultWhatsAppMsg(params.eventType, vars);

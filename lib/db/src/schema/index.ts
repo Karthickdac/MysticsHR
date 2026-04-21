@@ -27,5 +27,6 @@ export * from "./notifications";
 export * from "./exit";
 export * from "./notification_logs";
 export * from "./notification_templates";
+export * from "./notification_preferences";
 export * from "./system_settings";
 export * from "./approval_chain_configs";
