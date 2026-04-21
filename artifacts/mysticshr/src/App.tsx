@@ -9,6 +9,7 @@ import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
 import EmployeesPage from "@/pages/employees/index";
 import EmployeeDetailPage from "@/pages/employees/detail";
+import OrgChartPage from "@/pages/org-chart/index";
 import DepartmentsPage from "@/pages/departments";
 import DesignationsPage from "@/pages/designations";
 import UsersPage from "@/pages/users";
@@ -263,6 +264,14 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/dashboard">
             <ProtectedRoute><DashboardPage /></ProtectedRoute>
+          </Route>
+
+          <Route path="/org-chart">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"]}>
+                <OrgChartPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
           </Route>
 
           <Route path="/employees/new">

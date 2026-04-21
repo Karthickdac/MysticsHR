@@ -25,6 +25,7 @@ import {
   TrendingDown,
   BarChart3,
   Bell,
+  Network,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boo
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
+    { name: "Org Chart", href: "/org-chart", icon: Network, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
     { name: "Recruitment", href: "/recruitment", icon: UserPlus, roles: ["super_admin", "hr_manager", "hr_executive", "hod"] },
     { name: "Pre-Onboarding", href: "/pre-onboarding", icon: ClipboardCheck, roles: ["super_admin", "hr_manager", "hr_executive"] },
     { name: "Onboarding", href: "/onboarding", icon: ClipboardList, roles: ["super_admin", "hr_manager", "hr_executive", "hod"] },

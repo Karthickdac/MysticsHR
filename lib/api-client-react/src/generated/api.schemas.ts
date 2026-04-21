@@ -486,6 +486,20 @@ export interface Employee {
   updatedAt: string;
 }
 
+export interface OrgChartEmployee {
+  id: number;
+  firstName: string;
+  lastName: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+  /** @nullable */
+  managerId?: number | null;
+  /** @nullable */
+  departmentName?: string | null;
+  /** @nullable */
+  designationTitle?: string | null;
+}
+
 export interface EmployeeListResponse {
   data: Employee[];
   total: number;
@@ -3189,6 +3203,10 @@ export type ListEmployeesParams = {
   search?: string | null;
   limit?: number;
   offset?: number;
+};
+
+export type ListOrgChart200 = {
+  data?: OrgChartEmployee[];
 };
 
 export type PostEmployeesBulkImportBodyRowsItem = { [key: string]: unknown };

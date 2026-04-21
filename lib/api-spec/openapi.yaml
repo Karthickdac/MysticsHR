@@ -374,6 +374,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/Employee"
 
+  /employees/org-chart:
+    get:
+      operationId: listOrgChart
+      tags: [employees]
+      summary: List active employees with the minimal fields needed for an org chart
+      responses:
+        "200":
+          description: Org chart entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrgChartEmployee"
+
   /employees/{id}:
     get:
       operationId: getEmployee
@@ -6140,6 +6158,28 @@ components:
         - isDeleted
         - createdAt
         - updatedAt
+
+    OrgChartEmployee:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+        managerId:
+          type: ["integer", "null"]
+        departmentName:
+          type: ["string", "null"]
+        designationTitle:
+          type: ["string", "null"]
+      required:
+        - id
+        - firstName
+        - lastName
 
     EmployeeListResponse:
       type: object

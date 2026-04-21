@@ -130,6 +130,32 @@ router.post(
   }
 );
 
+// Safe minimal projection for the org chart — no salary, DOB, phone, etc.
+// Available to all HRMS users (the chart is intended to be visible org-wide).
+router.get("/employees/org-chart", requireHrmsUser, async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: employeesTable.id,
+        firstName: employeesTable.firstName,
+        lastName: employeesTable.lastName,
+        avatarUrl: employeesTable.avatarUrl,
+        managerId: employeesTable.managerId,
+        departmentName: departmentsTable.name,
+        designationTitle: designationsTable.title,
+      })
+      .from(employeesTable)
+      .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+      .leftJoin(designationsTable, eq(employeesTable.designationId, designationsTable.id))
+      .where(and(isNull(employeesTable.deletedAt), eq(employeesTable.isActive, true)));
+
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/employees/:id", requireHrmsUser, async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);

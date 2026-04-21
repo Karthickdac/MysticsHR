@@ -192,6 +192,7 @@ import type {
   ListNotificationLogs200,
   ListNotificationLogsParams,
   ListOffersParams,
+  ListOrgChart200,
   ListPayrollLocksParams,
   ListPayslipsParams,
   ListPerformanceCyclesParams,
@@ -1766,6 +1767,81 @@ export const useCreateEmployee = <
 > => {
   return useMutation(getCreateEmployeeMutationOptions(options));
 };
+
+/**
+ * @summary List active employees with the minimal fields needed for an org chart
+ */
+export const getListOrgChartUrl = () => {
+  return `/api/employees/org-chart`;
+};
+
+export const listOrgChart = async (
+  options?: RequestInit,
+): Promise<ListOrgChart200> => {
+  return customFetch<ListOrgChart200>(getListOrgChartUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListOrgChartQueryKey = () => {
+  return [`/api/employees/org-chart`] as const;
+};
+
+export const getListOrgChartQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOrgChart>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOrgChart>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListOrgChartQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listOrgChart>>> = ({
+    signal,
+  }) => listOrgChart({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOrgChart>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOrgChartQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOrgChart>>
+>;
+export type ListOrgChartQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List active employees with the minimal fields needed for an org chart
+ */
+
+export function useListOrgChart<
+  TData = Awaited<ReturnType<typeof listOrgChart>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOrgChart>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOrgChartQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get an employee by ID

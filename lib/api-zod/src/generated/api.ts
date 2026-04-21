@@ -301,6 +301,25 @@ export const CreateEmployeeBody = zod.object({
 });
 
 /**
+ * @summary List active employees with the minimal fields needed for an org chart
+ */
+export const ListOrgChartResponse = zod.object({
+  data: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        firstName: zod.string(),
+        lastName: zod.string(),
+        avatarUrl: zod.string().nullish(),
+        managerId: zod.number().nullish(),
+        departmentName: zod.string().nullish(),
+        designationTitle: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * @summary Get an employee by ID
  */
 export const GetEmployeeParams = zod.object({
