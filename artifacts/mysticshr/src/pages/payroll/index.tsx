@@ -293,7 +293,9 @@ function YoYTrendTooltip({ active, payload, label }: {
             <span className="flex items-center gap-2">
               <span className="font-medium">{r.cur != null ? compactInr(r.cur) : "—"}</span>
               {hasPrior && pctText && (
-                <span className={pctClass}>{pctText}</span>
+                <span className={pctClass}>
+                  <span className="text-muted-foreground">Δ vs prev yr:</span> {pctText}
+                </span>
               )}
             </span>
           </div>
@@ -392,7 +394,13 @@ export function PayrollAnalyticsSection({
 
   // Prior-year series is opt-in via the analytics endpoint's compareWithPrior
   // flag; detect by presence on any data point rather than threading another prop.
-  const showPrior = trend.some(p => (p as { priorTotalNet?: number | null }).priorTotalNet != null);
+  // Detect YoY mode by checking ANY of the prior fields, not just net — guards
+  // against an edge case where the backend ever returns prior fields
+  // asymmetrically (e.g. only gross has a comparable prior month).
+  const showPrior = trend.some(p => {
+    const r = p as { priorTotalGross?: number | null; priorTotalNet?: number | null; priorTotalDeductions?: number | null };
+    return r.priorTotalGross != null || r.priorTotalNet != null || r.priorTotalDeductions != null;
+  });
   const windowLabel = analytics.windowFrom && analytics.windowTo
     ? `${analytics.windowFrom} → ${analytics.windowTo}`
     : "selected period";
