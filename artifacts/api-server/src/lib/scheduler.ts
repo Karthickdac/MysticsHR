@@ -29,6 +29,7 @@ import { eq, and, gte, lte, isNotNull, ne, sql, lt, count, inArray } from "drizz
 import { generateTablePdf } from "./pdf";
 import { logger } from "./logger";
 import { runYearEndCarryForwardJob, maybeRunYearEndCarryForwardCatchUp } from "./carry-forward";
+import { cleanupOrphanedAttachments } from "./orphan-attachment-cleanup";
 
 // ─── SMTP transport (optional — only sends if SMTP_HOST is configured) ────────
 function createTransport() {
@@ -1250,6 +1251,11 @@ export function startScheduler(_port: number) {
   // annual Form 16 dispatch on startup whenever we boot in April or May.
   // dispatchForm16ForFy is idempotent (employee+FY dedup).
   setTimeout(() => void maybeRunForm16AnnualCatchUp(), 15_000);
+  // At 03:15 daily — delete orphaned ticket attachment objects from object
+  // storage (>7 days old with no ticket_attachments row).
+  cron.schedule("15 3 * * *", () => {
+    void cleanupOrphanedAttachments();
+  });
   // At 02:00 on Jan 1 (server local time) — auto year-end leave carry-forward
   // for the just-finished year. Idempotent — safe even if HR also triggered
   // it manually, and a manual re-run remains available as a fallback.
