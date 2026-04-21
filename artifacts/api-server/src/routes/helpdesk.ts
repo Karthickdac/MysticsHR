@@ -694,8 +694,9 @@ router.get("/helpdesk/sla-report.csv", requireHrmsUser, requireRole(...MANAGER_R
     };
     for (const t of report.tickets) {
       const breached = isBreached(t);
-      const resolutionHours = t.resolvedAt && t.createdAt
-        ? Math.round(((new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000) * 10) / 10
+      const completedAt = t.resolvedAt ?? t.closedAt;
+      const resolutionHours = completedAt && t.createdAt
+        ? Math.round(((new Date(completedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000) * 10) / 10
         : "";
       lines.push([
         t.id, t.subject, t.category, t.priority, t.status,
