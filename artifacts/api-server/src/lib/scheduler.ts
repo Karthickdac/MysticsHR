@@ -1094,6 +1094,99 @@ async function remindPendingPayrollApprovals() {
   }
 }
 
+/**
+ * Annual Form 16 dispatch — runs in early April. For every employee
+ * (active or exited) who had at least one payroll record in the just-finished
+ * financial year (April `year` → March `year+1`), email a link to download
+ * their Form 16 PDF. Exited employees are intentionally included — they still
+ * need Form 16 for tax filing.
+ *
+ * Idempotency is employee-based: each notification log is written with
+ * `entityType = "form_16_fy_<year>"` and `entityId = employeeId`, so re-runs
+ * (catch-up or manual) skip employees already successfully notified, even if
+ * their email later changes.
+ */
+export async function dispatchForm16ForFy(year: number): Promise<{ eligible: number; sent: number; skipped: number }> {
+  const fyLabel = `${year}-${String(year + 1).slice(2)}`;
+  const entityTypeKey = `form_16_fy_${year}`;
+  try {
+    // All employees (active or not) who actually had payroll records in this FY.
+    const recipients = await db.selectDistinctOn([employeesTable.id], {
+      id: employeesTable.id,
+      firstName: employeesTable.firstName,
+      lastName: employeesTable.lastName,
+      email: employeesTable.email,
+    })
+      .from(employeesTable)
+      .innerJoin(payrollRecordsTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
+      .innerJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
+      .where(sql`(${payrollRunsTable.periodYear} = ${year} AND ${payrollRunsTable.periodMonth} >= 4)
+          OR (${payrollRunsTable.periodYear} = ${year + 1} AND ${payrollRunsTable.periodMonth} <= 3)`);
+
+    if (recipients.length === 0) {
+      logger.info({ fy: fyLabel }, "[scheduler] dispatchForm16ForFy — no eligible employees");
+      return { eligible: 0, sent: 0, skipped: 0 };
+    }
+
+    // Employee-based idempotency: skip employees we've already successfully notified
+    // for this FY. Keyed on entityId (= employeeId) under entityType=`form_16_fy_<year>`.
+    const sentLogs = await db.select({ entityId: notificationLogsTable.entityId })
+      .from(notificationLogsTable)
+      .where(and(
+        eq(notificationLogsTable.eventType, "form_16_available"),
+        eq(notificationLogsTable.entityType, entityTypeKey),
+        eq(notificationLogsTable.status, "sent"),
+      ));
+    const alreadySent = new Set(sentLogs.map(l => l.entityId));
+
+    const { dispatchNotification } = await import("./notification-service");
+    const baseUrl = (process.env.APP_URL ?? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "")).replace(/\/$/, "");
+    const buildAppUrl = (path: string) => baseUrl ? `${baseUrl}${path.startsWith("/") ? path : `/${path}`}` : path;
+
+    let sent = 0; let skipped = 0;
+    for (const e of recipients) {
+      if (alreadySent.has(e.id)) { skipped++; continue; }
+      if (!e.email) { skipped++; continue; }
+      const fullName = `${e.firstName ?? ""} ${e.lastName ?? ""}`.trim();
+      const form16Url = buildAppUrl(`/payroll/reports/form-16/${e.id}/${year}/pdf`);
+
+      await dispatchNotification({
+        eventType: "form_16_available", module: "payroll",
+        recipientEmail: e.email, recipientName: fullName,
+        recipientEmployeeDbId: e.id,
+        variables: {
+          recipientName: fullName,
+          financialYear: fyLabel,
+          form16Url,
+        },
+        entityType: entityTypeKey, entityId: e.id,
+      }).then(() => { sent++; })
+        .catch((err) => logger.warn({ err, employeeId: e.id, to: e.email }, "[scheduler] form_16 dispatch failed"));
+    }
+
+    logger.info({ fy: fyLabel, eligible: recipients.length, sent, skipped }, "[scheduler] dispatchForm16ForFy completed");
+    return { eligible: recipients.length, sent, skipped };
+  } catch (err) {
+    logger.error({ err, year }, "[scheduler] dispatchForm16ForFy error");
+    return { eligible: 0, sent: 0, skipped: 0 };
+  }
+}
+
+/**
+ * Catch-up guard for the annual Form 16 dispatch. Called on scheduler startup:
+ * if today is in April or May (early window after FY-end), trigger
+ * `dispatchForm16ForFy` for the just-finished FY. The function itself is
+ * idempotent — already-notified employees are skipped — so this safely covers
+ * the case where the service was down at the scheduled cron time.
+ */
+async function maybeRunForm16AnnualCatchUp(): Promise<void> {
+  const now = new Date();
+  const month = now.getMonth(); // 0 = Jan
+  if (month !== 3 && month !== 4) return; // April or May only
+  const previousFyStartYear = now.getFullYear() - 1;
+  await dispatchForm16ForFy(previousFyStartYear);
+}
+
 // ─── Start scheduler ──────────────────────────────────────────────────────────
 export function startScheduler(_port: number) {
   // Run every hour at minute 0 — scheduled report delivery
@@ -1137,6 +1230,17 @@ export function startScheduler(_port: number) {
   cron.schedule("15 */4 * * *", () => {
     void remindPendingPayrollApprovals();
   });
+  // April 5 at 09:00 — annual Form 16 dispatch for the just-finished FY
+  // (FY runs Apr `year` → Mar `year+1`; in early April we email for FY = year-1).
+  // Idempotent: re-running won't double-send (dedup by notification_logs).
+  cron.schedule("0 9 5 4 *", () => {
+    const previousFyStartYear = new Date().getFullYear() - 1;
+    void dispatchForm16ForFy(previousFyStartYear);
+  });
+  // Catch-up: if the service was down at the April 5 cron, re-attempt the
+  // annual Form 16 dispatch on startup whenever we boot in April or May.
+  // dispatchForm16ForFy is idempotent (employee+FY dedup).
+  setTimeout(() => void maybeRunForm16AnnualCatchUp(), 15_000);
   // At 02:00 on Jan 1 (server local time) — auto year-end leave carry-forward
   // for the just-finished year. Idempotent — safe even if HR also triggered
   // it manually, and a manual re-run remains available as a fallback.
