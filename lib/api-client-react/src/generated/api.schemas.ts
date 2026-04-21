@@ -2724,6 +2724,7 @@ export interface UpdateHelpdeskTicketBody {
 export interface AddTicketCommentBody {
   message: string;
   isInternal?: boolean;
+  attachments?: UploadedAttachmentInput[];
 }
 
 export interface TicketAssignment {

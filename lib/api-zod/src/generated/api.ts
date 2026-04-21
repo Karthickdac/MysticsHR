@@ -5684,9 +5684,29 @@ export const AddTicketCommentParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const addTicketCommentBodyAttachmentsItemFileSizeMin = 0;
+
 export const AddTicketCommentBody = zod.object({
   message: zod.string(),
   isInternal: zod.boolean().optional(),
+  attachments: zod
+    .array(
+      zod
+        .object({
+          objectPath: zod
+            .string()
+            .describe("Path returned by \/storage\/uploads\/request-url"),
+          fileName: zod.string(),
+          fileSize: zod
+            .number()
+            .min(addTicketCommentBodyAttachmentsItemFileSizeMin),
+          contentType: zod.string(),
+        })
+        .describe(
+          "Metadata for a file already uploaded via the presigned URL endpoint.",
+        ),
+    )
+    .optional(),
 });
 
 /**
