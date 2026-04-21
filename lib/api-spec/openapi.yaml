@@ -2265,6 +2265,12 @@ paths:
       operationId: getMyAttendanceToday
       tags: [Attendance]
       summary: Get the calling employee's clock-in status and today's record
+      parameters:
+        - name: date
+          in: query
+          required: false
+          description: Employee's local calendar date (YYYY-MM-DD). Falls back to server UTC if omitted or invalid.
+          schema: { type: string, format: date }
       responses:
         "200":
           description: Today's self-service status
@@ -5825,12 +5831,13 @@ components:
 
     ClockPunchTelemetry:
       type: object
-      description: Optional client-supplied geolocation/device info for self-service punches.
+      description: Optional client-supplied context for self-service punches (geolocation, device, and the employee's local date).
       properties:
         latitude: { type: ["number", "null"], minimum: -90, maximum: 90 }
         longitude: { type: ["number", "null"], minimum: -180, maximum: 180 }
         accuracy: { type: ["number", "null"], minimum: 0, description: "Geolocation accuracy in metres" }
         userAgent: { type: ["string", "null"], maxLength: 500 }
+        clientDate: { type: ["string", "null"], format: date, description: "Employee's local calendar date (YYYY-MM-DD). Used as the attendance day instead of server UTC when present." }
 
     CreateAttendanceBody:
       type: object

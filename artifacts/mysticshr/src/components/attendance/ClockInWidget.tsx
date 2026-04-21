@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, LogIn, LogOut, CheckCircle2 } from "lucide-react";
 
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function fmtTime(ts: string | null | undefined): string {
   if (!ts) return "—";
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -35,7 +42,12 @@ function fmtMinutes(mins: number | null | undefined): string {
 
 export function ClockInWidget() {
   const qc = useQueryClient();
-  const { data, isLoading, error } = useGetMyAttendanceToday();
+  // Send the employee's local calendar date so a punch made just after
+  // local midnight is credited to the right day even if the server runs
+  // in UTC. Recomputed each render so it updates if the user crosses
+  // midnight without reloading.
+  const localDate = localDateStr(new Date());
+  const { data, isLoading, error } = useGetMyAttendanceToday({ date: localDate });
   const clockIn = useClockInMyAttendance();
   const clockOut = useClockOutMyAttendance();
   const [now, setNow] = useState(Date.now());
@@ -56,15 +68,16 @@ export function ClockInWidget() {
   // permission. Always returns a payload — at minimum the userAgent so HR
   // gets device info even if location is denied. We never block the punch
   // on this lookup and cap it at 8s so a stalled GPS doesn't lock the UI.
-  async function collectTelemetry(): Promise<{ latitude?: number; longitude?: number; accuracy?: number; userAgent: string }> {
+  async function collectTelemetry(): Promise<{ latitude?: number; longitude?: number; accuracy?: number; userAgent: string; clientDate: string }> {
     const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    if (typeof navigator === "undefined" || !navigator.geolocation) return { userAgent };
+    const clientDate = localDateStr(new Date());
+    if (typeof navigator === "undefined" || !navigator.geolocation) return { userAgent, clientDate };
     return new Promise((resolve) => {
       let settled = false;
       const finish = (extra: Partial<{ latitude: number; longitude: number; accuracy: number }> = {}) => {
         if (settled) return;
         settled = true;
-        resolve({ ...extra, userAgent });
+        resolve({ ...extra, userAgent, clientDate });
       };
       const t = setTimeout(() => finish(), 8000);
       navigator.geolocation.getCurrentPosition(

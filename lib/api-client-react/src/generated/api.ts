@@ -132,6 +132,7 @@ import type {
   GetLeaveCalendarParams,
   GetLeaveUtilizationReport200,
   GetLeaveUtilizationReportParams,
+  GetMyAttendanceTodayParams,
   GetOnboardingChecklistsParams,
   GetPayrollAnalytics200,
   GetPayrollRegisterReport200,
@@ -10426,41 +10427,63 @@ export function useGetAttendanceSummary<
 /**
  * @summary Get the calling employee's clock-in status and today's record
  */
-export const getGetMyAttendanceTodayUrl = () => {
-  return `/api/attendance/me/today`;
+export const getGetMyAttendanceTodayUrl = (
+  params?: GetMyAttendanceTodayParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/attendance/me/today?${stringifiedParams}`
+    : `/api/attendance/me/today`;
 };
 
 export const getMyAttendanceToday = async (
+  params?: GetMyAttendanceTodayParams,
   options?: RequestInit,
 ): Promise<MyAttendanceToday> => {
-  return customFetch<MyAttendanceToday>(getGetMyAttendanceTodayUrl(), {
+  return customFetch<MyAttendanceToday>(getGetMyAttendanceTodayUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetMyAttendanceTodayQueryKey = () => {
-  return [`/api/attendance/me/today`] as const;
+export const getGetMyAttendanceTodayQueryKey = (
+  params?: GetMyAttendanceTodayParams,
+) => {
+  return [`/api/attendance/me/today`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetMyAttendanceTodayQueryOptions = <
   TData = Awaited<ReturnType<typeof getMyAttendanceToday>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getMyAttendanceToday>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: GetMyAttendanceTodayParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMyAttendanceToday>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetMyAttendanceTodayQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMyAttendanceTodayQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getMyAttendanceToday>>
-  > = ({ signal }) => getMyAttendanceToday({ signal, ...requestOptions });
+  > = ({ signal }) =>
+    getMyAttendanceToday(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getMyAttendanceToday>>,
@@ -10481,15 +10504,18 @@ export type GetMyAttendanceTodayQueryError = ErrorType<unknown>;
 export function useGetMyAttendanceToday<
   TData = Awaited<ReturnType<typeof getMyAttendanceToday>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getMyAttendanceToday>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetMyAttendanceTodayQueryOptions(options);
+>(
+  params?: GetMyAttendanceTodayParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMyAttendanceToday>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyAttendanceTodayQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

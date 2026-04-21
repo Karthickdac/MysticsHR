@@ -236,7 +236,7 @@ export interface AttendanceRecord {
 }
 
 /**
- * Optional client-supplied geolocation/device info for self-service punches.
+ * Optional client-supplied context for self-service punches (geolocation, device, and the employee's local date).
  */
 export interface ClockPunchTelemetry {
   /**
@@ -262,6 +262,11 @@ export interface ClockPunchTelemetry {
    * @nullable
    */
   userAgent?: string | null;
+  /**
+   * Employee's local calendar date (YYYY-MM-DD). Used as the attendance day instead of server UTC when present.
+   * @nullable
+   */
+  clientDate?: string | null;
 }
 
 export interface CreateAttendanceBody {
@@ -3475,6 +3480,13 @@ export type GetAttendanceSummaryParams = {
    */
   month: string;
   departmentId?: number;
+};
+
+export type GetMyAttendanceTodayParams = {
+  /**
+   * Employee's local calendar date (YYYY-MM-DD). Falls back to server UTC if omitted or invalid.
+   */
+  date?: string;
 };
 
 export type GetAttendanceRegularizationsParams = {

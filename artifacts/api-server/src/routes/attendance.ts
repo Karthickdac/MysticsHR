@@ -526,6 +526,33 @@ function todayStr(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+// Validate a client-supplied calendar date (YYYY-MM-DD in the employee's
+// local timezone). Returns the date if it parses cleanly and is within
+// ±1 day of the server's UTC date — that window is wide enough for any
+// real timezone (UTC-12 to UTC+14) but narrow enough to catch garbage
+// or backdating attempts. Returns null otherwise.
+function parseClientLocalDate(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const candidate = `${m[1]}-${m[2]}-${m[3]}`;
+  // Sanity check: must be within 1 day of server UTC today.
+  const serverToday = new Date();
+  const minMs = serverToday.getTime() - 36 * 60 * 60 * 1000;
+  const maxMs = serverToday.getTime() + 36 * 60 * 60 * 1000;
+  const candidateMs = new Date(`${candidate}T12:00:00Z`).getTime();
+  if (Number.isNaN(candidateMs) || candidateMs < minMs || candidateMs > maxMs) return null;
+  return candidate;
+}
+
+// Resolve the "today" date for self-service attendance, preferring the
+// employee's local date when supplied. Falls back to server UTC for
+// pre-timezone-aware clients. Used everywhere the previous code called
+// todayStr() for self-service flows.
+function resolveAttendanceDate(clientValue: unknown): string {
+  return parseClientLocalDate(clientValue) ?? todayStr();
+}
+
 // Validate optional client-supplied geolocation/device telemetry on
 // self-service clock-in/out. Coordinates are bounded; accuracy is clamped
 // to a non-negative integer; userAgent falls back to the request header
@@ -556,7 +583,9 @@ router.get("/attendance/me/today", requireHrmsUser, requireRole(...ALL_ROLES), a
   try {
     const empId = await getCallerEmployeeId(req.hrmsUser!.id, req.hrmsUser!.employeeId);
     if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
-    const today = todayStr();
+    // Prefer the employee's local date (sent as ?date=YYYY-MM-DD) so a
+    // punch made just after midnight IST is credited to the right day.
+    const today = resolveAttendanceDate(req.query.date);
     const [record] = await db.select().from(attendanceRecordsTable)
       .where(and(eq(attendanceRecordsTable.employeeId, empId), eq(attendanceRecordsTable.attendanceDate, today)));
     const template = await getActiveShiftTemplate(empId, today);
@@ -584,7 +613,7 @@ router.post("/attendance/me/clock-in", requireHrmsUser, requireRole(...ALL_ROLES
   try {
     const empId = await getCallerEmployeeId(req.hrmsUser!.id, req.hrmsUser!.employeeId);
     if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
-    const today = todayStr();
+    const today = resolveAttendanceDate((req.body as { clientDate?: unknown })?.clientDate);
     const period = new Date(today);
     const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance", period.getFullYear(), period.getMonth() + 1);
     if (lockError) { res.status(422).json({ error: lockError }); return; }
@@ -625,7 +654,7 @@ router.post("/attendance/me/clock-out", requireHrmsUser, requireRole(...ALL_ROLE
   try {
     const empId = await getCallerEmployeeId(req.hrmsUser!.id, req.hrmsUser!.employeeId);
     if (!empId) { res.status(400).json({ error: "Employee record not found" }); return; }
-    const today = todayStr();
+    const today = resolveAttendanceDate((req.body as { clientDate?: unknown })?.clientDate);
     const period = new Date(today);
     const lockError = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance", period.getFullYear(), period.getMonth() + 1);
     if (lockError) { res.status(422).json({ error: lockError }); return; }

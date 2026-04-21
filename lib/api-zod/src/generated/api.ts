@@ -2787,6 +2787,15 @@ export const GetAttendanceSummaryResponse = zod.array(
 /**
  * @summary Get the calling employee's clock-in status and today's record
  */
+export const GetMyAttendanceTodayQueryParams = zod.object({
+  date: zod
+    .date()
+    .optional()
+    .describe(
+      "Employee's local calendar date (YYYY-MM-DD). Falls back to server UTC if omitted or invalid.",
+    ),
+});
+
 export const GetMyAttendanceTodayResponse = zod.object({
   attendanceDate: zod.coerce.date(),
   attendanceStatus: zod.enum(["Not Clocked In", "Clocked In", "Clocked Out"]),
@@ -2877,9 +2886,15 @@ export const ClockInMyAttendanceBody = zod
       .nullish()
       .describe("Geolocation accuracy in metres"),
     userAgent: zod.string().max(clockInMyAttendanceBodyUserAgentMax).nullish(),
+    clientDate: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "Employee's local calendar date (YYYY-MM-DD). Used as the attendance day instead of server UTC when present.",
+      ),
   })
   .describe(
-    "Optional client-supplied geolocation\/device info for self-service punches.",
+    "Optional client-supplied context for self-service punches (geolocation, device, and the employee's local date).",
   );
 
 /**
@@ -2913,9 +2928,15 @@ export const ClockOutMyAttendanceBody = zod
       .nullish()
       .describe("Geolocation accuracy in metres"),
     userAgent: zod.string().max(clockOutMyAttendanceBodyUserAgentMax).nullish(),
+    clientDate: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "Employee's local calendar date (YYYY-MM-DD). Used as the attendance day instead of server UTC when present.",
+      ),
   })
   .describe(
-    "Optional client-supplied geolocation\/device info for self-service punches.",
+    "Optional client-supplied context for self-service punches (geolocation, device, and the employee's local date).",
   );
 
 export const ClockOutMyAttendanceResponse = zod.object({
