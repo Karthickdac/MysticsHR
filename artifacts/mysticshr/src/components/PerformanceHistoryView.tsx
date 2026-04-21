@@ -56,6 +56,10 @@ type TrendPoint = {
   endDate: string | null;
   outcomeLabel: string | null;
   finalScore: number;
+  // Post-calibration score; only present for cycles where HR has actually
+  // recorded a normalized value, so the second trend line skips cycles
+  // without it (rather than dropping to zero).
+  normalizedScore: number | null;
   peerAverage: number | null;
   peerSampleSize: number | null;
 };
@@ -75,6 +79,11 @@ function PerformanceTrendTooltip({
       <p>
         Final score: <span className="font-semibold">{p.finalScore.toFixed(2)}</span>
       </p>
+      {p.normalizedScore !== null && (
+        <p>
+          Normalized: <span className="font-semibold">{p.normalizedScore.toFixed(2)}</span>
+        </p>
+      )}
       {p.peerAverage !== null && (
         <p>
           {comparisonLabel}:{" "}
@@ -107,14 +116,21 @@ function PerformanceTrendChart({
     );
   }
 
-  const scores = data.flatMap(d =>
-    showComparison && d.peerAverage !== null ? [d.finalScore, d.peerAverage] : [d.finalScore]
-  );
+  const hasAnyNormalized = data.some(d => d.normalizedScore !== null);
+  const scores = data.flatMap(d => {
+    const xs: number[] = [d.finalScore];
+    if (d.normalizedScore !== null) xs.push(d.normalizedScore);
+    if (showComparison && d.peerAverage !== null) xs.push(d.peerAverage);
+    return xs;
+  });
   const min = Math.min(...scores);
   const max = Math.max(...scores);
   const yMin = Math.max(0, Math.floor((min - 0.5) * 10) / 10);
   const yMax = Math.ceil((max + 0.5) * 10) / 10;
   const hasAnyComparison = showComparison && data.some(d => d.peerAverage !== null);
+  // Show the legend whenever a second series is on the chart so employees can
+  // tell the lines apart (Final / Normalized / peer comparison).
+  const showLegend = hasAnyComparison || hasAnyNormalized;
 
   return (
     <Card>
@@ -149,10 +165,10 @@ function PerformanceTrendChart({
                 allowDecimals
               />
               <Tooltip content={<PerformanceTrendTooltip comparisonLabel={comparisonLabel} />} />
-              {hasAnyComparison && <Legend wrapperStyle={{ fontSize: 11 }} />}
+              {showLegend && <Legend wrapperStyle={{ fontSize: 11 }} />}
               <Line
                 type="monotone"
-                name="Final score"
+                name="Final"
                 dataKey="finalScore"
                 stroke="hsl(var(--primary))"
                 strokeWidth={2}
@@ -160,6 +176,20 @@ function PerformanceTrendChart({
                 activeDot={{ r: 6 }}
                 isAnimationActive={false}
               />
+              {hasAnyNormalized && (
+                <Line
+                  type="monotone"
+                  name="Normalized"
+                  dataKey="normalizedScore"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  strokeDasharray="2 3"
+                  dot={{ r: 3, fill: "#10b981" }}
+                  activeDot={{ r: 5 }}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              )}
               {hasAnyComparison && (
                 <Line
                   type="monotone"
@@ -353,6 +383,7 @@ export default function PerformanceHistoryView({
     .map(c => {
       const o = outcomeByCycle.get(c.id);
       const score = o?.finalScore != null ? Number(o.finalScore) : NaN;
+      const normalized = o?.normalizedScore != null ? Number(o.normalizedScore) : NaN;
       const avg = averageByCycle.get(c.id);
       return {
         cycleId: c.id,
@@ -361,6 +392,7 @@ export default function PerformanceHistoryView({
         endDate: c.endDate,
         outcomeLabel: o?.outcomLabel ?? null,
         finalScore: Number.isFinite(score) ? score : null,
+        normalizedScore: Number.isFinite(normalized) ? normalized : null,
         peerAverage: avg ? avg.averageFinalScore : null,
         peerSampleSize: avg ? avg.sampleSize : null,
       };
