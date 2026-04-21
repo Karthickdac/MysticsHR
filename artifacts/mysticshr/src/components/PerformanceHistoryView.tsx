@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
-import { History, Trophy, Target, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, History, Trophy, Target, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 import {
   ResponsiveContainer,
@@ -64,6 +64,12 @@ type TrendPoint = {
   peerSampleSize: number | null;
 };
 
+// A cycle is flagged as an outlier when the employee's final score differs
+// from the peer average by more than this many points (on the 1–5 scale used
+// by performance outcomes). Centralised so the UI label, dot rendering, and
+// summary list all stay in sync.
+const OUTLIER_THRESHOLD = 1.0;
+
 function PerformanceTrendTooltip({
   active, payload, comparisonLabel,
 }: TooltipProps<number, string> & { comparisonLabel: string }) {
@@ -91,6 +97,19 @@ function PerformanceTrendTooltip({
           <span className="text-muted-foreground"> (n={p.peerSampleSize})</span>
         </p>
       )}
+      {p.peerAverage !== null && (() => {
+        const diff = p.finalScore - p.peerAverage;
+        const isOutlier = Math.abs(diff) >= OUTLIER_THRESHOLD;
+        if (!isOutlier) return null;
+        const sign = diff >= 0 ? "+" : "−";
+        const cls = diff >= 0 ? "text-emerald-600" : "text-red-600";
+        return (
+          <p className={`flex items-center gap-1 ${cls}`}>
+            <AlertTriangle className="w-3 h-3" />
+            <span className="font-medium">{sign}{Math.abs(diff).toFixed(1)} vs {comparisonLabel}</span>
+          </p>
+        );
+      })()}
       {p.outcomeLabel && (
         <p className="text-muted-foreground">Outcome: {p.outcomeLabel}</p>
       )}
@@ -172,7 +191,27 @@ function PerformanceTrendChart({
                 dataKey="finalScore"
                 stroke="hsl(var(--primary))"
                 strokeWidth={2}
-                dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                // Custom dot so outlier cycles (|finalScore - peerAverage| >=
+                // OUTLIER_THRESHOLD when comparison is on) render as a larger
+                // amber-ringed marker. Non-outlier and no-comparison cycles
+                // keep the standard dot.
+                dot={(dotProps) => {
+                  const { cx, cy, payload, index } = dotProps as { cx?: number; cy?: number; payload?: TrendPoint; index?: number };
+                  if (cx == null || cy == null || !payload) {
+                    return <g key={`final-empty-${index ?? 0}`} />;
+                  }
+                  const peer = payload.peerAverage;
+                  const isOutlier = showComparison && peer !== null && Math.abs(payload.finalScore - peer) >= OUTLIER_THRESHOLD;
+                  if (!isOutlier) {
+                    return <circle key={`final-${payload.cycleId}`} cx={cx} cy={cy} r={4} fill="hsl(var(--primary))" />;
+                  }
+                  return (
+                    <g key={`final-out-${payload.cycleId}`}>
+                      <circle cx={cx} cy={cy} r={7} fill="none" stroke="#f59e0b" strokeWidth={2} />
+                      <circle cx={cx} cy={cy} r={4} fill="#f59e0b" />
+                    </g>
+                  );
+                }}
                 activeDot={{ r: 6 }}
                 isAnimationActive={false}
               />
@@ -486,6 +525,46 @@ export default function PerformanceHistoryView({
         showComparison={canCompare && showComparison}
         comparisonLabel={comparisonLabel}
       />
+      {canCompare && showComparison && (() => {
+        // Build the outlier list from the same trendData the chart uses so
+        // the summary card and the amber dots can never disagree.
+        const outliers = trendData
+          .filter(d => d.peerAverage !== null && Math.abs(d.finalScore - d.peerAverage) >= OUTLIER_THRESHOLD)
+          .map(d => ({ ...d, diff: d.finalScore - (d.peerAverage as number) }))
+          .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+        if (outliers.length === 0) return null;
+        return (
+          <Card className="border-amber-200 bg-amber-50/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-amber-900">
+                <AlertTriangle className="w-4 h-4" /> Outlier cycles
+                <span className="text-xs font-normal text-amber-800/80">
+                  Diverge from {comparisonLabel.toLowerCase()} by ≥ {OUTLIER_THRESHOLD.toFixed(1)}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ul className="text-xs space-y-1">
+                {outliers.map(o => {
+                  const sign = o.diff >= 0 ? "+" : "−";
+                  const cls = o.diff >= 0 ? "text-emerald-700" : "text-red-700";
+                  return (
+                    <li key={o.cycleId} className="flex items-center justify-between gap-3">
+                      <span className="font-medium truncate">{o.title}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="text-muted-foreground">
+                          You {o.finalScore.toFixed(2)} · peers {(o.peerAverage as number).toFixed(2)} (n={o.peerSampleSize})
+                        </span>
+                        <span className={`font-semibold ${cls}`}>{sign}{Math.abs(o.diff).toFixed(2)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent>
+          </Card>
+        );
+      })()}
       {closedCycles.map(cycle => {
         const cycleGoals = goals.filter(g => g.cycleId === cycle.id);
         const cycleGoalIds = new Set(cycleGoals.map(g => g.id));
