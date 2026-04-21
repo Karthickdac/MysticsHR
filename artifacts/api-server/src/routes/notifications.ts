@@ -191,30 +191,46 @@ router.put("/my-preferences/notifications", requireHrmsUser, requireRole(...ALL_
       return;
     }
     const body = req.body as { items?: Array<{ eventType?: string; emailEnabled?: boolean; whatsappEnabled?: boolean }> };
-    const items = Array.isArray(body?.items) ? body.items : [];
-    if (items.length === 0) { res.status(400).json({ error: "items[] is required" }); return; }
+    const rawItems = Array.isArray(body?.items) ? body.items : [];
+    if (rawItems.length === 0) { res.status(400).json({ error: "items[] is required" }); return; }
 
-    for (const it of items) {
+    // Pre-validate every item before any DB write so a bad row late in the
+    // payload doesn't leave earlier rows partially applied. Also de-dupes
+    // by eventType (last write wins) so callers can be lenient.
+    const normalized = new Map<string, { eventType: string; emailEnabled: boolean; whatsappEnabled: boolean }>();
+    for (const it of rawItems) {
       const eventType = String(it.eventType ?? "").trim();
       if (!eventType || !NOTIFICATION_EVENT_TYPE_SET.has(eventType)) {
         res.status(400).json({ error: `Unknown eventType: ${eventType || "(empty)"}` });
         return;
       }
-      const emailEnabled = it.emailEnabled !== false; // default true
-      const whatsappEnabled = it.whatsappEnabled !== false;
-
-      const [existing] = await db.select({ id: notificationPreferencesTable.id })
-        .from(notificationPreferencesTable)
-        .where(and(eq(notificationPreferencesTable.employeeId, employeeId), eq(notificationPreferencesTable.eventType, eventType)))
-        .limit(1);
-      if (existing) {
-        await db.update(notificationPreferencesTable)
-          .set({ emailEnabled, whatsappEnabled, updatedAt: new Date() })
-          .where(eq(notificationPreferencesTable.id, existing.id));
-      } else {
-        await db.insert(notificationPreferencesTable).values({ employeeId, eventType, emailEnabled, whatsappEnabled });
-      }
+      normalized.set(eventType, {
+        eventType,
+        emailEnabled: it.emailEnabled !== false,
+        whatsappEnabled: it.whatsappEnabled !== false,
+      });
     }
+
+    // Apply all upserts in a single transaction so the write is all-or-nothing.
+    const items = Array.from(normalized.values());
+    await db.transaction(async (tx) => {
+      for (const it of items) {
+        const [existing] = await tx.select({ id: notificationPreferencesTable.id })
+          .from(notificationPreferencesTable)
+          .where(and(eq(notificationPreferencesTable.employeeId, employeeId), eq(notificationPreferencesTable.eventType, it.eventType)))
+          .limit(1);
+        if (existing) {
+          await tx.update(notificationPreferencesTable)
+            .set({ emailEnabled: it.emailEnabled, whatsappEnabled: it.whatsappEnabled, updatedAt: new Date() })
+            .where(eq(notificationPreferencesTable.id, existing.id));
+        } else {
+          await tx.insert(notificationPreferencesTable).values({
+            employeeId, eventType: it.eventType,
+            emailEnabled: it.emailEnabled, whatsappEnabled: it.whatsappEnabled,
+          });
+        }
+      }
+    });
     res.json({ success: true, count: items.length });
   } catch (e) {
     console.error("[my-preferences/notifications PUT]", e);
