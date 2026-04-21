@@ -46,9 +46,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Plus, Pencil, Trash2,
   GraduationCap, Briefcase, FileText, History, ClipboardList, Download,
+  TrendingUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
+import PerformanceHistoryView from "@/components/PerformanceHistoryView";
 
 const STATUS_COLORS: Record<string, string> = {
   "Active": "bg-green-100 text-green-800",
@@ -415,6 +417,7 @@ export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { role } = useCurrentHrmsUser();
   const canEdit = hasRole(role, ["super_admin", "hr_manager", "hr_executive"]);
+  const canViewPerformanceHistory = hasRole(role, ["super_admin", "hr_manager", "hr_executive", "hod"]);
   const empId = parseInt(id, 10);
   const { data: emp, isLoading, error } = useGetEmployee(empId);
   const { data: profile } = useGetEmployeesIdProfile(empId);
@@ -529,6 +532,9 @@ export default function EmployeeDetailPage() {
           <TabsTrigger value="documents"><FileText className="w-3.5 h-3.5 mr-1" />Documents</TabsTrigger>
           <TabsTrigger value="history"><History className="w-3.5 h-3.5 mr-1" />History</TabsTrigger>
           <TabsTrigger value="onboarding"><ClipboardList className="w-3.5 h-3.5 mr-1" />Onboarding</TabsTrigger>
+          {canViewPerformanceHistory && (
+            <TabsTrigger value="performance"><TrendingUp className="w-3.5 h-3.5 mr-1" />Performance History</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="personal">
@@ -658,6 +664,12 @@ export default function EmployeeDetailPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canViewPerformanceHistory && (
+          <TabsContent value="performance">
+            <PerformanceHistoryView employeeId={empId} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={editingProfile} onOpenChange={setEditingProfile}>
