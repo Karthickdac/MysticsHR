@@ -574,10 +574,16 @@ async function computeSlaReport(from?: Date, to?: Date) {
   };
   const slaBreachedCount = inRange.filter(isBreached).length;
 
-  const resolvedWithTime = inRange.filter(t => t.resolvedAt && t.createdAt);
+  // Treat "completion" as resolvedAt OR closedAt (whichever exists), so closed-without-resolved
+  // tickets still contribute to resolution-time metrics.
+  const completionTime = (t: typeof helpdeskTicketsTable.$inferSelect): Date | null => {
+    const c = t.resolvedAt ?? t.closedAt;
+    return c ? new Date(c) : null;
+  };
+  const resolvedWithTime = inRange.filter(t => completionTime(t) && t.createdAt);
   const avgResolutionHours = resolvedWithTime.length > 0
     ? resolvedWithTime.reduce((sum, t) => {
-        const diff = new Date(t.resolvedAt!).getTime() - new Date(t.createdAt).getTime();
+        const diff = completionTime(t)!.getTime() - new Date(t.createdAt).getTime();
         return sum + diff / (1000 * 60 * 60);
       }, 0) / resolvedWithTime.length
     : null;
@@ -586,19 +592,24 @@ async function computeSlaReport(from?: Date, to?: Date) {
   const categoryMap: Record<string, { count: number; breached: number; resolvedSumHrs: number; resolvedCount: number }> = {};
 
   for (const t of inRange) {
+    const completedAt = completionTime(t);
+    const resolvedHrs = (completedAt && t.createdAt)
+      ? (completedAt.getTime() - new Date(t.createdAt).getTime()) / 3_600_000
+      : null;
+
     if (!priorityMap[t.priority]) priorityMap[t.priority] = { count: 0, breached: 0, resolvedSumHrs: 0, resolvedCount: 0 };
     priorityMap[t.priority].count++;
     if (isBreached(t)) priorityMap[t.priority].breached++;
-    if (t.resolvedAt && t.createdAt) {
-      priorityMap[t.priority].resolvedSumHrs += (new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000;
+    if (resolvedHrs !== null) {
+      priorityMap[t.priority].resolvedSumHrs += resolvedHrs;
       priorityMap[t.priority].resolvedCount++;
     }
 
     if (!categoryMap[t.category]) categoryMap[t.category] = { count: 0, breached: 0, resolvedSumHrs: 0, resolvedCount: 0 };
     categoryMap[t.category].count++;
     if (isBreached(t)) categoryMap[t.category].breached++;
-    if (t.resolvedAt && t.createdAt) {
-      categoryMap[t.category].resolvedSumHrs += (new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000;
+    if (resolvedHrs !== null) {
+      categoryMap[t.category].resolvedSumHrs += resolvedHrs;
       categoryMap[t.category].resolvedCount++;
     }
   }
