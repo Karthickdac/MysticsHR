@@ -283,9 +283,9 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
       }
     }
 
-    // Broadcast new ticket to HR managers (super_admin + hr_manager) so HR is aware of incoming tickets
+    // Broadcast new ticket to HR (super_admin, hr_manager, hr_executive — matches HR_ROLES) so HR is aware of incoming tickets
     try {
-      const hrUsers = await getUsersByRoles(["super_admin", "hr_manager"]);
+      const hrUsers = await getUsersByRoles([...HR_ROLES]);
       const raiserName = emp ? `Employee #${emp.id}` : "an employee";
       for (const hr of hrUsers) {
         if (!hr.email || hr.id === assignedToUserId) continue; // skip assignee (already notified) and self
