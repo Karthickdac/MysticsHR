@@ -8106,7 +8106,7 @@ components:
         description: { type: string }
         category:
           type: string
-          enum: [IT, HR, Finance, Admin, Other]
+          enum: [IT, HR, Finance, Payroll, Admin, Other]
         priority:
           type: string
           enum: [Low, Medium, High, Urgent]

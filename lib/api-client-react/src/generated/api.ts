@@ -87,6 +87,7 @@ import type {
   Department,
   Designation,
   DocumentTemplate,
+  DownloadIssuedDocumentParams,
   Employee,
   EmployeeDocument,
   EmployeeEducation,
@@ -20324,22 +20325,44 @@ export const useGenerateDocument = <
 /**
  * @summary Download an issued document as PDF
  */
-export const getDownloadIssuedDocumentUrl = (id: number) => {
-  return `/api/documents/issued/${id}/download`;
+export const getDownloadIssuedDocumentUrl = (
+  id: number,
+  params?: DownloadIssuedDocumentParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/documents/issued/${id}/download?${stringifiedParams}`
+    : `/api/documents/issued/${id}/download`;
 };
 
 export const downloadIssuedDocument = async (
   id: number,
+  params?: DownloadIssuedDocumentParams,
   options?: RequestInit,
 ): Promise<Blob> => {
-  return customFetch<Blob>(getDownloadIssuedDocumentUrl(id), {
+  return customFetch<Blob>(getDownloadIssuedDocumentUrl(id, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getDownloadIssuedDocumentQueryKey = (id: number) => {
-  return [`/api/documents/issued/${id}/download`] as const;
+export const getDownloadIssuedDocumentQueryKey = (
+  id: number,
+  params?: DownloadIssuedDocumentParams,
+) => {
+  return [
+    `/api/documents/issued/${id}/download`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getDownloadIssuedDocumentQueryOptions = <
@@ -20347,6 +20370,7 @@ export const getDownloadIssuedDocumentQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   id: number,
+  params?: DownloadIssuedDocumentParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof downloadIssuedDocument>>,
@@ -20359,11 +20383,12 @@ export const getDownloadIssuedDocumentQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getDownloadIssuedDocumentQueryKey(id);
+    queryOptions?.queryKey ?? getDownloadIssuedDocumentQueryKey(id, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof downloadIssuedDocument>>
-  > = ({ signal }) => downloadIssuedDocument(id, { signal, ...requestOptions });
+  > = ({ signal }) =>
+    downloadIssuedDocument(id, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -20391,6 +20416,7 @@ export function useDownloadIssuedDocument<
   TError = ErrorType<unknown>,
 >(
   id: number,
+  params?: DownloadIssuedDocumentParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof downloadIssuedDocument>>,
@@ -20400,7 +20426,11 @@ export function useDownloadIssuedDocument<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getDownloadIssuedDocumentQueryOptions(id, options);
+  const queryOptions = getDownloadIssuedDocumentQueryOptions(
+    id,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

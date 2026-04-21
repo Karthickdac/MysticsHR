@@ -5039,7 +5039,7 @@ export const ListHelpdeskTicketsResponse = zod.array(
 export const CreateHelpdeskTicketBody = zod.object({
   subject: zod.string(),
   description: zod.string(),
-  category: zod.enum(["IT", "HR", "Finance", "Admin", "Other"]),
+  category: zod.enum(["IT", "HR", "Finance", "Payroll", "Admin", "Other"]),
   priority: zod.enum(["Low", "Medium", "High", "Urgent"]),
   attachmentUrl: zod.string().nullish(),
 });
@@ -5385,6 +5385,15 @@ export const GenerateDocumentBody = zod.object({
  */
 export const DownloadIssuedDocumentParams = zod.object({
   id: zod.coerce.number(),
+});
+
+export const DownloadIssuedDocumentQueryParams = zod.object({
+  inline: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      'When \"1\" or \"true\", serves PDF with Content-Disposition inline for in-browser preview',
+    ),
 });
 
 /**

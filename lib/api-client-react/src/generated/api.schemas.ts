@@ -2454,6 +2454,7 @@ export const CreateHelpdeskTicketBodyCategory = {
   IT: "IT",
   HR: "HR",
   Finance: "Finance",
+  Payroll: "Payroll",
   Admin: "Admin",
   Other: "Other",
 } as const;
@@ -3595,6 +3596,13 @@ export type RunHelpdeskSlaCheck200 = {
 export type ListIssuedDocumentsParams = {
   employeeId?: number;
   documentType?: string;
+};
+
+export type DownloadIssuedDocumentParams = {
+  /**
+   * When "1" or "true", serves PDF with Content-Disposition inline for in-browser preview
+   */
+  inline?: string;
 };
 
 export type ListExitRequestsParams = {

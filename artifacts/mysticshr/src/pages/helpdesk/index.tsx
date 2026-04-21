@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Ticket, AlertTriangle, Clock, CheckCircle2, BarChart3 } from "lucide-react";
 
-const CATEGORIES = ["IT", "HR", "Finance", "Admin", "Other"] as const;
+const CATEGORIES = ["IT", "HR", "Finance", "Payroll", "Admin", "Other"] as const;
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
 const STATUSES = ["Open", "In Progress", "Pending Employee Response", "Resolved", "Closed"] as const;
 

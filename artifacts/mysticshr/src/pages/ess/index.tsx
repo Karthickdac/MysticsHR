@@ -5,8 +5,13 @@ import {
   useGetEssProfile,
   useUpdateEssProfile,
   useListIssuedDocuments,
+  useListHelpdeskTickets,
+  useCreateHelpdeskTicket,
+  getListHelpdeskTicketsQueryKey,
   type EssProfile,
   type IssuedDocument,
+  type CreateHelpdeskTicketBody,
+  type HelpdeskTicket,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,9 +21,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   User, FileText, Calendar, Clock, Target, Wallet, Home, Phone, AlertCircle,
-  ChevronRight, CheckCircle2, Eye, Download,
+  ChevronRight, CheckCircle2, Eye, Download, LifeBuoy, Plus, Ticket,
 } from "lucide-react";
 
 type LeaveBalanceItem = {
@@ -140,6 +147,180 @@ function EditProfileModal({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
+const TICKET_CATEGORIES = ["IT", "HR", "Payroll", "Other"] as const;
+const TICKET_PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
+type TicketCategory = (typeof TICKET_CATEGORIES)[number];
+type TicketPriority = (typeof TICKET_PRIORITIES)[number];
+
+const TICKET_PRIORITY_COLORS: Record<string, string> = {
+  Low: "bg-blue-100 text-blue-800",
+  Medium: "bg-yellow-100 text-yellow-800",
+  High: "bg-orange-100 text-orange-800",
+  Urgent: "bg-red-100 text-red-800",
+};
+
+const TICKET_STATUS_COLORS: Record<string, string> = {
+  Open: "bg-gray-100 text-gray-800",
+  "In Progress": "bg-blue-100 text-blue-800",
+  "Pending Employee Response": "bg-yellow-100 text-yellow-800",
+  Resolved: "bg-green-100 text-green-800",
+  Closed: "bg-gray-100 text-gray-500",
+};
+
+function RaiseTicketModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const create = useCreateHelpdeskTicket();
+  const [form, setForm] = useState<CreateHelpdeskTicketBody>({
+    subject: "",
+    description: "",
+    category: "IT",
+    priority: "Medium",
+    attachmentUrl: null,
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    create.mutate({ data: form }, {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListHelpdeskTicketsQueryKey() });
+        setForm({ subject: "", description: "", category: "IT", priority: "Medium", attachmentUrl: null });
+        onClose();
+      },
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Raise a Helpdesk Ticket</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4" data-testid="form-raise-ticket">
+          <div>
+            <Label>Subject *</Label>
+            <Input
+              data-testid="input-ticket-subject"
+              value={form.subject}
+              onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
+              placeholder="Brief summary of the issue"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Category *</Label>
+              <Select value={form.category} onValueChange={(v: TicketCategory) => setForm(f => ({ ...f, category: v }))}>
+                <SelectTrigger data-testid="select-ticket-category"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TICKET_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Priority *</Label>
+              <Select value={form.priority} onValueChange={(v: TicketPriority) => setForm(f => ({ ...f, priority: v }))}>
+                <SelectTrigger data-testid="select-ticket-priority"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label>Description *</Label>
+            <Textarea
+              data-testid="input-ticket-description"
+              rows={4}
+              value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Describe the issue in detail..."
+              required
+            />
+          </div>
+          <div>
+            <Label>Attachment URL (optional)</Label>
+            <Input
+              value={form.attachmentUrl ?? ""}
+              onChange={e => setForm(f => ({ ...f, attachmentUrl: e.target.value || null }))}
+              placeholder="https://... (link to screenshot, document, etc.)"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              type="submit"
+              data-testid="button-submit-ticket"
+              disabled={create.isPending || !form.subject || !form.description}
+            >
+              {create.isPending ? "Submitting..." : "Submit Ticket"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HelpdeskTab() {
+  const [showCreate, setShowCreate] = useState(false);
+  const { data: tickets = [], isLoading } = useListHelpdeskTickets();
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <LifeBuoy className="w-4 h-4" /> My Helpdesk Tickets
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Raise IT, HR or Payroll requests and track their status.
+          </p>
+        </div>
+        <Button size="sm" data-testid="button-raise-ticket" onClick={() => setShowCreate(true)}>
+          <Plus className="w-4 h-4 mr-1" /> Raise Ticket
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Loading...</p>
+        ) : tickets.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <Ticket className="w-10 h-10 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">You haven't raised any tickets yet.</p>
+            <p className="text-xs mt-1">Click "Raise Ticket" to submit a new request.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(tickets as HelpdeskTicket[]).map(t => (
+              <Link key={t.id} href={`/helpdesk/${t.id}`}>
+                <div
+                  data-testid={`row-ticket-${t.id}`}
+                  className="flex items-center gap-4 p-3 rounded-md border hover:bg-muted/40 cursor-pointer transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm truncate">{t.subject}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge className={`text-xs ${TICKET_STATUS_COLORS[t.status] ?? ""}`}>{t.status}</Badge>
+                      <Badge className={`text-xs ${TICKET_PRIORITY_COLORS[t.priority] ?? ""}`}>{t.priority}</Badge>
+                      <span className="text-xs text-muted-foreground">{t.category}</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground shrink-0">
+                    {new Date(t.createdAt).toLocaleDateString("en-IN")}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+      <RaiseTicketModal open={showCreate} onClose={() => setShowCreate(false)} />
+    </Card>
+  );
+}
+
 const ESS_MODULES = [
   {
     label: "Payslips",
@@ -194,7 +375,7 @@ export default function EssPortalPage() {
     profile?.employeeId ? { employeeId: profile.employeeId } : {}
   );
 
-  const validTabs = ["dashboard", "profile", "services", "documents"];
+  const validTabs = ["dashboard", "profile", "services", "documents", "helpdesk"];
   const tabFromUrl = new URLSearchParams(search).get("tab");
   const urlTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "dashboard";
   const [activeTab, setActiveTab] = useState(urlTab);
@@ -231,6 +412,7 @@ export default function EssPortalPage() {
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="profile">My Profile</TabsTrigger>
           <TabsTrigger value="documents">My Documents</TabsTrigger>
+          <TabsTrigger value="helpdesk">Helpdesk</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
         </TabsList>
 
@@ -493,6 +675,10 @@ export default function EssPortalPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="helpdesk" className="space-y-4">
+          <HelpdeskTab />
+        </TabsContent>
+
         <TabsContent value="services" className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {ESS_MODULES.map(mod => (
@@ -511,6 +697,22 @@ export default function EssPortalPage() {
                 </Card>
               </Link>
             ))}
+            <Link href="/ess?tab=helpdesk">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                <CardContent className="p-5 flex items-start gap-4">
+                  <div className="p-2.5 rounded-lg flex-shrink-0 bg-rose-100 text-rose-600">
+                    <LifeBuoy className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">Helpdesk</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Raise IT, HR or Payroll tickets
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                </CardContent>
+              </Card>
+            </Link>
             <Link href="/ess?tab=documents">
               <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
                 <CardContent className="p-5 flex items-start gap-4">

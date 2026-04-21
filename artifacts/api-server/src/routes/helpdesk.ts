@@ -84,6 +84,7 @@ async function autoAssignForCategory(category: string): Promise<number | null> {
     IT: ["super_admin", "hr_manager"],
     HR: ["hr_manager", "hr_executive"],
     Finance: ["payroll_admin", "hr_manager"],
+    Payroll: ["payroll_admin", "hr_manager"],
     Admin: ["super_admin", "hr_manager"],
     Other: ["hr_manager", "hr_executive"],
   };

@@ -5,7 +5,7 @@ import { employeesTable } from "./employees";
 import { hrmsUsersTable } from "./hrms_users";
 
 export const ticketCategoryEnum = pgEnum("ticket_category", [
-  "IT", "HR", "Finance", "Admin", "Other",
+  "IT", "HR", "Finance", "Payroll", "Admin", "Other",
 ]);
 
 export const ticketPriorityEnum = pgEnum("ticket_priority", [
