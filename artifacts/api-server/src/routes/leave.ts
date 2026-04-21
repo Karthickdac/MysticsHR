@@ -594,10 +594,10 @@ router.post("/leave/backfill-attendance", requireHrmsUser, requireRole("super_ad
     // admins firing the endpoint simultaneously cannot duplicate-insert
     // attendance rows (no unique constraint exists on (employee_id, date) yet
     // — see follow-up).
-    const [{ locked }] = await db.execute<{ locked: boolean }>(
+    const lockResult = await db.execute<{ locked: boolean }>(
       sql`SELECT pg_try_advisory_lock(${BACKFILL_LOCK_KEY}) AS locked`,
-    ) as unknown as { locked: boolean }[];
-    if (!locked) {
+    );
+    if (!lockResult.rows[0]?.locked) {
       res.status(409).json({ error: "A backfill run is already in progress" });
       return;
     }
