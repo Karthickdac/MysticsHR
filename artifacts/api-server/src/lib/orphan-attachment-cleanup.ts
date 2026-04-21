@@ -1,6 +1,16 @@
 import { inArray, eq } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { ticketAttachmentsTable, storageCleanupRunsTable } from "@workspace/db/schema";
+import {
+  ticketAttachmentsTable,
+  helpdeskTicketsTable,
+  storageCleanupRunsTable,
+  candidatesTable,
+  offerLettersTable,
+  preOnboardingDocumentsTable,
+  employeeDocumentsTable,
+  employeesTable,
+  leaveApplicationsTable,
+} from "@workspace/db/schema";
 import { db } from "./db";
 import { logger } from "./logger";
 import { objectStorageClient } from "./objectStorage";
@@ -27,14 +37,57 @@ type TrackedSource = {
 };
 
 export const TRACKED_OBJECT_PATH_SOURCES: ReadonlyArray<TrackedSource> = [
+  // The canonical, fully-adopted source: helpdesk attachments persist the
+  // normalized `/objects/uploads/<id>` path returned by the presigned-upload
+  // flow.
   {
-    name: "ticket_attachments",
+    name: "ticket_attachments.object_path",
     table: ticketAttachmentsTable,
     column: ticketAttachmentsTable.objectPath,
   },
-  // Future modules (document requests, onboarding documents, candidate
-  // resumes, payslips, …) should append entries here as they adopt the
-  // presigned-upload flow.
+  // The columns below currently store mostly external URLs or pasted links,
+  // but they are reachable from upload-style UIs and could legitimately
+  // contain a `/objects/uploads/<id>` value (for example if a future
+  // migration switches them over to the presigned-upload flow). Including
+  // them now is a cheap safety net: the candidate list is already filtered
+  // to `/objects/uploads/<id>`-shaped paths, so an unrelated external URL in
+  // these columns can never accidentally match a real candidate, but a
+  // genuine object-storage reference will be correctly protected.
+  {
+    name: "helpdesk_tickets.attachment_url",
+    table: helpdeskTicketsTable,
+    column: helpdeskTicketsTable.attachmentUrl,
+  },
+  {
+    name: "candidates.resume_url",
+    table: candidatesTable,
+    column: candidatesTable.resumeUrl,
+  },
+  {
+    name: "offer_letters.letter_url",
+    table: offerLettersTable,
+    column: offerLettersTable.letterUrl,
+  },
+  {
+    name: "pre_onboarding_documents.file_url",
+    table: preOnboardingDocumentsTable,
+    column: preOnboardingDocumentsTable.fileUrl,
+  },
+  {
+    name: "employee_documents.file_url",
+    table: employeeDocumentsTable,
+    column: employeeDocumentsTable.fileUrl,
+  },
+  {
+    name: "employees.avatar_url",
+    table: employeesTable,
+    column: employeesTable.avatarUrl,
+  },
+  {
+    name: "leave_applications.document_url",
+    table: leaveApplicationsTable,
+    column: leaveApplicationsTable.documentUrl,
+  },
 ];
 
 export interface OrphanCleanupResult {
