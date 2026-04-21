@@ -1,5 +1,5 @@
-import { inArray } from "drizzle-orm";
-import { ticketAttachmentsTable } from "@workspace/db/schema";
+import { inArray, eq } from "drizzle-orm";
+import { ticketAttachmentsTable, storageCleanupRunsTable } from "@workspace/db/schema";
 import { db } from "./db";
 import { logger } from "./logger";
 import { objectStorageClient } from "./objectStorage";
@@ -12,11 +12,13 @@ export interface OrphanCleanupResult {
   errors: number;
   ageDays: number;
   dryRun: boolean;
+  runId?: number;
 }
 
 interface CleanupOptions {
   ageDays?: number;
   dryRun?: boolean;
+  triggeredBy?: string; // 'cron' | 'manual:<userId>'
 }
 
 const DB_LOOKUP_CHUNK = 500;
@@ -74,6 +76,9 @@ function chunk<T>(arr: T[], size: number): T[][] {
 export async function cleanupOrphanedAttachments(
   opts: CleanupOptions = {},
 ): Promise<OrphanCleanupResult> {
+  const startedAt = new Date();
+  const startMs = Date.now();
+  const triggeredBy = opts.triggeredBy ?? "cron";
   // Strict validation: a misconfigured ATTACHMENT_CLEANUP_AGE_DAYS must
   // never silently disable the age guard and let recent uploads be deleted.
   const rawAge = opts.ageDays ?? process.env.ATTACHMENT_CLEANUP_AGE_DAYS ?? 7;
@@ -91,8 +96,45 @@ export async function cleanupOrphanedAttachments(
     dryRun,
   };
 
+  // Best-effort: insert a "started" row so admins can see in-flight runs.
+  // If the insert fails (e.g. table missing during migration), we still run.
+  let runId: number | undefined;
+  try {
+    const [row] = await db.insert(storageCleanupRunsTable).values({
+      startedAt,
+      ageDays: result.ageDays,
+      dryRun,
+      triggeredBy,
+    }).returning({ id: storageCleanupRunsTable.id });
+    runId = row?.id;
+    result.runId = runId;
+  } catch (err) {
+    logger.warn({ err }, "[orphan-cleanup] failed to insert run record");
+  }
+
+  async function persist(errorMessage?: string) {
+    if (!runId) return;
+    try {
+      await db.update(storageCleanupRunsTable).set({
+        finishedAt: new Date(),
+        scanned: result.scanned,
+        candidates: result.candidates,
+        orphans: result.orphans,
+        deleted: result.deleted,
+        errors: result.errors,
+        ageDays: result.ageDays,
+        dryRun: result.dryRun,
+        durationMs: Date.now() - startMs,
+        errorMessage: errorMessage ?? null,
+      }).where(eq(storageCleanupRunsTable.id, runId));
+    } catch (err) {
+      logger.warn({ err, runId }, "[orphan-cleanup] failed to update run record");
+    }
+  }
+
   if (!Number.isFinite(ageDays)) {
     logger.error({ rawAge }, "[orphan-cleanup] invalid ATTACHMENT_CLEANUP_AGE_DAYS; skipping run");
+    await persist("Invalid ATTACHMENT_CLEANUP_AGE_DAYS configuration");
     return result;
   }
   const cutoff = Date.now() - ageDays * 24 * 60 * 60 * 1000;
@@ -104,6 +146,7 @@ export async function cleanupOrphanedAttachments(
     ({ bucketName, listPrefix, prefixCandidates } = parsePrivateDir());
   } catch (err) {
     logger.error({ err }, "[orphan-cleanup] could not resolve PRIVATE_OBJECT_DIR; skipping");
+    await persist("PRIVATE_OBJECT_DIR not resolvable");
     return result;
   }
 
@@ -126,12 +169,14 @@ export async function cleanupOrphanedAttachments(
     }
   } catch (err) {
     logger.error({ err, bucketName, listPrefix }, "[orphan-cleanup] failed to list objects");
+    await persist("Failed to list objects from storage");
     return result;
   }
 
   result.candidates = candidates.length;
   if (candidates.length === 0) {
     logger.info({ ...result }, "[orphan-cleanup] nothing to clean");
+    await persist();
     return result;
   }
 
@@ -160,6 +205,7 @@ export async function cleanupOrphanedAttachments(
       for (const r of rows) knownVariants.add(r.objectPath);
     } catch (err) {
       logger.error({ err }, "[orphan-cleanup] DB lookup failed; aborting to avoid false positives");
+      await persist("DB lookup failed; aborted to avoid false positives");
       return result;
     }
   }
@@ -184,5 +230,6 @@ export async function cleanupOrphanedAttachments(
   }
 
   logger.info({ ...result }, "[orphan-cleanup] completed");
+  await persist();
   return result;
 }

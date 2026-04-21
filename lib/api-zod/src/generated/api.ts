@@ -7370,6 +7370,68 @@ export const DeleteApprovalChainParams = zod.object({
 });
 
 /**
+ * @summary List recent orphan-attachment cleanup runs (super admin only)
+ */
+export const listStorageCleanupRunsQueryLimitDefault = 20;
+export const listStorageCleanupRunsQueryLimitMax = 100;
+
+export const ListStorageCleanupRunsQueryParams = zod.object({
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listStorageCleanupRunsQueryLimitMax)
+    .default(listStorageCleanupRunsQueryLimitDefault),
+});
+
+export const ListStorageCleanupRunsResponseItem = zod
+  .object({
+    id: zod.number(),
+    startedAt: zod.coerce.date(),
+    finishedAt: zod.coerce.date().nullish(),
+    scanned: zod.number().describe("Total objects scanned in storage"),
+    candidates: zod.number().describe("Objects older than the age threshold"),
+    orphans: zod
+      .number()
+      .describe("Candidates with no matching attachment row"),
+    deleted: zod.number().describe("Successfully deleted objects"),
+    errors: zod.number().describe("Delete failures during the run"),
+    ageDays: zod.number().describe("Age threshold (in days) used for this run"),
+    dryRun: zod.boolean(),
+    durationMs: zod.number().nullish(),
+    triggeredBy: zod.string().describe("'cron' or 'manual:<userId>'"),
+    errorMessage: zod.string().nullish(),
+  })
+  .describe("A single execution of the orphan-attachment cleanup job.");
+export const ListStorageCleanupRunsResponse = zod.array(
+  ListStorageCleanupRunsResponseItem,
+);
+
+/**
+ * @summary Manually trigger an orphan-attachment cleanup run (super admin only)
+ */
+export const triggerStorageCleanupRunBodyDryRunDefault = false;
+
+export const TriggerStorageCleanupRunBody = zod.object({
+  dryRun: zod
+    .boolean()
+    .default(triggerStorageCleanupRunBodyDryRunDefault)
+    .describe("If true, list candidates but do not delete"),
+});
+
+export const TriggerStorageCleanupRunResponse = zod
+  .object({
+    scanned: zod.number(),
+    candidates: zod.number(),
+    orphans: zod.number(),
+    deleted: zod.number(),
+    errors: zod.number(),
+    ageDays: zod.number(),
+    dryRun: zod.boolean(),
+    runId: zod.number().nullish(),
+  })
+  .describe("Summary returned from a cleanup run trigger.");
+
+/**
  * @summary Get RBAC permission matrix (all roles × modules × actions)
  */
 export const GetRolePermissionsResponse = zod

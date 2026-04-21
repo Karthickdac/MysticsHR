@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
 import { db } from "../lib/db";
-import { systemSettingsTable, approvalChainConfigsTable, hrmsUsersTable } from "@workspace/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { systemSettingsTable, approvalChainConfigsTable, hrmsUsersTable, storageCleanupRunsTable } from "@workspace/db/schema";
+import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import { requireHrmsUser, requireRole } from "../lib/auth";
+import { cleanupOrphanedAttachments } from "../lib/orphan-attachment-cleanup";
 
 const router = Router();
 
@@ -310,6 +311,34 @@ router.delete("/leave-blackouts/:id", requireHrmsUser, requireRole("super_admin"
       .where(and(eq(systemSettingsTable.category, "leave_blackout_dates"), eq(systemSettingsTable.key, key)));
     res.status(204).end();
   } catch { res.status(500).json({ error: "Failed to delete leave blackout" }); }
+});
+
+// ─── Storage Cleanup Activity ─────────────────────────────────────────────────
+
+router.get("/storage-cleanup/runs", requireHrmsUser, requireRole(...SUPER_ADMIN), async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(100, parseInt(String(req.query["limit"] ?? "20"), 10) || 20));
+    const rows = await db.select().from(storageCleanupRunsTable)
+      .orderBy(desc(storageCleanupRunsTable.startedAt))
+      .limit(limit);
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Failed to load cleanup runs" });
+  }
+});
+
+router.post("/storage-cleanup/run", requireHrmsUser, requireRole(...SUPER_ADMIN), async (req, res) => {
+  try {
+    const user = req.hrmsUser!;
+    const dryRun = req.body?.dryRun === true;
+    const result = await cleanupOrphanedAttachments({
+      triggeredBy: `manual:${user.id}`,
+      dryRun,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Cleanup run failed", detail: (err as Error).message });
+  }
 });
 
 // ─── Utility: Get all active users for broadcast notifications ────────────────

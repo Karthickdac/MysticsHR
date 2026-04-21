@@ -3404,6 +3404,46 @@ export interface RolePermissions {
   [key: string]: { [key: string]: RolePermissionsItem[] };
 }
 
+/**
+ * A single execution of the orphan-attachment cleanup job.
+ */
+export interface StorageCleanupRun {
+  id: number;
+  startedAt: string;
+  finishedAt?: string | null;
+  /** Total objects scanned in storage */
+  scanned: number;
+  /** Objects older than the age threshold */
+  candidates: number;
+  /** Candidates with no matching attachment row */
+  orphans: number;
+  /** Successfully deleted objects */
+  deleted: number;
+  /** Delete failures during the run */
+  errors: number;
+  /** Age threshold (in days) used for this run */
+  ageDays: number;
+  dryRun: boolean;
+  durationMs?: number | null;
+  /** 'cron' or 'manual:<userId>' */
+  triggeredBy: string;
+  errorMessage?: string | null;
+}
+
+/**
+ * Summary returned from a cleanup run trigger.
+ */
+export interface StorageCleanupRunResult {
+  scanned: number;
+  candidates: number;
+  orphans: number;
+  deleted: number;
+  errors: number;
+  ageDays: number;
+  dryRun: boolean;
+  runId?: number | null;
+}
+
 export type GetDashboardRecentActivityParams = {
   limit?: number;
 };
@@ -4345,4 +4385,22 @@ export type UpdateSystemSettingsBody = { [key: string]: unknown };
 
 export type UpdateSystemSettings200 = {
   success?: boolean;
+};
+
+export type ListStorageCleanupRunsParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type TriggerStorageCleanupRunBody = {
+  /** If true, list candidates but do not delete */
+  dryRun?: boolean;
+};
+
+export type TriggerStorageCleanupRun500 = {
+  error?: string;
+  detail?: string;
 };

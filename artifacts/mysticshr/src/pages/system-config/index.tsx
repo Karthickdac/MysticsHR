@@ -27,9 +27,10 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2, Lock, FormInput, Ban } from "lucide-react";
+import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2, Lock, FormInput, Ban, HardDrive, RefreshCw, Play, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@clerk/react";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -891,6 +892,243 @@ function LeaveBlackoutsTab() {
   );
 }
 
+// ─── Storage Cleanup Tab ──────────────────────────────────────────────────────
+
+interface StorageCleanupRunRow {
+  id: number;
+  startedAt: string;
+  finishedAt?: string | null;
+  scanned: number;
+  candidates: number;
+  orphans: number;
+  deleted: number;
+  errors: number;
+  ageDays: number;
+  dryRun: boolean;
+  durationMs?: number | null;
+  triggeredBy: string;
+  errorMessage?: string | null;
+}
+
+function StorageCleanupTab() {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  const [runs, setRuns] = useState<StorageCleanupRunRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
+
+  const queryKey = ["storage-cleanup-runs"];
+
+  async function load() {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${BASE_URL}/api/storage-cleanup/runs?limit=20`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as StorageCleanupRunRow[];
+      setRuns(data);
+    } catch (e) {
+      toast({ title: "Failed to load cleanup history", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  async function triggerRun() {
+    if (running) return;
+    setRunning(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${BASE_URL}/api/storage-cleanup/run`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ dryRun }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json();
+      toast({
+        title: dryRun ? "Dry-run complete" : "Cleanup complete",
+        description: `Scanned ${result.scanned}, ${result.orphans} orphans found, ${result.deleted} deleted, ${result.errors} errors.`,
+      });
+      qc.invalidateQueries({ queryKey });
+      await load();
+    } catch (e) {
+      toast({ title: "Cleanup failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const lastRun = runs[0];
+  const successInLast7 = runs.filter(r => {
+    const ts = new Date(r.startedAt).getTime();
+    return ts > Date.now() - 7 * 24 * 60 * 60 * 1000 && r.errors === 0 && !r.errorMessage;
+  }).length;
+  const errorInLast7 = runs.filter(r => {
+    const ts = new Date(r.startedAt).getTime();
+    return ts > Date.now() - 7 * 24 * 60 * 60 * 1000 && (r.errors > 0 || !!r.errorMessage);
+  }).length;
+
+  function fmtDate(s?: string | null) {
+    if (!s) return "—";
+    return new Date(s).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  }
+  function fmtDuration(ms?: number | null) {
+    if (ms == null) return "—";
+    if (ms < 1000) return `${ms} ms`;
+    return `${(ms / 1000).toFixed(1)} s`;
+  }
+  function triggerLabel(t: string) {
+    if (t === "cron") return "Scheduled";
+    if (t.startsWith("manual:")) return `Manual (user #${t.slice(7)})`;
+    return t;
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <HardDrive className="w-4 h-4" />Orphan Attachment Cleanup
+          </CardTitle>
+          <CardDescription>
+            A daily job (3:15 AM server time) deletes ticket-attachment files in object storage that are
+            older than 7 days and not referenced by any helpdesk ticket. This panel shows the most recent runs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="rounded border p-3">
+              <div className="text-xs text-muted-foreground">Last Run</div>
+              <div className="text-sm font-semibold mt-1">{lastRun ? fmtDate(lastRun.startedAt) : "Never"}</div>
+              {lastRun && (
+                <div className="text-xs text-muted-foreground mt-1">{triggerLabel(lastRun.triggeredBy)}</div>
+              )}
+            </div>
+            <div className="rounded border p-3">
+              <div className="text-xs text-muted-foreground">Files Deleted (last run)</div>
+              <div className="text-sm font-semibold mt-1">{lastRun?.deleted ?? "—"}</div>
+              {lastRun && lastRun.dryRun && (
+                <div className="text-xs text-amber-600 mt-1">Dry run — nothing was deleted</div>
+              )}
+            </div>
+            <div className="rounded border p-3">
+              <div className="text-xs text-muted-foreground">Successful runs (7d)</div>
+              <div className="text-sm font-semibold mt-1 text-green-700">{successInLast7}</div>
+            </div>
+            <div className="rounded border p-3">
+              <div className="text-xs text-muted-foreground">Runs with errors (7d)</div>
+              <div className={`text-sm font-semibold mt-1 ${errorInLast7 > 0 ? "text-red-700" : ""}`}>{errorInLast7}</div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Switch checked={dryRun} onCheckedChange={setDryRun} disabled={running} />
+              <Label className="cursor-pointer" onClick={() => !running && setDryRun(!dryRun)}>
+                Dry-run (preview only — no deletes)
+              </Label>
+            </div>
+            <Button onClick={triggerRun} disabled={running} size="sm">
+              <Play className="w-4 h-4 mr-1" />
+              {running ? "Running…" : dryRun ? "Run dry-run now" : "Run cleanup now"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || running}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`} />Refresh
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Recent Runs</CardTitle>
+          <CardDescription>Showing the {runs.length} most recent runs (newest first).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {!loading && runs.length === 0 && (
+            <p className="text-sm text-muted-foreground">No cleanup runs recorded yet. The first scheduled run will appear here.</p>
+          )}
+          {!loading && runs.length > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Trigger</TableHead>
+                    <TableHead className="text-right">Scanned</TableHead>
+                    <TableHead className="text-right">Candidates</TableHead>
+                    <TableHead className="text-right">Orphans</TableHead>
+                    <TableHead className="text-right">Deleted</TableHead>
+                    <TableHead className="text-right">Errors</TableHead>
+                    <TableHead className="text-right">Age</TableHead>
+                    <TableHead className="text-right">Duration</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {runs.map((r) => {
+                    const failed = !!r.errorMessage || r.errors > 0;
+                    const inProgress = !r.finishedAt;
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="whitespace-nowrap">{fmtDate(r.startedAt)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">{triggerLabel(r.triggeredBy)}</Badge>
+                          {r.dryRun && <Badge className="ml-1 text-xs bg-amber-100 text-amber-800">Dry</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right">{r.scanned}</TableCell>
+                        <TableCell className="text-right">{r.candidates}</TableCell>
+                        <TableCell className="text-right">{r.orphans}</TableCell>
+                        <TableCell className="text-right font-medium">{r.deleted}</TableCell>
+                        <TableCell className={`text-right ${r.errors > 0 ? "text-red-700 font-semibold" : ""}`}>{r.errors}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{r.ageDays}d</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{fmtDuration(r.durationMs)}</TableCell>
+                        <TableCell>
+                          {inProgress ? (
+                            <Badge className="bg-blue-100 text-blue-800">Running</Badge>
+                          ) : failed ? (
+                            <Badge className="bg-red-100 text-red-800 flex items-center gap-1 w-fit">
+                              <AlertTriangle className="w-3 h-3" />
+                              {r.errorMessage ? "Failed" : "Errors"}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-green-100 text-green-800">OK</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {runs.some(r => r.errorMessage) && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  {runs.filter(r => r.errorMessage).slice(0, 3).map(r => (
+                    <div key={r.id}>
+                      <span className="text-red-700">Run #{r.id}:</span> {r.errorMessage}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SystemConfigPage() {
@@ -913,6 +1151,7 @@ export default function SystemConfigPage() {
             <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
             <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
             <TabsTrigger value="leave-blackouts">Leave Blackouts</TabsTrigger>
+            <TabsTrigger value="storage-cleanup">Storage Cleanup</TabsTrigger>
           </TabsList>
 
           <TabsContent value="org" className="mt-4"><OrgProfileTab /></TabsContent>
@@ -924,6 +1163,7 @@ export default function SystemConfigPage() {
           <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
           <TabsContent value="custom-fields" className="mt-4"><CustomEmployeeFieldsTab /></TabsContent>
           <TabsContent value="leave-blackouts" className="mt-4"><LeaveBlackoutsTab /></TabsContent>
+          <TabsContent value="storage-cleanup" className="mt-4"><StorageCleanupTab /></TabsContent>
         </Tabs>
       </div>
     </MainLayout>

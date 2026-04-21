@@ -220,6 +220,7 @@ import type {
   ListSalaryRevisionsParams,
   ListSalaryStructuresParams,
   ListSelfAppraisalsParams,
+  ListStorageCleanupRunsParams,
   ListTaxDeclarationsParams,
   LoanRepayment,
   ManagerEvaluation,
@@ -277,6 +278,8 @@ import type {
   ShiftTemplate,
   StatusCount,
   StatutoryReport,
+  StorageCleanupRun,
+  StorageCleanupRunResult,
   SubmitExitInterviewBody,
   SubmitFeedbackBody,
   SubmitLeaveApplicationBody,
@@ -293,6 +296,8 @@ import type {
   TicketAssignment,
   TicketAttachment,
   TicketComment,
+  TriggerStorageCleanupRun500,
+  TriggerStorageCleanupRunBody,
   UpdateCandidateBody,
   UpdateClearanceTaskBody,
   UpdateDepartmentBody,
@@ -26582,6 +26587,200 @@ export const useDeleteApprovalChain = <
   TContext
 > => {
   return useMutation(getDeleteApprovalChainMutationOptions(options));
+};
+
+/**
+ * @summary List recent orphan-attachment cleanup runs (super admin only)
+ */
+export const getListStorageCleanupRunsUrl = (
+  params?: ListStorageCleanupRunsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/storage-cleanup/runs?${stringifiedParams}`
+    : `/api/storage-cleanup/runs`;
+};
+
+export const listStorageCleanupRuns = async (
+  params?: ListStorageCleanupRunsParams,
+  options?: RequestInit,
+): Promise<StorageCleanupRun[]> => {
+  return customFetch<StorageCleanupRun[]>(
+    getListStorageCleanupRunsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListStorageCleanupRunsQueryKey = (
+  params?: ListStorageCleanupRunsParams,
+) => {
+  return [`/api/storage-cleanup/runs`, ...(params ? [params] : [])] as const;
+};
+
+export const getListStorageCleanupRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listStorageCleanupRuns>>,
+  TError = ErrorType<void>,
+>(
+  params?: ListStorageCleanupRunsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listStorageCleanupRuns>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListStorageCleanupRunsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listStorageCleanupRuns>>
+  > = ({ signal }) =>
+    listStorageCleanupRuns(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listStorageCleanupRuns>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListStorageCleanupRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listStorageCleanupRuns>>
+>;
+export type ListStorageCleanupRunsQueryError = ErrorType<void>;
+
+/**
+ * @summary List recent orphan-attachment cleanup runs (super admin only)
+ */
+
+export function useListStorageCleanupRuns<
+  TData = Awaited<ReturnType<typeof listStorageCleanupRuns>>,
+  TError = ErrorType<void>,
+>(
+  params?: ListStorageCleanupRunsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listStorageCleanupRuns>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListStorageCleanupRunsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Manually trigger an orphan-attachment cleanup run (super admin only)
+ */
+export const getTriggerStorageCleanupRunUrl = () => {
+  return `/api/storage-cleanup/run`;
+};
+
+export const triggerStorageCleanupRun = async (
+  triggerStorageCleanupRunBody?: TriggerStorageCleanupRunBody,
+  options?: RequestInit,
+): Promise<StorageCleanupRunResult> => {
+  return customFetch<StorageCleanupRunResult>(
+    getTriggerStorageCleanupRunUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(triggerStorageCleanupRunBody),
+    },
+  );
+};
+
+export const getTriggerStorageCleanupRunMutationOptions = <
+  TError = ErrorType<void | TriggerStorageCleanupRun500>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triggerStorageCleanupRun>>,
+    TError,
+    { data: BodyType<TriggerStorageCleanupRunBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof triggerStorageCleanupRun>>,
+  TError,
+  { data: BodyType<TriggerStorageCleanupRunBody> },
+  TContext
+> => {
+  const mutationKey = ["triggerStorageCleanupRun"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof triggerStorageCleanupRun>>,
+    { data: BodyType<TriggerStorageCleanupRunBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return triggerStorageCleanupRun(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TriggerStorageCleanupRunMutationResult = NonNullable<
+  Awaited<ReturnType<typeof triggerStorageCleanupRun>>
+>;
+export type TriggerStorageCleanupRunMutationBody =
+  BodyType<TriggerStorageCleanupRunBody>;
+export type TriggerStorageCleanupRunMutationError =
+  ErrorType<void | TriggerStorageCleanupRun500>;
+
+/**
+ * @summary Manually trigger an orphan-attachment cleanup run (super admin only)
+ */
+export const useTriggerStorageCleanupRun = <
+  TError = ErrorType<void | TriggerStorageCleanupRun500>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof triggerStorageCleanupRun>>,
+    TError,
+    { data: BodyType<TriggerStorageCleanupRunBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof triggerStorageCleanupRun>>,
+  TError,
+  { data: BodyType<TriggerStorageCleanupRunBody> },
+  TContext
+> => {
+  return useMutation(getTriggerStorageCleanupRunMutationOptions(options));
 };
 
 /**

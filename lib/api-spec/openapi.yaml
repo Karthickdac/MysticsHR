@@ -5969,6 +5969,63 @@ paths:
         '204':
           description: Deleted
 
+  /storage-cleanup/runs:
+    get:
+      operationId: listStorageCleanupRuns
+      tags: [system-config]
+      summary: List recent orphan-attachment cleanup runs (super admin only)
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Most recent cleanup runs, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StorageCleanupRun'
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+
+  /storage-cleanup/run:
+    post:
+      operationId: triggerStorageCleanupRun
+      tags: [system-config]
+      summary: Manually trigger an orphan-attachment cleanup run (super admin only)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dryRun:
+                  type: boolean
+                  description: If true, list candidates but do not delete
+                  default: false
+      responses:
+        '200':
+          description: Run summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageCleanupRunResult'
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+        '500':
+          description: Cleanup failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  detail: { type: string }
+
   /role-permissions:
     get:
       operationId: getRolePermissions
@@ -9362,3 +9419,36 @@ components:
           items:
             type: string
             enum: [super_admin, hr_manager, hr_executive, hod, payroll_admin, employee]
+
+    StorageCleanupRun:
+      type: object
+      description: A single execution of the orphan-attachment cleanup job.
+      properties:
+        id: { type: integer }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        scanned: { type: integer, description: "Total objects scanned in storage" }
+        candidates: { type: integer, description: "Objects older than the age threshold" }
+        orphans: { type: integer, description: "Candidates with no matching attachment row" }
+        deleted: { type: integer, description: "Successfully deleted objects" }
+        errors: { type: integer, description: "Delete failures during the run" }
+        ageDays: { type: integer, description: "Age threshold (in days) used for this run" }
+        dryRun: { type: boolean }
+        durationMs: { type: integer, nullable: true }
+        triggeredBy: { type: string, description: "'cron' or 'manual:<userId>'" }
+        errorMessage: { type: string, nullable: true }
+      required: [id, startedAt, scanned, candidates, orphans, deleted, errors, ageDays, dryRun, triggeredBy]
+
+    StorageCleanupRunResult:
+      type: object
+      description: Summary returned from a cleanup run trigger.
+      properties:
+        scanned: { type: integer }
+        candidates: { type: integer }
+        orphans: { type: integer }
+        deleted: { type: integer }
+        errors: { type: integer }
+        ageDays: { type: integer }
+        dryRun: { type: boolean }
+        runId: { type: integer, nullable: true }
+      required: [scanned, candidates, orphans, deleted, errors, ageDays, dryRun]

@@ -1270,7 +1270,7 @@ export function startScheduler(_port: number) {
   // At 03:15 daily — delete orphaned ticket attachment objects from object
   // storage (>7 days old with no ticket_attachments row).
   cron.schedule("15 3 * * *", () => {
-    void cleanupOrphanedAttachments();
+    void cleanupOrphanedAttachments({ triggeredBy: "cron" });
   });
   // At 02:00 on Jan 1 (server local time) — auto year-end leave carry-forward
   // for the just-finished year. Idempotent — safe even if HR also triggered
