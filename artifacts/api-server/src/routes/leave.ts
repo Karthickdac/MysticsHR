@@ -577,6 +577,99 @@ router.put("/leave/applications/:id", requireHrmsUser, requireRole(...HR_ROLES),
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// One-time backfill: walk every Approved leave application and run the same
+// attendance sync used by the live approval path. Idempotent — re-running it
+// is safe because applyLeaveToAttendance only upgrades "Absent" /
+// "Regularization Pending" rows and inserts missing days; HR-overridden rows
+// and other statuses are left untouched. Restricted to super_admin.
+// Stable lock key for the backfill operation (chosen arbitrarily; just needs
+// to be unique across the application's advisory-lock namespace).
+const BACKFILL_LOCK_KEY = 729103948;
+
+router.post("/leave/backfill-attendance", requireHrmsUser, requireRole("super_admin"), async (req, res) => {
+  try {
+    const { dryRun } = req.body as { dryRun?: boolean } ?? {};
+
+    // Serialize concurrent backfill runs with a Postgres advisory lock so two
+    // admins firing the endpoint simultaneously cannot duplicate-insert
+    // attendance rows (no unique constraint exists on (employee_id, date) yet
+    // — see follow-up).
+    const [{ locked }] = await db.execute<{ locked: boolean }>(
+      sql`SELECT pg_try_advisory_lock(${BACKFILL_LOCK_KEY}) AS locked`,
+    ) as unknown as { locked: boolean }[];
+    if (!locked) {
+      res.status(409).json({ error: "A backfill run is already in progress" });
+      return;
+    }
+
+    let summary: {
+      applicationsProcessed: number;
+      rowsInserted: number;
+      rowsUpdated: number;
+      failures: { id: number; error: string }[];
+      dryRun: boolean;
+    };
+    try {
+      summary = await runBackfill(dryRun ?? false);
+    } finally {
+      await db.execute(sql`SELECT pg_advisory_unlock(${BACKFILL_LOCK_KEY})`);
+    }
+
+    await logAudit({
+      user: req.hrmsUser,
+      action: dryRun ? "BACKFILL_LEAVE_ATTENDANCE_DRYRUN" : "BACKFILL_LEAVE_ATTENDANCE",
+      module: "Leave",
+      newValue: `apps=${summary.applicationsProcessed} inserted=${summary.rowsInserted} updated=${summary.rowsUpdated} failed=${summary.failures.length}`,
+      ipAddress: req.ip,
+    });
+
+    res.json(summary);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+async function runBackfill(dryRun: boolean) {
+  const approved = await db
+    .select({
+      id: leaveApplicationsTable.id,
+      employeeId: leaveApplicationsTable.employeeId,
+      fromDate: leaveApplicationsTable.fromDate,
+      toDate: leaveApplicationsTable.toDate,
+    })
+    .from(leaveApplicationsTable)
+    .where(eq(leaveApplicationsTable.status, "Approved"));
+
+  let totalInserted = 0;
+  let totalUpdated = 0;
+  const failures: { id: number; error: string }[] = [];
+
+  for (const app of approved) {
+    try {
+      if (dryRun) continue;
+      const counts = await db.transaction(async (tx) =>
+        applyLeaveToAttendance(
+          tx,
+          app.id,
+          app.employeeId,
+          app.fromDate as string,
+          app.toDate as string,
+        ),
+      );
+      totalInserted += counts.inserted;
+      totalUpdated += counts.updated;
+    } catch (e) {
+      failures.push({ id: app.id, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  return {
+    applicationsProcessed: approved.length,
+    rowsInserted: totalInserted,
+    rowsUpdated: totalUpdated,
+    failures,
+    dryRun,
+  };
+}
+
 router.post("/leave/applications", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const { leaveTypeId, fromDate, toDate, isHalfDay, halfDaySession, reason, documentUrl, lopConfirmed } = req.body as {

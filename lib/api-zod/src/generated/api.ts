@@ -3386,6 +3386,26 @@ export const SubmitLeaveApplicationBody = zod.object({
 });
 
 /**
+ * @summary Admin one-time backfill of attendance for previously-approved leaves
+ */
+export const BackfillLeaveAttendanceBody = zod.object({
+  dryRun: zod.boolean().optional(),
+});
+
+export const BackfillLeaveAttendanceResponse = zod.object({
+  applicationsProcessed: zod.number(),
+  rowsInserted: zod.number(),
+  rowsUpdated: zod.number(),
+  dryRun: zod.boolean(),
+  failures: zod.array(
+    zod.object({
+      id: zod.number(),
+      error: zod.string(),
+    }),
+  ),
+});
+
+/**
  * @summary Get a leave application
  */
 export const GetLeaveApplicationParams = zod.object({

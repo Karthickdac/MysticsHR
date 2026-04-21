@@ -30,7 +30,7 @@ export async function applyLeaveToAttendance(
   employeeId: number,
   fromDate: string,
   toDate: string,
-): Promise<void> {
+): Promise<{ inserted: number; updated: number }> {
   const note = autoNote(leaveAppId);
   const existing = await tx
     .select({
@@ -70,6 +70,7 @@ export async function applyLeaveToAttendance(
   if (toInsert.length > 0) {
     await tx.insert(attendanceRecordsTable).values(toInsert);
   }
+  return { inserted: toInsert.length, updated: toUpdate.length };
 }
 
 /**

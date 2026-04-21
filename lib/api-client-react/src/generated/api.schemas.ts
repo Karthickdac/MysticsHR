@@ -1595,6 +1595,19 @@ export interface SubmitLeaveApplicationBody {
   lopConfirmed?: boolean;
 }
 
+export type LeaveBackfillSummaryFailuresItem = {
+  id: number;
+  error: string;
+};
+
+export interface LeaveBackfillSummary {
+  applicationsProcessed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  dryRun: boolean;
+  failures: LeaveBackfillSummaryFailuresItem[];
+}
+
 export interface EditLeaveDatesBody {
   fromDate: string;
   toDate: string;
@@ -3534,6 +3547,10 @@ export type ListLeaveApplicationsParams = {
   toDate?: string;
   departmentId?: number;
   leaveTypeId?: number;
+};
+
+export type BackfillLeaveAttendanceBody = {
+  dryRun?: boolean;
 };
 
 export type CancelActionLeaveApplicationBodyAction =

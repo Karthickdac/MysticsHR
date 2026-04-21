@@ -33,6 +33,7 @@ import type {
   AttendanceRecord,
   AttendanceRegularization,
   AuditLogListResponse,
+  BackfillLeaveAttendanceBody,
   BlackoutDate,
   BulkImportResult,
   CalibrationRecord,
@@ -173,6 +174,7 @@ import type {
   JobRequisition,
   LeaveActionBody,
   LeaveApplication,
+  LeaveBackfillSummary,
   LeaveBalance,
   LeaveCalendarEntry,
   LeavePolicy,
@@ -11982,6 +11984,93 @@ export const useSubmitLeaveApplication = <
   TContext
 > => {
   return useMutation(getSubmitLeaveApplicationMutationOptions(options));
+};
+
+/**
+ * @summary Admin one-time backfill of attendance for previously-approved leaves
+ */
+export const getBackfillLeaveAttendanceUrl = () => {
+  return `/api/leave/backfill-attendance`;
+};
+
+export const backfillLeaveAttendance = async (
+  backfillLeaveAttendanceBody?: BackfillLeaveAttendanceBody,
+  options?: RequestInit,
+): Promise<LeaveBackfillSummary> => {
+  return customFetch<LeaveBackfillSummary>(getBackfillLeaveAttendanceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(backfillLeaveAttendanceBody),
+  });
+};
+
+export const getBackfillLeaveAttendanceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backfillLeaveAttendance>>,
+    TError,
+    { data: BodyType<BackfillLeaveAttendanceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof backfillLeaveAttendance>>,
+  TError,
+  { data: BodyType<BackfillLeaveAttendanceBody> },
+  TContext
+> => {
+  const mutationKey = ["backfillLeaveAttendance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof backfillLeaveAttendance>>,
+    { data: BodyType<BackfillLeaveAttendanceBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return backfillLeaveAttendance(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BackfillLeaveAttendanceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof backfillLeaveAttendance>>
+>;
+export type BackfillLeaveAttendanceMutationBody =
+  BodyType<BackfillLeaveAttendanceBody>;
+export type BackfillLeaveAttendanceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Admin one-time backfill of attendance for previously-approved leaves
+ */
+export const useBackfillLeaveAttendance = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof backfillLeaveAttendance>>,
+    TError,
+    { data: BodyType<BackfillLeaveAttendanceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof backfillLeaveAttendance>>,
+  TError,
+  { data: BodyType<BackfillLeaveAttendanceBody> },
+  TContext
+> => {
+  return useMutation(getBackfillLeaveAttendanceMutationOptions(options));
 };
 
 /**

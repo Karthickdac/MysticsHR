@@ -2565,6 +2565,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeaveApplication"
 
+  /leave/backfill-attendance:
+    post:
+      operationId: backfillLeaveAttendance
+      tags: [Leave]
+      summary: Admin one-time backfill of attendance for previously-approved leaves
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dryRun: { type: boolean }
+      responses:
+        "200":
+          description: Backfill summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveBackfillSummary"
+
   /leave/applications/{id}:
     get:
       operationId: getLeaveApplication
@@ -7518,6 +7539,23 @@ components:
         reason: { type: string }
         documentUrl: { type: ["string", "null"] }
         lopConfirmed: { type: boolean }
+
+    LeaveBackfillSummary:
+      type: object
+      required: [applicationsProcessed, rowsInserted, rowsUpdated, failures, dryRun]
+      properties:
+        applicationsProcessed: { type: integer }
+        rowsInserted: { type: integer }
+        rowsUpdated: { type: integer }
+        dryRun: { type: boolean }
+        failures:
+          type: array
+          items:
+            type: object
+            required: [id, error]
+            properties:
+              id: { type: integer }
+              error: { type: string }
 
     EditLeaveDatesBody:
       type: object
