@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { dispatchNotification } from "../lib/notification-service";
+import { getUsersByRoles } from "./system-config";
 import { db } from "../lib/db";
 import {
   helpdeskTicketsTable,
@@ -97,6 +98,57 @@ async function autoAssignForCategory(category: string): Promise<number | null> {
   return null;
 }
 
+// Shared SLA escalation: creates SLA log + in-app notifications + dispatches email/WhatsApp.
+// Idempotent: callers should only invoke when slaEscalatedAt is null. The DB update sets escalated=true
+// before any side-effects, but since dispatch is fire-and-forget we accept a small risk of duplicate
+// dispatch under race conditions (acceptable per task notification idempotency expectations).
+async function escalateSlaBreach(ticket: typeof helpdeskTicketsTable.$inferSelect, at: Date) {
+  await db.update(helpdeskTicketsTable)
+    .set({ slaBreached: true, slaEscalatedAt: at })
+    .where(eq(helpdeskTicketsTable.id, ticket.id));
+  await db.insert(ticketSlaLogsTable).values({
+    ticketId: ticket.id,
+    event: `SLA BREACH: Ticket #${ticket.id} "${ticket.subject}" is overdue. Assignee: user ${ticket.assignedToUserId ?? "unassigned"}.`,
+  });
+
+  const hrUsers = await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
+    .from(hrmsUsersTable)
+    .where(or(
+      eq(hrmsUsersTable.role, "hr_manager"),
+      eq(hrmsUsersTable.role, "super_admin"),
+      eq(hrmsUsersTable.role, "hod"),
+    ));
+  const recipients: Array<{ id: number; email: string | null; name: string | null; employeeId: number | null }> = [...hrUsers];
+  if (ticket.assignedToUserId && !recipients.find(r => r.id === ticket.assignedToUserId)) {
+    const [assignee] = await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
+      .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, ticket.assignedToUserId)).limit(1);
+    if (assignee) recipients.push(assignee);
+  }
+
+  for (const r of recipients) {
+    await db.insert(userNotificationsTable).values({
+      recipientUserId: r.id,
+      title: "SLA Breach Alert",
+      message: `Ticket #${ticket.id} "${ticket.subject}" has breached its SLA deadline. Immediate action required.`,
+      entityType: "helpdesk_ticket",
+      entityId: ticket.id,
+    }).catch(() => {});
+
+    if (r.email) {
+      dispatchNotification({
+        eventType: "helpdesk_sla_breach", module: "helpdesk",
+        recipientEmail: r.email, recipientName: r.name ?? undefined,
+        recipientEmployeeDbId: r.employeeId,
+        variables: {
+          ticketId: String(ticket.id), subject: ticket.subject,
+          recipientName: r.name ?? "Team Member",
+        },
+        entityType: "helpdesk_ticket", entityId: ticket.id,
+      }).catch(() => {});
+    }
+  }
+}
+
 async function enrichTicket(ticketInput: typeof helpdeskTicketsTable.$inferSelect) {
   let ticket = ticketInput;
   const [raisedBy] = ticket.raisedByEmployeeId
@@ -112,38 +164,9 @@ async function enrichTicket(ticketInput: typeof helpdeskTicketsTable.$inferSelec
   const isOpenStatus = !["Resolved", "Closed"].includes(ticket.status);
   const slaBreached = !!(ticket.slaDeadline && now > new Date(ticket.slaDeadline) && isOpenStatus);
 
-  // Lazy SLA escalation: if breach is newly detected and not yet logged, write escalation log + notifications
+  // Lazy SLA escalation: if breach is newly detected and not yet logged, escalate (logs + in-app + email/WhatsApp)
   if (slaBreached && !ticket.slaEscalatedAt) {
-    await db.update(helpdeskTicketsTable)
-      .set({ slaBreached: true, slaEscalatedAt: now })
-      .where(eq(helpdeskTicketsTable.id, ticket.id));
-    await db.insert(ticketSlaLogsTable).values({
-      ticketId: ticket.id,
-      event: `SLA BREACH: Ticket #${ticket.id} "${ticket.subject}" is overdue. Assignee: user ${ticket.assignedToUserId ?? "unassigned"}.`,
-    });
-
-    // Persist in-app notifications to HR managers, HOD (dept managers), and assignee
-    const hrUsers = await db.select({ id: hrmsUsersTable.id })
-      .from(hrmsUsersTable)
-      .where(or(
-        eq(hrmsUsersTable.role, "hr_manager"),
-        eq(hrmsUsersTable.role, "super_admin"),
-        eq(hrmsUsersTable.role, "hod"),
-      ));
-    const recipients: number[] = hrUsers.map(u => u.id);
-    if (ticket.assignedToUserId && !recipients.includes(ticket.assignedToUserId)) {
-      recipients.push(ticket.assignedToUserId);
-    }
-    for (const recipientUserId of recipients) {
-      await db.insert(userNotificationsTable).values({
-        recipientUserId,
-        title: "SLA Breach Alert",
-        message: `Ticket #${ticket.id} "${ticket.subject}" has breached its SLA deadline. Immediate action required.`,
-        entityType: "helpdesk_ticket",
-        entityId: ticket.id,
-      }).catch(() => {}); // non-blocking
-    }
-
+    try { await escalateSlaBreach(ticket, now); } catch (e) { console.error("[helpdesk] lazy escalate failed", e); }
     ticket = { ...ticket, slaBreached: true, slaEscalatedAt: now };
   }
 
@@ -259,6 +282,27 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
         }).catch(() => {});
       }
     }
+
+    // Broadcast new ticket to HR managers (super_admin + hr_manager) so HR is aware of incoming tickets
+    try {
+      const hrUsers = await getUsersByRoles(["super_admin", "hr_manager"]);
+      const raiserName = emp ? `Employee #${emp.id}` : "an employee";
+      for (const hr of hrUsers) {
+        if (!hr.email || hr.id === assignedToUserId) continue; // skip assignee (already notified) and self
+        dispatchNotification({
+          eventType: "helpdesk_ticket_created", module: "helpdesk",
+          recipientEmail: hr.email, recipientName: hr.name ?? undefined,
+          recipientEmployeeDbId: hr.employeeId,
+          variables: {
+            ticketId: String(ticket.id), subject, category, priority,
+            slaDeadline: slaDeadline.toISOString(),
+            raisedBy: raiserName, recipientName: hr.name ?? "HR",
+          },
+          entityType: "helpdesk_ticket", entityId: ticket.id,
+        }).catch(() => {});
+      }
+    } catch (e) { console.error("[helpdesk] failed to broadcast ticket created to HR", e); }
+
     res.status(201).json(await enrichTicket(ticket));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -327,6 +371,48 @@ router.put("/helpdesk/tickets/:id", requireHrmsUser, requireRole(...MANAGER_ROLE
     const [updated] = await db.update(helpdeskTicketsTable).set(updates)
       .where(eq(helpdeskTicketsTable.id, id)).returning();
 
+    // Notify raiser when status changes
+    if (status && status !== existing.status && existing.raisedByEmployeeId) {
+      try {
+        const [raiser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
+          .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, existing.raisedByEmployeeId)).limit(1);
+        if (raiser?.email) {
+          dispatchNotification({
+            eventType: "helpdesk_status_changed", module: "helpdesk",
+            recipientEmail: raiser.email, recipientName: raiser.name ?? undefined,
+            recipientEmployeeDbId: raiser.employeeId,
+            variables: {
+              ticketId: String(id), subject: existing.subject,
+              oldStatus: existing.status, newStatus: status,
+              recipientName: raiser.name ?? "Team Member",
+            },
+            entityType: "helpdesk_ticket", entityId: id,
+          }).catch(() => {});
+        }
+      } catch (e) { console.error("[helpdesk] failed to notify raiser of status change", e); }
+    }
+
+    // Notify new assignee when assignment changes
+    if (assignedToUserId !== undefined && assignedToUserId !== existing.assignedToUserId && assignedToUserId !== null) {
+      try {
+        const [newAssignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
+          .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, assignedToUserId)).limit(1);
+        if (newAssignee?.email) {
+          dispatchNotification({
+            eventType: "helpdesk_ticket_raised", module: "helpdesk",
+            recipientEmail: newAssignee.email, recipientName: newAssignee.name ?? undefined,
+            recipientEmployeeDbId: newAssignee.employeeId,
+            variables: {
+              ticketId: String(id), subject: existing.subject,
+              slaDeadline: (updates.slaDeadline ?? existing.slaDeadline ?? new Date()).toISOString(),
+              recipientName: newAssignee.name ?? "Team Member",
+            },
+            entityType: "helpdesk_ticket", entityId: id,
+          }).catch(() => {});
+        }
+      } catch (e) { console.error("[helpdesk] failed to notify new assignee", e); }
+    }
+
     res.json(await enrichTicket(updated));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -390,6 +476,45 @@ router.post("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...AL
     const [authorRow] = await db.select({ name: hrmsUsersTable.name }).from(hrmsUsersTable)
       .where(eq(hrmsUsersTable.id, u.id));
 
+    // Notify the "other party" on a public comment (skip internal comments)
+    if (!internalFlag) {
+      try {
+        const commentPreview = message.length > 200 ? message.slice(0, 200) + "…" : message;
+        const notifyMap = new Map<number, { email: string; name: string | null; employeeId: number | null }>();
+
+        // Look up raiser via employeeId
+        if (ticket.raisedByEmployeeId) {
+          const [raiser] = await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
+            .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, ticket.raisedByEmployeeId)).limit(1);
+          if (raiser?.email && raiser.id !== u.id) {
+            notifyMap.set(raiser.id, { email: raiser.email, name: raiser.name, employeeId: raiser.employeeId });
+          }
+        }
+        // Look up assignee (deduped against raiser via map keyed by user id)
+        if (ticket.assignedToUserId && ticket.assignedToUserId !== u.id && !notifyMap.has(ticket.assignedToUserId)) {
+          const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
+            .from(hrmsUsersTable).where(eq(hrmsUsersTable.id, ticket.assignedToUserId)).limit(1);
+          if (assignee?.email) {
+            notifyMap.set(ticket.assignedToUserId, { email: assignee.email, name: assignee.name, employeeId: assignee.employeeId });
+          }
+        }
+
+        for (const t of notifyMap.values()) {
+          dispatchNotification({
+            eventType: "helpdesk_comment_added", module: "helpdesk",
+            recipientEmail: t.email, recipientName: t.name ?? undefined,
+            recipientEmployeeDbId: t.employeeId,
+            variables: {
+              ticketId: String(ticketId), subject: ticket.subject,
+              commentAuthor: authorRow?.name ?? "A team member",
+              commentPreview, recipientName: t.name ?? "Team Member",
+            },
+            entityType: "helpdesk_ticket", entityId: ticketId,
+          }).catch(() => {});
+        }
+      } catch (e) { console.error("[helpdesk] failed to notify on comment", e); }
+    }
+
     res.status(201).json({ ...comment, authorName: authorRow?.name ?? null });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
@@ -409,41 +534,9 @@ router.post("/helpdesk/sla-check", requireHrmsUser, requireRole(...MANAGER_ROLES
       !t.slaEscalatedAt
     );
 
-    // Collect HR managers, HR heads, and HOD (department managers) to notify
-    const hrUsers = await db.select({ id: hrmsUsersTable.id, role: hrmsUsersTable.role })
-      .from(hrmsUsersTable)
-      .where(or(
-        eq(hrmsUsersTable.role, "hr_manager"),
-        eq(hrmsUsersTable.role, "super_admin"),
-        eq(hrmsUsersTable.role, "hod"),
-      ));
-
     let escalated = 0;
     for (const ticket of breachTargets) {
-      await db.update(helpdeskTicketsTable)
-        .set({ slaBreached: true, slaEscalatedAt: now })
-        .where(eq(helpdeskTicketsTable.id, ticket.id));
-
-      await db.insert(ticketSlaLogsTable).values({
-        ticketId: ticket.id,
-        event: `SLA BREACH: Ticket #${ticket.id} "${ticket.subject}" overdue. Assignee: user ${ticket.assignedToUserId ?? "unassigned"}.`,
-      });
-
-      // Create in-app notifications for HR managers and ticket assignee
-      const recipients: number[] = hrUsers.map(u => u.id);
-      if (ticket.assignedToUserId && !recipients.includes(ticket.assignedToUserId)) {
-        recipients.push(ticket.assignedToUserId);
-      }
-      for (const recipientUserId of recipients) {
-        await db.insert(userNotificationsTable).values({
-          recipientUserId,
-          title: "SLA Breach Alert",
-          message: `Ticket #${ticket.id} "${ticket.subject}" has breached its SLA deadline. Immediate action required.`,
-          entityType: "helpdesk_ticket",
-          entityId: ticket.id,
-        });
-      }
-
+      await escalateSlaBreach(ticket, now);
       escalated++;
     }
 
