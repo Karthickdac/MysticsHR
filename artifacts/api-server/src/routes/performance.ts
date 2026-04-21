@@ -639,17 +639,29 @@ router.get("/performance/cycle-averages", requireHrmsUser, requireRole(...MANAGE
     const targetId = Number(employeeId);
     if (!Number.isFinite(targetId)) { res.status(400).json({ error: "employeeId must be numeric" }); return; }
 
-    const scope: "department" | "company" = scopeRaw === "company" ? "company" : "department";
+    const scope: "department" | "designation" | "company" = scopeRaw === "company"
+      ? "company"
+      : scopeRaw === "designation" ? "designation" : "department";
     const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
 
-    // Look up target employee (need departmentId for department scope)
-    const [targetEmp] = await db.select({ id: employeesTable.id, departmentId: employeesTable.departmentId, managerId: employeesTable.managerId })
-      .from(employeesTable).where(eq(employeesTable.id, targetId));
+    // Look up target employee (need departmentId/designationId for the
+    // corresponding cohort scopes).
+    const [targetEmp] = await db.select({
+      id: employeesTable.id,
+      departmentId: employeesTable.departmentId,
+      designationId: employeesTable.designationId,
+      managerId: employeesTable.managerId,
+    }).from(employeesTable).where(eq(employeesTable.id, targetId));
     if (!targetEmp) { res.status(404).json({ error: "Employee not found" }); return; }
 
-    // HOD restrictions: only department scope, only for direct reports
+    // HOD restrictions: only department scope, only for direct reports.
+    // Designation and company scopes both expose data outside the HOD's
+    // immediate team, so they're HR-only.
     if (!isHrRole) {
-      if (scope === "company") { res.status(403).json({ error: "Company averages are restricted to HR" }); return; }
+      if (scope !== "department") {
+        res.status(403).json({ error: `${scope === "company" ? "Company" : "Designation"} averages are restricted to HR` });
+        return;
+      }
       const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));
@@ -662,11 +674,16 @@ router.get("/performance/cycle-averages", requireHrmsUser, requireRole(...MANAGE
     if (scope === "department" && !targetEmp.departmentId) {
       res.json([]); return;
     }
+    if (scope === "designation" && !targetEmp.designationId) {
+      res.json([]); return;
+    }
 
     // Build the peer pool: employees whose outcomes count toward the average.
     const peerConds = [];
     if (scope === "department") {
       peerConds.push(eq(employeesTable.departmentId, targetEmp.departmentId!));
+    } else if (scope === "designation") {
+      peerConds.push(eq(employeesTable.designationId, targetEmp.designationId!));
     }
     const peerEmployees = await db.select({ id: employeesTable.id })
       .from(employeesTable)

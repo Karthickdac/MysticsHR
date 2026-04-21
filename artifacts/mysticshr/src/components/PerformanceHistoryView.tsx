@@ -329,10 +329,12 @@ export default function PerformanceHistoryView({
   const isHodRole = role === "hod";
   const canCompare = isHrRole || isHodRole;
 
-  // HOD can only see department averages; HR can choose either scope.
+  // HOD can only see department averages; HR can choose any scope. The
+  // designation scope aggregates all employees sharing the target's job title
+  // regardless of department, useful for like-for-like calibration.
   const [showComparison, setShowComparison] = useState(false);
-  const [scope, setScope] = useState<"department" | "company">("department");
-  const effectiveScope: "department" | "company" = isHodRole ? "department" : scope;
+  const [scope, setScope] = useState<"department" | "designation" | "company">("department");
+  const effectiveScope: "department" | "designation" | "company" = isHodRole ? "department" : scope;
 
   const { data: cycles = [], isLoading: cyclesLoading } = useListPerformanceCycles({ status: "Closed" });
   const params = employeeId ? { employeeId } : undefined;
@@ -399,7 +401,11 @@ export default function PerformanceHistoryView({
     })
     .filter(d => d.finalScore !== null) as TrendPoint[];
 
-  const comparisonLabel = effectiveScope === "company" ? "Company average" : "Department average";
+  const comparisonLabel = effectiveScope === "company"
+    ? "Company average"
+    : effectiveScope === "designation"
+      ? "Designation average"
+      : "Department average";
 
   if (!employeeId) {
     return (
@@ -457,10 +463,13 @@ export default function PerformanceHistoryView({
                 type="single"
                 size="sm"
                 value={scope}
-                onValueChange={(v) => { if (v === "department" || v === "company") setScope(v); }}
+                onValueChange={(v) => {
+                  if (v === "department" || v === "designation" || v === "company") setScope(v);
+                }}
                 className="border rounded-md"
               >
                 <ToggleGroupItem value="department" className="text-xs px-3">Department</ToggleGroupItem>
+                <ToggleGroupItem value="designation" className="text-xs px-3">Designation</ToggleGroupItem>
                 <ToggleGroupItem value="company" className="text-xs px-3">Company</ToggleGroupItem>
               </ToggleGroup>
             )}

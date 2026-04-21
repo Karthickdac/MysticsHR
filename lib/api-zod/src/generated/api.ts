@@ -5382,13 +5382,16 @@ export const getCycleAveragesQueryScopeDefault = `department`;
 export const GetCycleAveragesQueryParams = zod.object({
   employeeId: zod.coerce.number(),
   scope: zod
-    .enum(["department", "company"])
-    .default(getCycleAveragesQueryScopeDefault),
+    .enum(["department", "designation", "company"])
+    .default(getCycleAveragesQueryScopeDefault)
+    .describe(
+      "Cohort over which peers are aggregated. `department` averages all employees in the target's department; `designation` averages all employees sharing the target's designation (job title) regardless of department, useful for like-for-like calibration discussions; `company` averages every employee. HOD users may only request `department`. Cycles where the target employee has no designation yield an empty result for `designation` scope.",
+    ),
 });
 
 export const GetCycleAveragesResponseItem = zod.object({
   cycleId: zod.number(),
-  scope: zod.enum(["department", "company"]),
+  scope: zod.enum(["department", "designation", "company"]),
   averageFinalScore: zod.number(),
   sampleSize: zod.number(),
 });

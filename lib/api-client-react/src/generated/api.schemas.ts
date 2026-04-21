@@ -2482,6 +2482,7 @@ export type CycleAverageScope =
 
 export const CycleAverageScope = {
   department: "department",
+  designation: "designation",
   company: "company",
 } as const;
 
@@ -4025,6 +4026,9 @@ export type ListManagerEvaluationsParams = {
 
 export type GetCycleAveragesParams = {
   employeeId: number;
+  /**
+   * Cohort over which peers are aggregated. `department` averages all employees in the target's department; `designation` averages all employees sharing the target's designation (job title) regardless of department, useful for like-for-like calibration discussions; `company` averages every employee. HOD users may only request `department`. Cycles where the target employee has no designation yield an empty result for `designation` scope.
+   */
   scope?: GetCycleAveragesScope;
 };
 
@@ -4033,6 +4037,7 @@ export type GetCycleAveragesScope =
 
 export const GetCycleAveragesScope = {
   department: "department",
+  designation: "designation",
   company: "company",
 } as const;
 
