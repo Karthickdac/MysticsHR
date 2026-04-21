@@ -17,12 +17,13 @@ function fmtTime(ts: string | null | undefined): string {
 }
 
 function fmtElapsed(fromIso: string, now: number): string {
-  const ms = now - new Date(fromIso).getTime();
-  if (ms < 0) return "0m";
-  const totalMins = Math.floor(ms / 60000);
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const ms = Math.max(0, now - new Date(fromIso).getTime());
+  const totalSecs = Math.floor(ms / 1000);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}h ${pad(m)}m ${pad(s)}s` : `${m}m ${pad(s)}s`;
 }
 
 function fmtMinutes(mins: number | null | undefined): string {
@@ -40,10 +41,16 @@ export function ClockInWidget() {
   const [now, setNow] = useState(Date.now());
   const [actionError, setActionError] = useState<string>("");
 
+  // Tick every second so the "Elapsed" timer updates smoothly while the
+  // employee is clocked in. Pause the interval otherwise to avoid
+  // unnecessary re-renders. No network calls — purely client-side.
+  const isTicking = data?.attendanceStatus === "Clocked In" && !!data?.record?.signInTime;
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30000);
+    if (!isTicking) return;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [isTicking]);
 
   async function handleClockIn() {
     setActionError("");
