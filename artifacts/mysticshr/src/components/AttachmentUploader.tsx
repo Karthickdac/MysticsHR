@@ -165,15 +165,38 @@ export function AttachmentList({
       {attachments.map(a => {
         const url = `/api/storage${a.objectPath}`;
         const canDelete = onDelete && (currentUserId == null || a.uploadedByUserId === currentUserId);
+        // Show an inline thumbnail for image MIME types so triagers can scan
+        // attached screenshots at a glance instead of opening each one. The
+        // thumbnail itself is a link that opens the full image in a new tab,
+        // matching the behaviour of the filename link beside it.
+        const isImage = typeof a.contentType === "string" && a.contentType.startsWith("image/");
         return (
           <li key={a.id} className="flex items-center justify-between gap-3 text-xs bg-white border border-slate-200 rounded px-2 py-1.5">
-            <div className="min-w-0 flex-1">
-              <a href={url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate block">
-                {a.fileName}
-              </a>
-              <div className="text-[11px] text-slate-500">
-                {formatBytes(a.fileSize)}
-                {a.uploadedByName ? ` · ${a.uploadedByName}` : ""}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {isImage && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 block w-12 h-12 rounded border border-slate-200 overflow-hidden bg-slate-50"
+                  title={`Open ${a.fileName} in a new tab`}
+                >
+                  <img
+                    src={url}
+                    alt={a.fileName}
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                  />
+                </a>
+              )}
+              <div className="min-w-0 flex-1">
+                <a href={url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate block">
+                  {a.fileName}
+                </a>
+                <div className="text-[11px] text-slate-500">
+                  {formatBytes(a.fileSize)}
+                  {a.uploadedByName ? ` · ${a.uploadedByName}` : ""}
+                </div>
               </div>
             </div>
             {canDelete && (
