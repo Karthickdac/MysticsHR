@@ -346,6 +346,9 @@ export async function dispatchNotification(params: {
   entityType?: string;
   entityId?: number;
   metadata?: Record<string, unknown>;
+  /** Mandatory/compliance notifications (e.g. annual Form 16) — when true,
+   * skip per-employee opt-out preferences. Default false. */
+  bypassPreferences?: boolean;
 }): Promise<void> {
   try {
     const templates = await db.select().from(notificationTemplatesTable).where(
@@ -364,7 +367,9 @@ export async function dispatchNotification(params: {
     // (e.g. external candidate emails).
     const recipientEmpId = params.recipientEmployeeDbId
       ?? await resolveEmployeeIdByEmail(params.recipientEmail);
-    const prefs = await getEmployeePreference(recipientEmpId, params.eventType);
+    const prefs = params.bypassPreferences
+      ? { email: true, whatsapp: true }
+      : await getEmployeePreference(recipientEmpId, params.eventType);
 
     if (params.recipientEmail && shouldEmail && prefs.email) {
       const subject = tpl?.emailSubject ? interpolate(tpl.emailSubject, vars) : getDefaultSubject(params.eventType);

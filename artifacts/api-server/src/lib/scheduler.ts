@@ -1095,22 +1095,23 @@ async function remindPendingPayrollApprovals() {
 }
 
 /**
- * Annual Form 16 dispatch — runs in early April. For every employee
- * (active or exited) who had at least one payroll record in the just-finished
- * financial year (April `year` → March `year+1`), email a link to download
- * their Form 16 PDF. Exited employees are intentionally included — they still
- * need Form 16 for tax filing.
+ * Annual Form 16 dispatch — runs in early April. For every active employee
+ * who had at least one payroll record in the just-finished financial year
+ * (April `year` → March `year+1`), email a link to download their Form 16 PDF.
  *
- * Idempotency is employee-based: each notification log is written with
- * `entityType = "form_16_fy_<year>"` and `entityId = employeeId`, so re-runs
- * (catch-up or manual) skip employees already successfully notified, even if
- * their email later changes.
+ * Compliance/mandatory: bypasses per-employee opt-out preferences so every
+ * eligible employee receives the email.
+ *
+ * Idempotency is employee+channel based: each notification log is written
+ * with `entityType = "form_16_fy_<year>"` and `entityId = employeeId`, and
+ * dedup considers only `channel='email'` rows with `status='sent'`. A failed
+ * email or a WhatsApp-only success will NOT block a future email retry.
  */
 export async function dispatchForm16ForFy(year: number): Promise<{ eligible: number; sent: number; skipped: number }> {
   const fyLabel = `${year}-${String(year + 1).slice(2)}`;
   const entityTypeKey = `form_16_fy_${year}`;
   try {
-    // All employees (active or not) who actually had payroll records in this FY.
+    // Active employees who actually had payroll records in this FY.
     const recipients = await db.selectDistinctOn([employeesTable.id], {
       id: employeesTable.id,
       firstName: employeesTable.firstName,
@@ -1120,21 +1121,27 @@ export async function dispatchForm16ForFy(year: number): Promise<{ eligible: num
       .from(employeesTable)
       .innerJoin(payrollRecordsTable, eq(payrollRecordsTable.employeeId, employeesTable.id))
       .innerJoin(payrollRunsTable, eq(payrollRecordsTable.payrollRunId, payrollRunsTable.id))
-      .where(sql`(${payrollRunsTable.periodYear} = ${year} AND ${payrollRunsTable.periodMonth} >= 4)
-          OR (${payrollRunsTable.periodYear} = ${year + 1} AND ${payrollRunsTable.periodMonth} <= 3)`);
+      .where(and(
+        eq(employeesTable.isActive, true),
+        sql`(${payrollRunsTable.periodYear} = ${year} AND ${payrollRunsTable.periodMonth} >= 4)
+            OR (${payrollRunsTable.periodYear} = ${year + 1} AND ${payrollRunsTable.periodMonth} <= 3)`,
+      ));
 
     if (recipients.length === 0) {
       logger.info({ fy: fyLabel }, "[scheduler] dispatchForm16ForFy — no eligible employees");
       return { eligible: 0, sent: 0, skipped: 0 };
     }
 
-    // Employee-based idempotency: skip employees we've already successfully notified
-    // for this FY. Keyed on entityId (= employeeId) under entityType=`form_16_fy_<year>`.
+    // Employee+email-channel idempotency: skip only employees whose email was
+    // already successfully sent for this FY. Failed emails or WhatsApp-only
+    // sends will not block a retry. Keyed on entityId (= employeeId) under
+    // entityType=`form_16_fy_<year>`.
     const sentLogs = await db.select({ entityId: notificationLogsTable.entityId })
       .from(notificationLogsTable)
       .where(and(
         eq(notificationLogsTable.eventType, "form_16_available"),
         eq(notificationLogsTable.entityType, entityTypeKey),
+        eq(notificationLogsTable.channel, "email"),
         eq(notificationLogsTable.status, "sent"),
       ));
     const alreadySent = new Set(sentLogs.map(l => l.entityId));
@@ -1160,6 +1167,7 @@ export async function dispatchForm16ForFy(year: number): Promise<{ eligible: num
           form16Url,
         },
         entityType: entityTypeKey, entityId: e.id,
+        bypassPreferences: true,
       }).then(() => { sent++; })
         .catch((err) => logger.warn({ err, employeeId: e.id, to: e.email }, "[scheduler] form_16 dispatch failed"));
     }
