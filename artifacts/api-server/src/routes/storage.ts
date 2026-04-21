@@ -12,7 +12,7 @@ import {
   helpdeskTicketsTable,
   employeesTable,
 } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -37,8 +37,9 @@ const ALLOWED_CONTENT_TYPES = new Set<string>([
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 // Returns true if the requesting user can access the ticket the attachment
-// belongs to. Mirrors checkTicketAccess() in helpdesk.ts but is intentionally
-// scoped to attachment-by-objectPath lookups so storage.ts stays self-contained.
+// belongs to. Mirrors checkTicketAccess() in helpdesk.ts: HR roles always
+// allowed; the assignee always allowed; the raising employee always allowed;
+// HODs allowed when the raiser is on their team (manager-of relationship).
 async function userCanAccessAttachment(userId: number, role: string, objectPath: string): Promise<boolean> {
   const [attachment] = await db.select({ ticketId: ticketAttachmentsTable.ticketId })
     .from(ticketAttachmentsTable)
@@ -46,16 +47,27 @@ async function userCanAccessAttachment(userId: number, role: string, objectPath:
     .limit(1);
   if (!attachment) return false;
   if (HR_ROLES.has(role)) return true;
+
   const [ticket] = await db.select({
     raisedByEmployeeId: helpdeskTicketsTable.raisedByEmployeeId,
     assignedToUserId: helpdeskTicketsTable.assignedToUserId,
   }).from(helpdeskTicketsTable).where(eq(helpdeskTicketsTable.id, attachment.ticketId));
   if (!ticket) return false;
   if (ticket.assignedToUserId === userId) return true;
-  // Raised-by check: find the employee record(s) belonging to this user.
+
+  // Find the employee record(s) belonging to this user (used for raised-by + HOD checks).
   const empRows = await db.select({ id: employeesTable.id })
     .from(employeesTable).where(eq(employeesTable.userId, userId));
   if (ticket.raisedByEmployeeId && empRows.some(e => e.id === ticket.raisedByEmployeeId)) return true;
+
+  if (role === "hod" && empRows.length > 0 && ticket.raisedByEmployeeId !== null) {
+    const hodEmpIds = empRows.map(e => e.id);
+    const reports = await db.select({ id: employeesTable.id }).from(employeesTable)
+      .where(inArray(employeesTable.managerId, hodEmpIds));
+    const teamIds = new Set<number>([...hodEmpIds, ...reports.map(r => r.id)]);
+    if (teamIds.has(ticket.raisedByEmployeeId)) return true;
+  }
+
   return false;
 }
 

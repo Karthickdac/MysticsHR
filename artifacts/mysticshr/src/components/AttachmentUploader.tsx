@@ -9,7 +9,19 @@ export type UploadedAttachment = {
 };
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const ALLOWED_PREFIXES = ["image/", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument", "text/plain"];
+// Mirrors the server-side allowlist in artifacts/api-server/src/routes/storage.ts
+const ALLOWED_TYPES = new Set<string>([
+  "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+]);
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -18,7 +30,7 @@ function formatBytes(n: number) {
 }
 
 function isAllowed(contentType: string) {
-  return ALLOWED_PREFIXES.some(p => contentType.startsWith(p));
+  return ALLOWED_TYPES.has(contentType);
 }
 
 export function AttachmentUploader({
