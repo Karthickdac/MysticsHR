@@ -590,29 +590,21 @@ router.post("/leave/backfill-attendance", requireHrmsUser, requireRole("super_ad
   try {
     const { dryRun } = req.body as { dryRun?: boolean } ?? {};
 
-    // Serialize concurrent backfill runs with a Postgres advisory lock so two
-    // admins firing the endpoint simultaneously cannot duplicate-insert
-    // attendance rows (no unique constraint exists on (employee_id, date) yet
-    // — see follow-up).
-    const lockResult = await db.execute<{ locked: boolean }>(
-      sql`SELECT pg_try_advisory_lock(${BACKFILL_LOCK_KEY}) AS locked`,
-    );
-    if (!lockResult.rows[0]?.locked) {
+    // Serialize concurrent backfill runs with a transaction-scoped advisory
+    // lock. pg_try_advisory_xact_lock binds the lock to the current
+    // transaction so it is guaranteed released on commit/rollback even with
+    // a pooled connection (no risk of leaking the lock across pg clients).
+    let lockBusy = false;
+    const summary = await db.transaction(async (tx) => {
+      const lockRes = await tx.execute<{ locked: boolean }>(
+        sql`SELECT pg_try_advisory_xact_lock(${BACKFILL_LOCK_KEY}) AS locked`,
+      );
+      if (!lockRes.rows[0]?.locked) { lockBusy = true; return null; }
+      return await runBackfillTx(tx, dryRun ?? false);
+    });
+    if (lockBusy || !summary) {
       res.status(409).json({ error: "A backfill run is already in progress" });
       return;
-    }
-
-    let summary: {
-      applicationsProcessed: number;
-      rowsInserted: number;
-      rowsUpdated: number;
-      failures: { id: number; error: string }[];
-      dryRun: boolean;
-    };
-    try {
-      summary = await runBackfill(dryRun ?? false);
-    } finally {
-      await db.execute(sql`SELECT pg_advisory_unlock(${BACKFILL_LOCK_KEY})`);
     }
 
     await logAudit({
@@ -627,8 +619,10 @@ router.post("/leave/backfill-attendance", requireHrmsUser, requireRole("super_ad
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-async function runBackfill(dryRun: boolean) {
-  const approved = await db
+type BackfillTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function runBackfillTx(tx: BackfillTx, dryRun: boolean) {
+  const approved = await tx
     .select({
       id: leaveApplicationsTable.id,
       employeeId: leaveApplicationsTable.employeeId,
@@ -645,9 +639,11 @@ async function runBackfill(dryRun: boolean) {
   for (const app of approved) {
     try {
       if (dryRun) continue;
-      const counts = await db.transaction(async (tx) =>
+      // Per-app savepoint so a single bad application aborts only its own
+      // changes, not the entire backfill batch.
+      const counts = await tx.transaction(async (sp) =>
         applyLeaveToAttendance(
-          tx,
+          sp,
           app.id,
           app.employeeId,
           app.fromDate as string,
