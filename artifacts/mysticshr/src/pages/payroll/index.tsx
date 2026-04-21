@@ -405,35 +405,40 @@ export function PayrollAnalyticsSection({
     ? `${analytics.windowFrom} → ${analytics.windowTo}`
     : "selected period";
 
-  // Aggregate window-over-prior-window variance for the KPI strip. Only counts
-  // months that have BOTH current and prior values, so partially-overlapping
-  // windows (e.g. only 6 of 12 months have last-year data) don't artificially
-  // skew the comparison. Headcount uses the average across paired months — sum
-  // doesn't make sense for a per-month snapshot — and we round to whole people.
+  // Aggregate window-over-prior-window variance for the KPI strip. Each metric
+  // is paired independently — a month with only e.g. prior gross (but no prior
+  // headcount) still counts toward the gross KPI. Headcount uses the average
+  // across paired months — sum is meaningless for a per-month snapshot — and is
+  // rounded to whole people for display.
   const aggregateVariance = (() => {
     if (!showPrior) return null;
-    let curGross = 0, priorGross = 0, curNet = 0, priorNet = 0;
-    let curEmp = 0, priorEmp = 0, paired = 0;
-    for (const p of trend as Array<{
+    type Row = {
       totalGross: number; totalNet: number; employees: number;
       priorTotalGross?: number | null; priorTotalNet?: number | null; priorEmployees?: number | null;
-    }>) {
-      if (p.priorTotalGross == null || p.priorTotalNet == null || p.priorEmployees == null) continue;
-      curGross += p.totalGross; priorGross += p.priorTotalGross;
-      curNet += p.totalNet; priorNet += p.priorTotalNet;
-      curEmp += p.employees; priorEmp += p.priorEmployees;
-      paired += 1;
-    }
-    if (paired === 0) return null;
+    };
+    const rows = trend as Row[];
     const pct = (cur: number, prior: number) => prior === 0 ? null : ((cur - prior) / prior) * 100;
+    function pairSum(curKey: keyof Row, priorKey: keyof Row): { cur: number; prior: number; paired: number } {
+      let cur = 0, prior = 0, paired = 0;
+      for (const r of rows) {
+        const p = r[priorKey] as number | null | undefined;
+        if (p == null) continue;
+        cur += r[curKey] as number; prior += p; paired += 1;
+      }
+      return { cur, prior, paired };
+    }
+    const gross = pairSum("totalGross", "priorTotalGross");
+    const net = pairSum("totalNet", "priorTotalNet");
+    const emp = pairSum("employees", "priorEmployees");
+    if (gross.paired === 0 && net.paired === 0 && emp.paired === 0) return null;
     return {
-      paired,
-      gross: { cur: curGross, prior: priorGross, pct: pct(curGross, priorGross) },
-      net: { cur: curNet, prior: priorNet, pct: pct(curNet, priorNet) },
+      gross: { cur: gross.cur, prior: gross.prior, pct: gross.paired ? pct(gross.cur, gross.prior) : null, paired: gross.paired },
+      net: { cur: net.cur, prior: net.prior, pct: net.paired ? pct(net.cur, net.prior) : null, paired: net.paired },
       headcount: {
-        cur: Math.round(curEmp / paired),
-        prior: Math.round(priorEmp / paired),
-        pct: pct(curEmp, priorEmp),
+        cur: emp.paired ? Math.round(emp.cur / emp.paired) : 0,
+        prior: emp.paired ? Math.round(emp.prior / emp.paired) : 0,
+        pct: emp.paired ? pct(emp.cur, emp.prior) : null,
+        paired: emp.paired,
       },
     };
   })();
@@ -466,10 +471,14 @@ export function PayrollAnalyticsSection({
               ].map(item => (
                 <div key={item.label} className="px-1">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{item.label}</p>
-                  <p className="text-base font-semibold leading-tight">{item.fmtVal(item.v.cur)}</p>
-                  <p className={`text-xs leading-tight ${pctColor(item.v.pct, item.invertColor)}`}>
-                    {fmtPct(item.v.pct)} <span className="text-muted-foreground">vs prev yr ({item.fmtVal(item.v.prior)})</span>
-                  </p>
+                  <p className="text-base font-semibold leading-tight">{item.v.paired > 0 ? item.fmtVal(item.v.cur) : "—"}</p>
+                  {item.v.paired > 0 ? (
+                    <p className={`text-xs leading-tight ${pctColor(item.v.pct, item.invertColor)}`}>
+                      {fmtPct(item.v.pct)} <span className="text-muted-foreground">vs prev yr ({item.fmtVal(item.v.prior)})</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs leading-tight text-muted-foreground">No prior-year data</p>
+                  )}
                 </div>
               ))}
             </div>
