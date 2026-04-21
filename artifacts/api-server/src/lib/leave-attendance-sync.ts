@@ -108,3 +108,44 @@ export async function revertLeaveFromAttendance(
     .set({ status: "Absent", notes: null, updatedAt: new Date() })
     .where(inArray(attendanceRecordsTable.id, ids));
 }
+
+/**
+ * Like {@link revertLeaveFromAttendance} but operates on an explicit list of
+ * dates (used when an HR edit shrinks a leave's date range and only specific
+ * days need to be reverted, not a contiguous sub-range). Same safety rules:
+ * only rows that are still status "On Leave" with the auto-note for this
+ * leave application are reverted to "Absent".
+ */
+export async function revertLeaveDaysFromAttendance(
+  tx: Tx,
+  leaveAppId: number,
+  employeeId: number,
+  dates: string[],
+): Promise<void> {
+  if (dates.length === 0) return;
+  const note = autoNote(leaveAppId);
+  const rows = await tx
+    .select({ id: attendanceRecordsTable.id })
+    .from(attendanceRecordsTable)
+    .where(
+      and(
+        eq(attendanceRecordsTable.employeeId, employeeId),
+        inArray(attendanceRecordsTable.attendanceDate, dates),
+        eq(attendanceRecordsTable.status, "On Leave"),
+        eq(attendanceRecordsTable.notes, note),
+      ),
+    );
+  if (rows.length === 0) return;
+  const ids = rows.map((r) => r.id);
+  await tx
+    .update(attendanceRecordsTable)
+    .set({ status: "Absent", notes: null, updatedAt: new Date() })
+    .where(inArray(attendanceRecordsTable.id, ids));
+}
+
+/** Enumerate all YYYY-MM-DD dates in [from, to] inclusive. */
+export function listDatesInRange(fromDate: string, toDate: string): string[] {
+  const out: string[] = [];
+  for (const d of iterateDates(fromDate, toDate)) out.push(d);
+  return out;
+}

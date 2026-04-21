@@ -91,6 +91,7 @@ import type {
   DocumentRequest,
   DocumentTemplate,
   DownloadIssuedDocumentParams,
+  EditLeaveDatesBody,
   Employee,
   EmployeeDocument,
   EmployeeEducation,
@@ -12069,6 +12070,94 @@ export function useGetLeaveApplication<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary HR edits an approved leave application's date range; auto-syncs attendance
+ */
+export const getEditLeaveApplicationDatesUrl = (id: number) => {
+  return `/api/leave/applications/${id}`;
+};
+
+export const editLeaveApplicationDates = async (
+  id: number,
+  editLeaveDatesBody: EditLeaveDatesBody,
+  options?: RequestInit,
+): Promise<LeaveApplication> => {
+  return customFetch<LeaveApplication>(getEditLeaveApplicationDatesUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(editLeaveDatesBody),
+  });
+};
+
+export const getEditLeaveApplicationDatesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof editLeaveApplicationDates>>,
+    TError,
+    { id: number; data: BodyType<EditLeaveDatesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof editLeaveApplicationDates>>,
+  TError,
+  { id: number; data: BodyType<EditLeaveDatesBody> },
+  TContext
+> => {
+  const mutationKey = ["editLeaveApplicationDates"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof editLeaveApplicationDates>>,
+    { id: number; data: BodyType<EditLeaveDatesBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return editLeaveApplicationDates(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EditLeaveApplicationDatesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof editLeaveApplicationDates>>
+>;
+export type EditLeaveApplicationDatesMutationBody =
+  BodyType<EditLeaveDatesBody>;
+export type EditLeaveApplicationDatesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary HR edits an approved leave application's date range; auto-syncs attendance
+ */
+export const useEditLeaveApplicationDates = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof editLeaveApplicationDates>>,
+    TError,
+    { id: number; data: BodyType<EditLeaveDatesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof editLeaveApplicationDates>>,
+  TError,
+  { id: number; data: BodyType<EditLeaveDatesBody> },
+  TContext
+> => {
+  return useMutation(getEditLeaveApplicationDatesMutationOptions(options));
+};
 
 /**
  * @summary HOD approves or rejects leave application

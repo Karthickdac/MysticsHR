@@ -4,7 +4,12 @@ import { dispatchNotification } from "../lib/notification-service";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { checkPayrollLock } from "../lib/payroll-lock";
-import { applyLeaveToAttendance, revertLeaveFromAttendance } from "../lib/leave-attendance-sync";
+import {
+  applyLeaveToAttendance,
+  revertLeaveFromAttendance,
+  revertLeaveDaysFromAttendance,
+  listDatesInRange,
+} from "../lib/leave-attendance-sync";
 import {
   leaveTypesTable,
   leavePoliciesTable,
@@ -416,6 +421,159 @@ router.get("/leave/applications/:id", requireHrmsUser, requireRole(...ALL_ROLES)
     // payroll_admin, hr_*, super_admin: unrestricted read
 
     res.json(app);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// HR edits an approved leave application's date range. Diffs the old vs new
+// range and: reverts the auto "On Leave" rows for days dropped from the range,
+// applies "On Leave" to days added, and adjusts the leave balance by the delta.
+// Days that already have HR-overridden attendance or non-auto notes are left
+// untouched (handled inside the sync helpers).
+router.put("/leave/applications/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const appId = Number(req.params.id);
+    const { fromDate, toDate, isHalfDay, halfDaySession, reason } = req.body as {
+      fromDate?: string; toDate?: string; isHalfDay?: boolean;
+      halfDaySession?: string | null; reason?: string;
+    };
+    if (!fromDate || !toDate) {
+      res.status(400).json({ error: "fromDate and toDate are required" });
+      return;
+    }
+    if (new Date(toDate) < new Date(fromDate)) {
+      res.status(400).json({ error: "toDate must be on or after fromDate" });
+      return;
+    }
+
+    const [app] = await db.select().from(leaveApplicationsTable).where(eq(leaveApplicationsTable.id, appId));
+    if (!app) { res.status(404).json({ error: "Not found" }); return; }
+    if (app.status !== "Approved") {
+      res.status(422).json({ error: "Only approved leave applications can be edited" });
+      return;
+    }
+
+    const oldFrom = app.fromDate as string;
+    const oldTo = app.toDate as string;
+    const oldIsHalfDay = app.isHalfDay as boolean;
+    const newIsHalfDay = isHalfDay ?? oldIsHalfDay;
+
+    // Block half-day toggles on multi-day ranges (mirrors submit-leave logic).
+    if (newIsHalfDay && fromDate !== toDate) {
+      res.status(400).json({ error: "Half-day leave must have fromDate === toDate" });
+      return;
+    }
+
+    const oldTotalDays = parseFloat(app.totalDays as string);
+    const newTotalDays = computeWorkingDays(fromDate, toDate, newIsHalfDay);
+    const delta = newTotalDays - oldTotalDays;
+
+    // Diff date ranges to know which days to revert vs apply.
+    const oldDays = new Set(listDatesInRange(oldFrom, oldTo));
+    const newDays = new Set(listDatesInRange(fromDate, toDate));
+    const removedDays = [...oldDays].filter((d) => !newDays.has(d));
+    const addedDays = [...newDays].filter((d) => !oldDays.has(d));
+    // Symmetric diff: only days that actually change need lock-checked.
+    const changedDays = [...removedDays, ...addedDays];
+
+    // Reject edits that change year (either endpoint), since balance ledgers
+    // are per-year. HR should cancel + re-apply for cross-year changes.
+    const oldYear = new Date(oldFrom).getFullYear();
+    if (
+      new Date(fromDate).getFullYear() !== oldYear ||
+      new Date(toDate).getFullYear() !== oldYear
+    ) {
+      res.status(400).json({ error: "Editing the leave year is not supported; cancel and re-apply instead" });
+      return;
+    }
+
+    // Payroll-lock guard: every (year, month) touched by the symmetric diff
+    // must be unlocked. Iterating over the actual changed days catches
+    // intermediate months that bare endpoint comparison would miss.
+    const touchedMonths = new Set<string>();
+    for (const d of changedDays) {
+      const dt = new Date(d);
+      touchedMonths.add(`${dt.getFullYear()}-${dt.getMonth() + 1}`);
+    }
+    for (const ym of touchedMonths) {
+      const [y, m] = ym.split("-").map(Number);
+      const lockErr = await checkPayrollLock(req.hrmsUser!.id, "edit_attendance", y, m, req.hrmsUser?.email ?? undefined);
+      if (lockErr) {
+        res.status(422).json({ error: `Payroll for ${y}-${String(m).padStart(2, "0")} is locked; cannot edit leave dates that affect it` });
+        return;
+      }
+    }
+
+    // Overlap guard: the new range must not collide with any other active
+    // leave application for the same employee (mirrors submit-leave logic).
+    if (addedDays.length > 0) {
+      const overlap = await db
+        .select({ id: leaveApplicationsTable.id })
+        .from(leaveApplicationsTable)
+        .where(
+          and(
+            eq(leaveApplicationsTable.employeeId, app.employeeId),
+            inArray(leaveApplicationsTable.status, ["Pending", "HOD Approved", "HR Approved", "Approved", "Cancel Requested"]),
+            lte(leaveApplicationsTable.fromDate, toDate),
+            gte(leaveApplicationsTable.toDate, fromDate),
+          ),
+        );
+      const collision = overlap.find((o) => o.id !== appId);
+      if (collision) {
+        res.status(422).json({ error: `Edited range overlaps with leave application #${collision.id}` });
+        return;
+      }
+    }
+
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx.update(leaveApplicationsTable)
+        .set({
+          fromDate,
+          toDate,
+          isHalfDay: newIsHalfDay,
+          halfDaySession: newIsHalfDay ? (halfDaySession ?? app.halfDaySession ?? "Forenoon") : null,
+          reason: reason ?? app.reason,
+          totalDays: String(newTotalDays),
+          updatedAt: new Date(),
+        })
+        .where(eq(leaveApplicationsTable.id, appId))
+        .returning();
+
+      if (delta !== 0) {
+        const [bal] = await tx.select().from(leaveBalancesTable).where(
+          and(
+            eq(leaveBalancesTable.employeeId, app.employeeId),
+            eq(leaveBalancesTable.leaveTypeId, app.leaveTypeId),
+            eq(leaveBalancesTable.year, oldYear),
+          ),
+        );
+        if (bal) {
+          // Floor at 0 so a downward delta on inconsistent historical data
+          // can never push `used` negative (corrupting the ledger).
+          await tx.update(leaveBalancesTable)
+            .set({ used: sql`GREATEST(0, ${leaveBalancesTable.used} + ${delta})`, updatedAt: new Date() })
+            .where(eq(leaveBalancesTable.id, bal.id));
+        }
+      }
+
+      // Revert dropped days, then apply the new full range (idempotent for
+      // days already correctly marked).
+      await revertLeaveDaysFromAttendance(tx, app.id, app.employeeId, removedDays);
+      await applyLeaveToAttendance(tx, app.id, app.employeeId, fromDate, toDate);
+
+      return row;
+    });
+
+    await logAudit({
+      user: req.hrmsUser,
+      action: "EDIT_LEAVE_DATES",
+      module: "Leave",
+      recordId: appId,
+      previousValue: `${oldFrom}~${oldTo} (${oldTotalDays}d)`,
+      newValue: `${fromDate}~${toDate} (${newTotalDays}d)`,
+      ipAddress: req.ip,
+    });
+
+    res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

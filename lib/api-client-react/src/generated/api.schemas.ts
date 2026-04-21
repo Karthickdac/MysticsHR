@@ -1595,6 +1595,15 @@ export interface SubmitLeaveApplicationBody {
   lopConfirmed?: boolean;
 }
 
+export interface EditLeaveDatesBody {
+  fromDate: string;
+  toDate: string;
+  isHalfDay?: boolean;
+  /** @nullable */
+  halfDaySession?: string | null;
+  reason?: string;
+}
+
 export type LeaveActionBodyAction =
   (typeof LeaveActionBodyAction)[keyof typeof LeaveActionBodyAction];
 

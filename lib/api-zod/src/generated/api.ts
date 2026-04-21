@@ -3425,6 +3425,53 @@ export const GetLeaveApplicationResponse = zod.object({
 });
 
 /**
+ * @summary HR edits an approved leave application's date range; auto-syncs attendance
+ */
+export const EditLeaveApplicationDatesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const EditLeaveApplicationDatesBody = zod.object({
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  isHalfDay: zod.boolean().optional(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string().optional(),
+});
+
+export const EditLeaveApplicationDatesResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  employeeName: zod.string().nullish(),
+  employeeCode: zod.string().nullish(),
+  departmentName: zod.string().nullish(),
+  leaveTypeId: zod.number(),
+  leaveTypeName: zod.string().nullish(),
+  leaveTypeCode: zod.string().nullish(),
+  fromDate: zod.coerce.date(),
+  toDate: zod.coerce.date(),
+  totalDays: zod.string(),
+  isHalfDay: zod.boolean(),
+  halfDaySession: zod.string().nullish(),
+  reason: zod.string(),
+  documentUrl: zod.string().nullish(),
+  status: zod.string(),
+  isLop: zod.boolean(),
+  lopConfirmed: zod.boolean(),
+  hodActionedById: zod.number().nullish(),
+  hodRemarks: zod.string().nullish(),
+  hodActionedAt: zod.coerce.date().nullish(),
+  hrActionedById: zod.number().nullish(),
+  hrRemarks: zod.string().nullish(),
+  hrActionedAt: zod.coerce.date().nullish(),
+  cancelledById: zod.number().nullish(),
+  cancellationReason: zod.string().nullish(),
+  cancelledAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary HOD approves or rejects leave application
  */
 export const HodActionLeaveParams = zod.object({

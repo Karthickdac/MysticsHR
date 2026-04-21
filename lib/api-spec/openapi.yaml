@@ -2579,6 +2579,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeaveApplication"
+    put:
+      operationId: editLeaveApplicationDates
+      tags: [Leave]
+      summary: HR edits an approved leave application's date range; auto-syncs attendance
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditLeaveDatesBody"
+      responses:
+        "200":
+          description: Updated leave application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveApplication"
 
   /leave/applications/{id}/hod-action:
     post:
@@ -7499,6 +7518,16 @@ components:
         reason: { type: string }
         documentUrl: { type: ["string", "null"] }
         lopConfirmed: { type: boolean }
+
+    EditLeaveDatesBody:
+      type: object
+      required: [fromDate, toDate]
+      properties:
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        isHalfDay: { type: boolean }
+        halfDaySession: { type: ["string", "null"] }
+        reason: { type: string }
 
     LeaveActionBody:
       type: object
