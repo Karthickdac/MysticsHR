@@ -140,7 +140,17 @@ export default function TicketDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm">{ticket.description}</p>
+          <p className="text-sm whitespace-pre-wrap">{ticket.description}</p>
+          {ticket.attachments && ticket.attachments.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-slate-700 mb-1.5">Attachments</p>
+              <AttachmentList
+                attachments={ticket.attachments}
+                onDelete={handleDeleteAttachment}
+                currentUserId={hrmsUser?.id ?? null}
+              />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Raised by: </span>

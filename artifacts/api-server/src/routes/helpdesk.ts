@@ -402,14 +402,10 @@ router.get("/helpdesk/tickets/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
       .orderBy(ticketAttachmentsTable.createdAt);
 
     const ticketLevelAttachments = attachmentRows.filter(a => a.commentId === null);
-    const visibleCommentIds = new Set(visibleComments.map(c => c.id));
     const commentsWithAttachments = visibleComments.map(c => ({
       ...c,
       attachments: attachmentRows.filter(a => a.commentId === c.id),
     }));
-    // Hide attachments that belong to internal comments the caller can't see.
-    const visibleCommentAttachments = attachmentRows.filter(a => a.commentId !== null && visibleCommentIds.has(a.commentId));
-    void visibleCommentAttachments; // kept for clarity; comments already carry their own attachments
 
     res.json({ ...enriched, comments: commentsWithAttachments, attachments: ticketLevelAttachments });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }

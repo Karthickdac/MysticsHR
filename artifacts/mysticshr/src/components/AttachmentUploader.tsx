@@ -49,11 +49,12 @@ export function AttachmentUploader({
         if (!isAllowed(file.type)) {
           throw new Error(`"${file.name}" file type (${file.type || "unknown"}) is not allowed`);
         }
-        const { uploadUrl, objectPath } = await requestUploadUrl({
-          fileName: file.name,
+        const { uploadURL, objectPath } = await requestUploadUrl({
+          name: file.name,
+          size: file.size,
           contentType: file.type,
         });
-        const putRes = await fetch(uploadUrl, {
+        const putRes = await fetch(uploadURL, {
           method: "PUT",
           headers: { "Content-Type": file.type },
           body: file,
