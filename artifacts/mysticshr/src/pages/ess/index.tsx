@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { AttachmentUploader, type UploadedAttachment } from "@/components/AttachmentUploader";
 import {
   User, FileText, Calendar, Clock, Target, Wallet, Home, Phone, AlertCircle,
   ChevronRight, CheckCircle2, Eye, Download, LifeBuoy, Plus, Ticket, Send, Bell,
@@ -192,14 +193,16 @@ function RaiseTicketModal({ open, onClose }: { open: boolean; onClose: () => voi
     priority: "Medium",
     attachmentUrl: null,
   });
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    create.mutate({ data: form }, {
+    create.mutate({ data: { ...form, attachments } }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getListHelpdeskTicketsQueryKey() });
         qc.invalidateQueries({ queryKey: getGetEssDashboardQueryKey() });
         setForm({ subject: "", description: "", category: "IT", priority: "Medium", attachmentUrl: null });
+        setAttachments([]);
         onClose();
       },
     });
@@ -253,14 +256,7 @@ function RaiseTicketModal({ open, onClose }: { open: boolean; onClose: () => voi
               required
             />
           </div>
-          <div>
-            <Label>Attachment URL (optional)</Label>
-            <Input
-              value={form.attachmentUrl ?? ""}
-              onChange={e => setForm(f => ({ ...f, attachmentUrl: e.target.value || null }))}
-              placeholder="https://... (link to screenshot, document, etc.)"
-            />
-          </div>
+          <AttachmentUploader value={attachments} onChange={setAttachments} disabled={create.isPending} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button

@@ -8,11 +8,12 @@ import {
   ticketCommentsTable,
   ticketSlaLogsTable,
   ticketAssignmentsTable,
+  ticketAttachmentsTable,
   userNotificationsTable,
   employeesTable,
   hrmsUsersTable,
 } from "@workspace/db/schema";
-import { eq, and, desc, inArray, or } from "drizzle-orm";
+import { eq, and, desc, inArray, or, isNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -149,6 +150,41 @@ async function escalateSlaBreach(ticket: typeof helpdeskTicketsTable.$inferSelec
   }
 }
 
+// Insert validated attachment rows for a ticket (and optionally a comment).
+// Each row is "promoted" — the file was already uploaded to object storage via
+// the presigned URL endpoint and the client passed the resulting metadata back.
+async function insertAttachments(
+  ticketId: number,
+  uploadedByUserId: number,
+  attachments: Array<{ objectPath: string; fileName: string; fileSize: number; contentType: string }>,
+  commentId: number | null = null,
+) {
+  if (!attachments.length) return [];
+  const rows = await db.insert(ticketAttachmentsTable).values(
+    attachments.map(a => ({
+      ticketId,
+      commentId,
+      uploadedByUserId,
+      fileName: a.fileName,
+      fileSize: a.fileSize,
+      contentType: a.contentType,
+      objectPath: a.objectPath,
+    })),
+  ).returning();
+  return rows;
+}
+
+function isValidUploadedAttachment(a: unknown): a is { objectPath: string; fileName: string; fileSize: number; contentType: string } {
+  if (!a || typeof a !== "object") return false;
+  const o = a as Record<string, unknown>;
+  return (
+    typeof o["objectPath"] === "string" && o["objectPath"].startsWith("/objects/") &&
+    typeof o["fileName"] === "string" && o["fileName"].length > 0 &&
+    typeof o["fileSize"] === "number" && Number.isFinite(o["fileSize"]) && o["fileSize"] >= 0 &&
+    typeof o["contentType"] === "string" && o["contentType"].length > 0
+  );
+}
+
 async function enrichTicket(ticketInput: typeof helpdeskTicketsTable.$inferSelect) {
   let ticket = ticketInput;
   const [raisedBy] = ticket.raisedByEmployeeId
@@ -230,9 +266,17 @@ router.get("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asyn
 router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
-    const { subject, description, category, priority, attachmentUrl } = req.body;
+    const { subject, description, category, priority, attachmentUrl, attachments } = req.body;
     if (!subject || !description || !category || !priority) {
       res.status(400).json({ error: "subject, description, category and priority are required" }); return;
+    }
+
+    let validatedAttachments: Array<{ objectPath: string; fileName: string; fileSize: number; contentType: string }> = [];
+    if (attachments !== undefined) {
+      if (!Array.isArray(attachments) || !attachments.every(isValidUploadedAttachment)) {
+        res.status(400).json({ error: "attachments must be an array of {objectPath,fileName,fileSize,contentType}" }); return;
+      }
+      validatedAttachments = attachments;
     }
 
     const emp = await getEmployeeForUser(u.id);
@@ -249,6 +293,10 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
       slaDeadline,
       attachmentUrl: attachmentUrl ?? null,
     }).returning();
+
+    if (validatedAttachments.length) {
+      await insertAttachments(ticket.id, u.id, validatedAttachments, null);
+    }
 
     await db.insert(ticketSlaLogsTable).values({
       ticketId: ticket.id,
@@ -334,7 +382,36 @@ router.get("/helpdesk/tickets/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
 
     const visibleComments = isManagerRole ? comments : comments.filter(c => !c.isInternal);
 
-    res.json({ ...enriched, comments: visibleComments });
+    // Fetch attachments and group by commentId. Ticket-level attachments
+    // (commentId IS NULL) live on `attachments`; per-comment attachments live
+    // on each comment's `attachments` array.
+    const attachmentRows = await db.select({
+      id: ticketAttachmentsTable.id,
+      ticketId: ticketAttachmentsTable.ticketId,
+      commentId: ticketAttachmentsTable.commentId,
+      uploadedByUserId: ticketAttachmentsTable.uploadedByUserId,
+      uploadedByName: hrmsUsersTable.name,
+      fileName: ticketAttachmentsTable.fileName,
+      fileSize: ticketAttachmentsTable.fileSize,
+      contentType: ticketAttachmentsTable.contentType,
+      objectPath: ticketAttachmentsTable.objectPath,
+      createdAt: ticketAttachmentsTable.createdAt,
+    }).from(ticketAttachmentsTable)
+      .leftJoin(hrmsUsersTable, eq(ticketAttachmentsTable.uploadedByUserId, hrmsUsersTable.id))
+      .where(eq(ticketAttachmentsTable.ticketId, id))
+      .orderBy(ticketAttachmentsTable.createdAt);
+
+    const ticketLevelAttachments = attachmentRows.filter(a => a.commentId === null);
+    const visibleCommentIds = new Set(visibleComments.map(c => c.id));
+    const commentsWithAttachments = visibleComments.map(c => ({
+      ...c,
+      attachments: attachmentRows.filter(a => a.commentId === c.id),
+    }));
+    // Hide attachments that belong to internal comments the caller can't see.
+    const visibleCommentAttachments = attachmentRows.filter(a => a.commentId !== null && visibleCommentIds.has(a.commentId));
+    void visibleCommentAttachments; // kept for clarity; comments already carry their own attachments
+
+    res.json({ ...enriched, comments: commentsWithAttachments, attachments: ticketLevelAttachments });
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
@@ -452,8 +529,16 @@ router.post("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...AL
   try {
     const ticketId = Number(req.params.id);
     const u = req.hrmsUser!;
-    const { message, isInternal = false } = req.body;
+    const { message, isInternal = false, attachments } = req.body;
     if (!message) { res.status(400).json({ error: "message is required" }); return; }
+
+    let validatedAttachments: Array<{ objectPath: string; fileName: string; fileSize: number; contentType: string }> = [];
+    if (attachments !== undefined) {
+      if (!Array.isArray(attachments) || !attachments.every(isValidUploadedAttachment)) {
+        res.status(400).json({ error: "attachments must be an array of {objectPath,fileName,fileSize,contentType}" }); return;
+      }
+      validatedAttachments = attachments;
+    }
 
     const ticket = await checkTicketAccess(ticketId, u);
     if (!ticket) {
@@ -469,6 +554,11 @@ router.post("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...AL
       message,
       isInternal: internalFlag,
     }).returning();
+
+    let createdAttachments: Array<typeof ticketAttachmentsTable.$inferSelect> = [];
+    if (validatedAttachments.length) {
+      createdAttachments = await insertAttachments(ticketId, u.id, validatedAttachments, comment.id);
+    }
 
     await db.update(helpdeskTicketsTable).set({ updatedAt: new Date() })
       .where(eq(helpdeskTicketsTable.id, ticketId));
@@ -515,7 +605,81 @@ router.post("/helpdesk/tickets/:id/comments", requireHrmsUser, requireRole(...AL
       } catch (e) { console.error("[helpdesk] failed to notify on comment", e); }
     }
 
-    res.status(201).json({ ...comment, authorName: authorRow?.name ?? null });
+    res.status(201).json({ ...comment, authorName: authorRow?.name ?? null, attachments: createdAttachments });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── TICKET ATTACHMENTS ──────────────────────────────────────────────────────
+// List ticket-level attachments (commentId IS NULL). Comment attachments are
+// already returned inline in the ticket detail / comment list responses.
+router.get("/helpdesk/tickets/:id/attachments", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const ticketId = Number(req.params.id);
+    const u = req.hrmsUser!;
+    const ticket = await checkTicketAccess(ticketId, u);
+    if (!ticket) { res.status(404).json({ error: "Ticket not found or access denied" }); return; }
+
+    const rows = await db.select({
+      id: ticketAttachmentsTable.id,
+      ticketId: ticketAttachmentsTable.ticketId,
+      commentId: ticketAttachmentsTable.commentId,
+      uploadedByUserId: ticketAttachmentsTable.uploadedByUserId,
+      uploadedByName: hrmsUsersTable.name,
+      fileName: ticketAttachmentsTable.fileName,
+      fileSize: ticketAttachmentsTable.fileSize,
+      contentType: ticketAttachmentsTable.contentType,
+      objectPath: ticketAttachmentsTable.objectPath,
+      createdAt: ticketAttachmentsTable.createdAt,
+    }).from(ticketAttachmentsTable)
+      .leftJoin(hrmsUsersTable, eq(ticketAttachmentsTable.uploadedByUserId, hrmsUsersTable.id))
+      .where(and(eq(ticketAttachmentsTable.ticketId, ticketId), isNull(ticketAttachmentsTable.commentId)))
+      .orderBy(ticketAttachmentsTable.createdAt);
+    res.json(rows);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// Attach already-uploaded files to an existing ticket (anyone with access).
+router.post("/helpdesk/tickets/:id/attachments", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const ticketId = Number(req.params.id);
+    const u = req.hrmsUser!;
+    const ticket = await checkTicketAccess(ticketId, u);
+    if (!ticket) { res.status(404).json({ error: "Ticket not found or access denied" }); return; }
+
+    const { attachments } = req.body;
+    if (!Array.isArray(attachments) || attachments.length === 0 || !attachments.every(isValidUploadedAttachment)) {
+      res.status(400).json({ error: "attachments must be a non-empty array of {objectPath,fileName,fileSize,contentType}" }); return;
+    }
+
+    const created = await insertAttachments(ticketId, u.id, attachments, null);
+    await db.update(helpdeskTicketsTable).set({ updatedAt: new Date() })
+      .where(eq(helpdeskTicketsTable.id, ticketId));
+    res.status(201).json(created);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// Remove an attachment. Only the uploader or an HR role may delete; the
+// underlying object in GCS is intentionally NOT deleted (keeps the audit
+// trail simple and avoids cross-region delete coupling).
+router.delete("/helpdesk/tickets/:id/attachments/:attachmentId", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const ticketId = Number(req.params.id);
+    const attachmentId = Number(req.params.attachmentId);
+    const u = req.hrmsUser!;
+    const ticket = await checkTicketAccess(ticketId, u);
+    if (!ticket) { res.status(404).json({ error: "Ticket not found or access denied" }); return; }
+
+    const [attachment] = await db.select().from(ticketAttachmentsTable)
+      .where(and(eq(ticketAttachmentsTable.id, attachmentId), eq(ticketAttachmentsTable.ticketId, ticketId)));
+    if (!attachment) { res.status(404).json({ error: "Attachment not found" }); return; }
+
+    const isHrRole = (HR_ROLES as readonly string[]).includes(u.role);
+    if (!isHrRole && attachment.uploadedByUserId !== u.id) {
+      res.status(403).json({ error: "Only the uploader or HR can remove this attachment" }); return;
+    }
+
+    await db.delete(ticketAttachmentsTable).where(eq(ticketAttachmentsTable.id, attachmentId));
+    res.status(204).end();
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 

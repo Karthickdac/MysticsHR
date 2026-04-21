@@ -4590,6 +4590,95 @@ paths:
             text/csv:
               schema: { type: string }
 
+  /helpdesk/tickets/{id}/attachments:
+    get:
+      operationId: listTicketAttachments
+      tags: [helpdesk]
+      summary: List file attachments for a ticket
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of attachments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TicketAttachment"
+    post:
+      operationId: addTicketAttachments
+      tags: [helpdesk]
+      summary: Attach uploaded files to an existing ticket
+      description: |
+        Files must already be uploaded to object storage via
+        POST /storage/uploads/request-url. Pass the returned objectPath plus
+        client-side metadata for each file.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTicketAttachmentsBody"
+      responses:
+        "201":
+          description: Attachments created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TicketAttachment"
+
+  /helpdesk/tickets/{id}/attachments/{attachmentId}:
+    delete:
+      operationId: deleteTicketAttachment
+      tags: [helpdesk]
+      summary: Remove an attachment from a ticket (raiser or HR)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: attachmentId
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Attachment removed
+
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [helpdesk]
+      summary: Request a presigned URL for direct file upload to object storage
+      description: |
+        Returns a presigned PUT URL the client uses to upload the file bytes
+        directly to GCS, plus the normalized object path to persist with the
+        owning entity (e.g. ticket attachment).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+
   /helpdesk/sla-check:
     post:
       operationId: runHelpdeskSlaCheck
@@ -8525,7 +8614,11 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/TicketComment"
-          required: [comments]
+            attachments:
+              type: array
+              items:
+                $ref: "#/components/schemas/TicketAttachment"
+          required: [comments, attachments]
 
     TicketComment:
       type: object
@@ -8537,7 +8630,63 @@ components:
         message: { type: string }
         isInternal: { type: boolean }
         createdAt: { type: string, format: date-time }
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketAttachment"
       required: [id, ticketId, authorId, message, isInternal, createdAt]
+
+    TicketAttachment:
+      type: object
+      properties:
+        id: { type: integer }
+        ticketId: { type: integer }
+        commentId: { type: ['integer', 'null'] }
+        uploadedByUserId: { type: ['integer', 'null'] }
+        uploadedByName: { type: ['string', 'null'] }
+        fileName: { type: string }
+        fileSize: { type: integer }
+        contentType: { type: string }
+        objectPath:
+          type: string
+          description: Object storage path. Serve via GET /api/storage{objectPath}.
+        createdAt: { type: string, format: date-time }
+      required: [id, ticketId, fileName, fileSize, contentType, objectPath, createdAt]
+
+    UploadedAttachmentInput:
+      type: object
+      description: Metadata for a file already uploaded via the presigned URL endpoint.
+      required: [objectPath, fileName, fileSize, contentType]
+      properties:
+        objectPath: { type: string, description: Path returned by /storage/uploads/request-url }
+        fileName: { type: string }
+        fileSize: { type: integer, minimum: 0 }
+        contentType: { type: string }
+
+    AddTicketAttachmentsBody:
+      type: object
+      required: [attachments]
+      properties:
+        attachments:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/UploadedAttachmentInput"
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 1 }
+        contentType: { type: string, minLength: 1 }
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string, format: uri }
+        objectPath: { type: string }
 
     CreateHelpdeskTicketBody:
       type: object
@@ -8552,6 +8701,11 @@ components:
           type: string
           enum: [Low, Medium, High, Urgent]
         attachmentUrl: { type: string, nullable: true }
+        attachments:
+          type: array
+          description: Files already uploaded via /storage/uploads/request-url.
+          items:
+            $ref: "#/components/schemas/UploadedAttachmentInput"
 
     UpdateHelpdeskTicketBody:
       type: object

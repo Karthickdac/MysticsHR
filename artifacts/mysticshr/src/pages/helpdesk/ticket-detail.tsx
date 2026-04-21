@@ -4,9 +4,12 @@ import {
   useGetHelpdeskTicket,
   useUpdateHelpdeskTicket,
   useAddTicketComment,
+  useDeleteTicketAttachment,
+  getGetHelpdeskTicketQueryKey,
   getListHelpdeskTicketsQueryKey,
   type UpdateHelpdeskTicketBody,
 } from "@workspace/api-client-react";
+import { AttachmentUploader, AttachmentList, type UploadedAttachment } from "@/components/AttachmentUploader";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,18 +50,28 @@ export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const ticketId = Number(id);
   const qc = useQueryClient();
-  const { role } = useCurrentHrmsUser();
+  const { role, hrmsUser } = useCurrentHrmsUser();
 
   const isManager = ["super_admin", "hr_manager", "hr_executive", "hod"].includes(role ?? "");
 
   const { data: ticket, isLoading } = useGetHelpdeskTicket(ticketId);
   const updateTicket = useUpdateHelpdeskTicket();
   const addComment = useAddTicketComment();
+  const deleteAttachment = useDeleteTicketAttachment();
 
   const [editStatus, setEditStatus] = useState<Status | "">("");
   const [editPriority, setEditPriority] = useState<Priority | "">("");
   const [comment, setComment] = useState("");
   const [isInternal, setIsInternal] = useState(false);
+  const [commentAttachments, setCommentAttachments] = useState<UploadedAttachment[]>([]);
+
+  function invalidateTicket() {
+    qc.invalidateQueries({ queryKey: getGetHelpdeskTicketQueryKey(ticketId) });
+  }
+
+  function handleDeleteAttachment(attachmentId: number) {
+    deleteAttachment.mutate({ id: ticketId, attachmentId }, { onSuccess: invalidateTicket });
+  }
 
   if (isLoading) return <div className="p-6 text-muted-foreground">Loading ticket...</div>;
   if (!ticket) return <div className="p-6 text-muted-foreground">Ticket not found.</div>;
@@ -80,11 +93,12 @@ export default function TicketDetailPage() {
   function handleComment(e: React.FormEvent) {
     e.preventDefault();
     if (!comment.trim()) return;
-    addComment.mutate({ id: ticketId, data: { message: comment, isInternal } }, {
+    addComment.mutate({ id: ticketId, data: { message: comment, isInternal, attachments: commentAttachments } }, {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: [`/api/helpdesk/tickets/${ticketId}`] });
+        invalidateTicket();
         setComment("");
         setIsInternal(false);
+        setCommentAttachments([]);
       },
     });
   }
@@ -207,7 +221,16 @@ export default function TicketDetailPage() {
                 </div>
                 <span className="text-xs text-muted-foreground">{formatDt(c.createdAt)}</span>
               </div>
-              <p className="text-muted-foreground">{c.message}</p>
+              <p className="text-muted-foreground whitespace-pre-wrap">{c.message}</p>
+              {c.attachments && c.attachments.length > 0 && (
+                <div className="mt-2">
+                  <AttachmentList
+                    attachments={c.attachments}
+                    onDelete={handleDeleteAttachment}
+                    currentUserId={hrmsUser?.id ?? null}
+                  />
+                </div>
+              )}
             </div>
           ))}
 
@@ -215,6 +238,12 @@ export default function TicketDetailPage() {
           <form onSubmit={handleComment} className="space-y-3 pt-2 border-t">
             <Textarea rows={3} value={comment} onChange={e => setComment(e.target.value)}
               placeholder="Add a comment..." required />
+            <AttachmentUploader
+              value={commentAttachments}
+              onChange={setCommentAttachments}
+              disabled={addComment.isPending}
+              label="Attach files to this comment"
+            />
             {isManager && (
               <div className="flex items-center gap-2">
                 <Switch id="internal" checked={isInternal} onCheckedChange={setIsInternal} />

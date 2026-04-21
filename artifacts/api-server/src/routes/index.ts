@@ -24,6 +24,7 @@ import exitRouter from "./exit";
 import reportsRouter from "./reports";
 import notificationsRouter from "./notifications";
 import systemConfigRouter from "./system-config";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -51,6 +52,7 @@ router.use(exitRouter);
 router.use(reportsRouter);
 router.use(notificationsRouter);
 router.use(systemConfigRouter);
+router.use(storageRouter);
 router.use(auditLogsRouter);
 
 export default router;

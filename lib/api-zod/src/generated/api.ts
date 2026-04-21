@@ -5484,12 +5484,33 @@ export const ListHelpdeskTicketsResponse = zod.array(
 /**
  * @summary Create a helpdesk ticket
  */
+export const createHelpdeskTicketBodyAttachmentsItemFileSizeMin = 0;
+
 export const CreateHelpdeskTicketBody = zod.object({
   subject: zod.string(),
   description: zod.string(),
   category: zod.enum(["IT", "HR", "Finance", "Payroll", "Admin", "Other"]),
   priority: zod.enum(["Low", "Medium", "High", "Urgent"]),
   attachmentUrl: zod.string().nullish(),
+  attachments: zod
+    .array(
+      zod
+        .object({
+          objectPath: zod
+            .string()
+            .describe("Path returned by \/storage\/uploads\/request-url"),
+          fileName: zod.string(),
+          fileSize: zod
+            .number()
+            .min(createHelpdeskTicketBodyAttachmentsItemFileSizeMin),
+          contentType: zod.string(),
+        })
+        .describe(
+          "Metadata for a file already uploaded via the presigned URL endpoint.",
+        ),
+    )
+    .optional()
+    .describe("Files already uploaded via \/storage\/uploads\/request-url."),
 });
 
 /**
@@ -5530,6 +5551,44 @@ export const GetHelpdeskTicketResponse = zod
           authorName: zod.string().nullish(),
           message: zod.string(),
           isInternal: zod.boolean(),
+          createdAt: zod.coerce.date(),
+          attachments: zod
+            .array(
+              zod.object({
+                id: zod.number(),
+                ticketId: zod.number(),
+                commentId: zod.number().nullish(),
+                uploadedByUserId: zod.number().nullish(),
+                uploadedByName: zod.string().nullish(),
+                fileName: zod.string(),
+                fileSize: zod.number(),
+                contentType: zod.string(),
+                objectPath: zod
+                  .string()
+                  .describe(
+                    "Object storage path. Serve via GET \/api\/storage{objectPath}.",
+                  ),
+                createdAt: zod.coerce.date(),
+              }),
+            )
+            .optional(),
+        }),
+      ),
+      attachments: zod.array(
+        zod.object({
+          id: zod.number(),
+          ticketId: zod.number(),
+          commentId: zod.number().nullish(),
+          uploadedByUserId: zod.number().nullish(),
+          uploadedByName: zod.string().nullish(),
+          fileName: zod.string(),
+          fileSize: zod.number(),
+          contentType: zod.string(),
+          objectPath: zod
+            .string()
+            .describe(
+              "Object storage path. Serve via GET \/api\/storage{objectPath}.",
+            ),
           createdAt: zod.coerce.date(),
         }),
       ),
@@ -5593,6 +5652,26 @@ export const ListTicketCommentsResponseItem = zod.object({
   message: zod.string(),
   isInternal: zod.boolean(),
   createdAt: zod.coerce.date(),
+  attachments: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        ticketId: zod.number(),
+        commentId: zod.number().nullish(),
+        uploadedByUserId: zod.number().nullish(),
+        uploadedByName: zod.string().nullish(),
+        fileName: zod.string(),
+        fileSize: zod.number(),
+        contentType: zod.string(),
+        objectPath: zod
+          .string()
+          .describe(
+            "Object storage path. Serve via GET \/api\/storage{objectPath}.",
+          ),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const ListTicketCommentsResponse = zod.array(
   ListTicketCommentsResponseItem,
@@ -5688,6 +5767,92 @@ export const GetHelpdeskSlaReportResponse = zod.object({
 export const GetHelpdeskSlaReportCsvQueryParams = zod.object({
   from: zod.date().optional(),
   to: zod.date().optional(),
+});
+
+/**
+ * @summary List file attachments for a ticket
+ */
+export const ListTicketAttachmentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListTicketAttachmentsResponseItem = zod.object({
+  id: zod.number(),
+  ticketId: zod.number(),
+  commentId: zod.number().nullish(),
+  uploadedByUserId: zod.number().nullish(),
+  uploadedByName: zod.string().nullish(),
+  fileName: zod.string(),
+  fileSize: zod.number(),
+  contentType: zod.string(),
+  objectPath: zod
+    .string()
+    .describe("Object storage path. Serve via GET \/api\/storage{objectPath}."),
+  createdAt: zod.coerce.date(),
+});
+export const ListTicketAttachmentsResponse = zod.array(
+  ListTicketAttachmentsResponseItem,
+);
+
+/**
+ * Files must already be uploaded to object storage via
+POST /storage/uploads/request-url. Pass the returned objectPath plus
+client-side metadata for each file.
+
+ * @summary Attach uploaded files to an existing ticket
+ */
+export const AddTicketAttachmentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const addTicketAttachmentsBodyAttachmentsItemFileSizeMin = 0;
+
+export const AddTicketAttachmentsBody = zod.object({
+  attachments: zod
+    .array(
+      zod
+        .object({
+          objectPath: zod
+            .string()
+            .describe("Path returned by \/storage\/uploads\/request-url"),
+          fileName: zod.string(),
+          fileSize: zod
+            .number()
+            .min(addTicketAttachmentsBodyAttachmentsItemFileSizeMin),
+          contentType: zod.string(),
+        })
+        .describe(
+          "Metadata for a file already uploaded via the presigned URL endpoint.",
+        ),
+    )
+    .min(1),
+});
+
+/**
+ * @summary Remove an attachment from a ticket (raiser or HR)
+ */
+export const DeleteTicketAttachmentParams = zod.object({
+  id: zod.coerce.number(),
+  attachmentId: zod.coerce.number(),
+});
+
+/**
+ * Returns a presigned PUT URL the client uses to upload the file bytes
+directly to GCS, plus the normalized object path to persist with the
+owning entity (e.g. ticket attachment).
+
+ * @summary Request a presigned URL for direct file upload to object storage
+ */
+
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string().min(1),
+  size: zod.number().min(1),
+  contentType: zod.string().min(1),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string().url(),
+  objectPath: zod.string(),
 });
 
 /**

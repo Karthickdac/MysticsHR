@@ -22,6 +22,7 @@ import type {
   AccrueLeaveBalancesBody,
   ActionBody,
   ActivityItem,
+  AddTicketAttachmentsBody,
   AddTicketCommentBody,
   AppraisalOutcome,
   ApprovalChainConfig,
@@ -285,6 +286,7 @@ import type {
   TestWhatsAppConfig200,
   TestWhatsAppConfigBody,
   TicketAssignment,
+  TicketAttachment,
   TicketComment,
   UpdateCandidateBody,
   UpdateClearanceTaskBody,
@@ -310,6 +312,8 @@ import type {
   UpdateSystemSettings200,
   UpdateSystemSettingsBody,
   UpdateUserBody,
+  UploadUrlRequest,
+  UploadUrlResponse,
   UpsertEmployeeProfileBody,
   UpsertPayrollSettingBody,
 } from "./api.schemas";
@@ -20606,6 +20610,364 @@ export function useGetHelpdeskSlaReportCsv<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List file attachments for a ticket
+ */
+export const getListTicketAttachmentsUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}/attachments`;
+};
+
+export const listTicketAttachments = async (
+  id: number,
+  options?: RequestInit,
+): Promise<TicketAttachment[]> => {
+  return customFetch<TicketAttachment[]>(getListTicketAttachmentsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTicketAttachmentsQueryKey = (id: number) => {
+  return [`/api/helpdesk/tickets/${id}/attachments`] as const;
+};
+
+export const getListTicketAttachmentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTicketAttachments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTicketAttachments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListTicketAttachmentsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTicketAttachments>>
+  > = ({ signal }) => listTicketAttachments(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTicketAttachments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTicketAttachmentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTicketAttachments>>
+>;
+export type ListTicketAttachmentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List file attachments for a ticket
+ */
+
+export function useListTicketAttachments<
+  TData = Awaited<ReturnType<typeof listTicketAttachments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listTicketAttachments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTicketAttachmentsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Files must already be uploaded to object storage via
+POST /storage/uploads/request-url. Pass the returned objectPath plus
+client-side metadata for each file.
+
+ * @summary Attach uploaded files to an existing ticket
+ */
+export const getAddTicketAttachmentsUrl = (id: number) => {
+  return `/api/helpdesk/tickets/${id}/attachments`;
+};
+
+export const addTicketAttachments = async (
+  id: number,
+  addTicketAttachmentsBody: AddTicketAttachmentsBody,
+  options?: RequestInit,
+): Promise<TicketAttachment[]> => {
+  return customFetch<TicketAttachment[]>(getAddTicketAttachmentsUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addTicketAttachmentsBody),
+  });
+};
+
+export const getAddTicketAttachmentsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addTicketAttachments>>,
+    TError,
+    { id: number; data: BodyType<AddTicketAttachmentsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addTicketAttachments>>,
+  TError,
+  { id: number; data: BodyType<AddTicketAttachmentsBody> },
+  TContext
+> => {
+  const mutationKey = ["addTicketAttachments"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addTicketAttachments>>,
+    { id: number; data: BodyType<AddTicketAttachmentsBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addTicketAttachments(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddTicketAttachmentsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addTicketAttachments>>
+>;
+export type AddTicketAttachmentsMutationBody =
+  BodyType<AddTicketAttachmentsBody>;
+export type AddTicketAttachmentsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Attach uploaded files to an existing ticket
+ */
+export const useAddTicketAttachments = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addTicketAttachments>>,
+    TError,
+    { id: number; data: BodyType<AddTicketAttachmentsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addTicketAttachments>>,
+  TError,
+  { id: number; data: BodyType<AddTicketAttachmentsBody> },
+  TContext
+> => {
+  return useMutation(getAddTicketAttachmentsMutationOptions(options));
+};
+
+/**
+ * @summary Remove an attachment from a ticket (raiser or HR)
+ */
+export const getDeleteTicketAttachmentUrl = (
+  id: number,
+  attachmentId: number,
+) => {
+  return `/api/helpdesk/tickets/${id}/attachments/${attachmentId}`;
+};
+
+export const deleteTicketAttachment = async (
+  id: number,
+  attachmentId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteTicketAttachmentUrl(id, attachmentId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteTicketAttachmentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTicketAttachment>>,
+    TError,
+    { id: number; attachmentId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteTicketAttachment>>,
+  TError,
+  { id: number; attachmentId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteTicketAttachment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteTicketAttachment>>,
+    { id: number; attachmentId: number }
+  > = (props) => {
+    const { id, attachmentId } = props ?? {};
+
+    return deleteTicketAttachment(id, attachmentId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteTicketAttachmentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteTicketAttachment>>
+>;
+
+export type DeleteTicketAttachmentMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove an attachment from a ticket (raiser or HR)
+ */
+export const useDeleteTicketAttachment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTicketAttachment>>,
+    TError,
+    { id: number; attachmentId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteTicketAttachment>>,
+  TError,
+  { id: number; attachmentId: number },
+  TContext
+> => {
+  return useMutation(getDeleteTicketAttachmentMutationOptions(options));
+};
+
+/**
+ * Returns a presigned PUT URL the client uses to upload the file bytes
+directly to GCS, plus the normalized object path to persist with the
+owning entity (e.g. ticket attachment).
+
+ * @summary Request a presigned URL for direct file upload to object storage
+ */
+export const getRequestUploadUrlUrl = () => {
+  return `/api/storage/uploads/request-url`;
+};
+
+export const requestUploadUrl = async (
+  uploadUrlRequest: UploadUrlRequest,
+  options?: RequestInit,
+): Promise<UploadUrlResponse> => {
+  return customFetch<UploadUrlResponse>(getRequestUploadUrlUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(uploadUrlRequest),
+  });
+};
+
+export const getRequestUploadUrlMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    TError,
+    { data: BodyType<UploadUrlRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestUploadUrl>>,
+  TError,
+  { data: BodyType<UploadUrlRequest> },
+  TContext
+> => {
+  const mutationKey = ["requestUploadUrl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    { data: BodyType<UploadUrlRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return requestUploadUrl(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestUploadUrlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestUploadUrl>>
+>;
+export type RequestUploadUrlMutationBody = BodyType<UploadUrlRequest>;
+export type RequestUploadUrlMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Request a presigned URL for direct file upload to object storage
+ */
+export const useRequestUploadUrl = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    TError,
+    { data: BodyType<UploadUrlRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestUploadUrl>>,
+  TError,
+  { data: BodyType<UploadUrlRequest> },
+  TContext
+> => {
+  return useMutation(getRequestUploadUrlMutationOptions(options));
+};
 
 /**
  * @summary Process SLA breaches for all open tickets and write escalation logs

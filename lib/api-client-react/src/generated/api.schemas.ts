@@ -2596,6 +2596,23 @@ export interface HelpdeskTicket {
   updatedAt: string;
 }
 
+export interface TicketAttachment {
+  id: number;
+  ticketId: number;
+  /** @nullable */
+  commentId?: number | null;
+  /** @nullable */
+  uploadedByUserId?: number | null;
+  /** @nullable */
+  uploadedByName?: string | null;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+  /** Object storage path. Serve via GET /api/storage{objectPath}. */
+  objectPath: string;
+  createdAt: string;
+}
+
 export interface TicketComment {
   id: number;
   ticketId: number;
@@ -2605,11 +2622,44 @@ export interface TicketComment {
   message: string;
   isInternal: boolean;
   createdAt: string;
+  attachments?: TicketAttachment[];
 }
 
 export type HelpdeskTicketDetail = HelpdeskTicket & {
   comments: TicketComment[];
+  attachments: TicketAttachment[];
 };
+
+/**
+ * Metadata for a file already uploaded via the presigned URL endpoint.
+ */
+export interface UploadedAttachmentInput {
+  /** Path returned by /storage/uploads/request-url */
+  objectPath: string;
+  fileName: string;
+  /** @minimum 0 */
+  fileSize: number;
+  contentType: string;
+}
+
+export interface AddTicketAttachmentsBody {
+  /** @minItems 1 */
+  attachments: UploadedAttachmentInput[];
+}
+
+export interface UploadUrlRequest {
+  /** @minLength 1 */
+  name: string;
+  /** @minimum 1 */
+  size: number;
+  /** @minLength 1 */
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+}
 
 export type CreateHelpdeskTicketBodyCategory =
   (typeof CreateHelpdeskTicketBodyCategory)[keyof typeof CreateHelpdeskTicketBodyCategory];
@@ -2639,6 +2689,8 @@ export interface CreateHelpdeskTicketBody {
   category: CreateHelpdeskTicketBodyCategory;
   priority: CreateHelpdeskTicketBodyPriority;
   attachmentUrl?: string | null;
+  /** Files already uploaded via /storage/uploads/request-url. */
+  attachments?: UploadedAttachmentInput[];
 }
 
 export type UpdateHelpdeskTicketBodyStatus =

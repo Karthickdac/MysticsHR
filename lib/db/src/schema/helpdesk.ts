@@ -46,6 +46,25 @@ export const ticketCommentsTable = pgTable("ticket_comments", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── TICKET ATTACHMENTS ───────────────────────────────────────────────────────
+// One row per file attached to a ticket. `commentId` is null for files attached
+// at ticket creation (or later directly to the ticket); set when the upload is
+// part of a comment. `objectPath` stores the normalized object-storage path
+// returned by the upload endpoint (e.g. "/objects/uploads/<uuid>"); `fileName`,
+// `fileSize`, and `contentType` are captured at upload time so the UI can render
+// without a HEAD round-trip.
+export const ticketAttachmentsTable = pgTable("ticket_attachments", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").notNull().references(() => helpdeskTicketsTable.id),
+  commentId: integer("comment_id").references(() => ticketCommentsTable.id),
+  uploadedByUserId: integer("uploaded_by_user_id").references(() => hrmsUsersTable.id),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  contentType: text("content_type").notNull(),
+  objectPath: text("object_path").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── TICKET SLA LOGS ──────────────────────────────────────────────────────────
 export const ticketSlaLogsTable = pgTable("ticket_sla_logs", {
   id: serial("id").primaryKey(),
