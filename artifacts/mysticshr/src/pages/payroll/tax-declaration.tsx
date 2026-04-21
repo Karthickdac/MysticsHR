@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useListTaxDeclarations, useCreateTaxDeclaration, getListTaxDeclarationsQueryKey,
-  useCalculateTax,
+  useCalculateTax, useGetMyActiveSalaryStructure, getGetMyActiveSalaryStructureQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
@@ -84,6 +84,28 @@ export default function TaxDeclarationPage() {
   const calcMutation = useCalculateTax();
   const [calcGross, setCalcGross] = useState("");
   const [calcInv, setCalcInv] = useState<Record<string, string>>({});
+  const [grossTouched, setGrossTouched] = useState(false);
+
+  // Pre-fill the calculator with the caller's own annual CTC (annual gross)
+  // so employees don't have to look it up by hand. Silent if no active
+  // structure exists (server returns 204) or for users without an employee link.
+  // Once the employee touches the field, we never overwrite it — they can model
+  // "what-if" scenarios freely (including clearing the field).
+  const { data: myStructure } = useGetMyActiveSalaryStructure({
+    query: {
+      queryKey: getGetMyActiveSalaryStructureQueryKey(),
+      staleTime: 5 * 60 * 1000,
+      retry: false,
+    },
+  });
+  useEffect(() => {
+    if (grossTouched) return;
+    if (calcGross !== "") return;
+    const annual = myStructure?.annualCtc;
+    if (annual && Number(annual) > 0) {
+      setCalcGross(String(Math.round(Number(annual))));
+    }
+  }, [myStructure, calcGross, grossTouched]);
 
   function handleCalculate() {
     const annualGross = Number(calcGross);
@@ -227,7 +249,7 @@ export default function TaxDeclarationPage() {
                 type="number"
                 placeholder="e.g. 1200000"
                 value={calcGross}
-                onChange={e => setCalcGross(e.target.value)}
+                onChange={e => { setCalcGross(e.target.value); setGrossTouched(true); }}
               />
             </div>
             {CALC_FIELDS.map(f => (

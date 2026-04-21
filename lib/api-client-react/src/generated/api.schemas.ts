@@ -3694,6 +3694,14 @@ export type ListSalaryStructuresParams = {
   isActive?: string;
 };
 
+export type GetMyActiveSalaryStructure200 = {
+  id: number;
+  name: string;
+  effectiveFrom: string;
+  grossCtc: string;
+  annualCtc: string;
+};
+
 export type ListLoansParams = {
   employeeId?: number;
   isActive?: string;

@@ -3082,6 +3082,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/SalaryStructure"
 
+  /payroll/my-active-salary-structure:
+    get:
+      operationId: getMyActiveSalaryStructure
+      tags: [payroll]
+      summary: Get the caller's own active salary structure (employee self-service)
+      description: |
+        Returns the active salary structure linked to the authenticated user's
+        employee record. Returns `204 No Content` when the caller has no
+        employee link or no active structure exists.
+      responses:
+        "200":
+          description: Active salary structure (minimal projection)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, effectiveFrom, grossCtc, annualCtc]
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  effectiveFrom: { type: string }
+                  grossCtc: { type: string }
+                  annualCtc: { type: string }
+        "204":
+          description: No active salary structure for this user
+
   /payroll/salary-structures/{id}:
     get:
       operationId: getSalaryStructure

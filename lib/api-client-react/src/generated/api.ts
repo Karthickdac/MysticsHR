@@ -135,6 +135,7 @@ import type {
   GetLeaveUsageTrendParams,
   GetLeaveUtilizationReport200,
   GetLeaveUtilizationReportParams,
+  GetMyActiveSalaryStructure200,
   GetMyAttendanceTodayParams,
   GetOnboardingChecklistsParams,
   GetPayrollAnalytics200,
@@ -14345,6 +14346,89 @@ export const useCreateSalaryStructure = <
 > => {
   return useMutation(getCreateSalaryStructureMutationOptions(options));
 };
+
+/**
+ * Returns the active salary structure linked to the authenticated user's
+employee record. Returns `204 No Content` when the caller has no
+employee link or no active structure exists.
+
+ * @summary Get the caller's own active salary structure (employee self-service)
+ */
+export const getGetMyActiveSalaryStructureUrl = () => {
+  return `/api/payroll/my-active-salary-structure`;
+};
+
+export const getMyActiveSalaryStructure = async (
+  options?: RequestInit,
+): Promise<GetMyActiveSalaryStructure200 | void> => {
+  return customFetch<GetMyActiveSalaryStructure200 | void>(
+    getGetMyActiveSalaryStructureUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetMyActiveSalaryStructureQueryKey = () => {
+  return [`/api/payroll/my-active-salary-structure`] as const;
+};
+
+export const getGetMyActiveSalaryStructureQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyActiveSalaryStructure>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyActiveSalaryStructure>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMyActiveSalaryStructureQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMyActiveSalaryStructure>>
+  > = ({ signal }) => getMyActiveSalaryStructure({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyActiveSalaryStructure>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyActiveSalaryStructureQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyActiveSalaryStructure>>
+>;
+export type GetMyActiveSalaryStructureQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the caller's own active salary structure (employee self-service)
+ */
+
+export function useGetMyActiveSalaryStructure<
+  TData = Awaited<ReturnType<typeof getMyActiveSalaryStructure>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyActiveSalaryStructure>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyActiveSalaryStructureQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get salary structure with components

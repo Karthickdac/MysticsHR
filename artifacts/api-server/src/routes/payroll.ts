@@ -178,6 +178,33 @@ router.get("/payroll/salary-structures", requireHrmsUser, requireRole(...HR_READ
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// Employee-self endpoint: returns the caller's own active salary structure (if any).
+// Used to pre-fill the tax calculator on the Tax Declaration page so employees
+// don't have to look up their gross salary by hand.
+router.get("/payroll/my-active-salary-structure", requireHrmsUser, async (req, res) => {
+  try {
+    const employeeId = req.hrmsUser?.employeeId;
+    if (!employeeId) { res.status(204).end(); return; }
+    const [structure] = await db
+      .select({
+        id: salaryStructuresTable.id,
+        name: salaryStructuresTable.name,
+        effectiveFrom: salaryStructuresTable.effectiveFrom,
+        grossCtc: salaryStructuresTable.grossCtc,
+        annualCtc: salaryStructuresTable.annualCtc,
+      })
+      .from(salaryStructuresTable)
+      .where(and(
+        eq(salaryStructuresTable.employeeId, employeeId),
+        eq(salaryStructuresTable.isActive, true),
+      ))
+      .orderBy(desc(salaryStructuresTable.effectiveFrom))
+      .limit(1);
+    if (!structure) { res.status(204).end(); return; }
+    res.json(structure);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 router.get("/payroll/salary-structures/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
   try {
     const id = Number(req.params.id);

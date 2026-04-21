@@ -4134,6 +4134,21 @@ export const CreateSalaryStructureBody = zod.object({
 });
 
 /**
+ * Returns the active salary structure linked to the authenticated user's
+employee record. Returns `204 No Content` when the caller has no
+employee link or no active structure exists.
+
+ * @summary Get the caller's own active salary structure (employee self-service)
+ */
+export const GetMyActiveSalaryStructureResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  effectiveFrom: zod.string(),
+  grossCtc: zod.string(),
+  annualCtc: zod.string(),
+});
+
+/**
  * @summary Get salary structure with components
  */
 export const GetSalaryStructureParams = zod.object({
