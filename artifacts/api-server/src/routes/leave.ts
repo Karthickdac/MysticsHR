@@ -4,7 +4,7 @@ import { dispatchNotification } from "../lib/notification-service";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
 import { checkPayrollLock } from "../lib/payroll-lock";
-import { runCarryForwardForYear } from "../lib/carry-forward";
+import { runCarryForwardForYear, CarryForwardLockedError } from "../lib/carry-forward";
 import {
   applyLeaveToAttendance,
   revertLeaveFromAttendance,
@@ -1272,7 +1272,13 @@ router.post("/leave/balances/carry-forward", requireHrmsUser, requireRole(...HR_
       toYear: summary.toYear,
       message: `Processed ${summary.processed} balance(s); carried forward ${summary.totalDaysCarried.toFixed(1)} day(s) for ${summary.carriedForwardCount} record(s) from ${summary.fromYear} to ${summary.toYear}`,
     });
-  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+  } catch (err) {
+    if (err instanceof CarryForwardLockedError) {
+      res.status(409).json({ error: "A carry-forward run is already in progress. Please retry shortly." });
+      return;
+    }
+    console.error(err); res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 router.post("/leave/balances/accrue", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
