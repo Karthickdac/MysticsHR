@@ -8,6 +8,6 @@ Run these from the repo root before opening a PR — they are also enforced by t
 `PR Checks` GitHub Actions workflow (`.github/workflows/pr-checks.yml`).
 
 - `pnpm run typecheck` — typechecks the shared libraries and every artifact / script package.
-- `pnpm --filter @workspace/api-server run test` — runs the api-server vitest suite (currently covers orphan storage cleanup).
+- `pnpm -r --if-present run test` — runs the test suites in every package that defines a `test` script (api-server, web client, shared libs).
 
-A failing api-server test will block the PR.
+A failing test in any package will block the PR.
