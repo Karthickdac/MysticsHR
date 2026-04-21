@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
 import {
-  Target, Plus, ArrowRight, ChevronRight, Activity, Users, CheckCircle2, Clock,
+  Target, Plus, ArrowRight, ChevronRight, Activity, Users, CheckCircle2, Clock, History,
 } from "lucide-react";
 
 const STAGE_ORDER = [
@@ -287,6 +287,15 @@ export default function PerformancePage() {
               <CheckCircle2 className="w-5 h-5 mx-auto mb-2 text-amber-600" />
               <p className="text-sm font-medium">Self Appraisal</p>
               <p className="text-xs text-muted-foreground">Submit self ratings</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/performance/history">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+            <CardContent className="p-4 text-center">
+              <History className="w-5 h-5 mx-auto mb-2 text-blue-600" />
+              <p className="text-sm font-medium">History</p>
+              <p className="text-xs text-muted-foreground">Past cycles & scores</p>
             </CardContent>
           </Card>
         </Link>

@@ -432,17 +432,25 @@ router.post("/performance/self-appraisals", requireHrmsUser, requireRole(...PERF
 
 // ─── MANAGER EVALUATIONS ──────────────────────────────────────────────────────
 
-router.get("/performance/manager-evaluations", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+router.get("/performance/manager-evaluations", requireHrmsUser, requireRole(...PERF_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
     const { cycleId, employeeId } = req.query as { cycleId?: string; employeeId?: string };
     const conds = [];
     if (employeeId) conds.push(eq(managerEvaluationsTable.employeeId, Number(employeeId)));
 
-    // HOD scope enforcement: only show evaluations for their direct reports.
-    // HR roles and super_admin have unrestricted read scope.
+    // Scope enforcement:
+    // - HR/super_admin: unrestricted
+    // - employee: only their own manager evaluations (read-only history)
+    // - HOD: only evaluations for their direct reports
     const isHrRole = (["super_admin", "hr_manager", "hr_executive"] as string[]).includes(u.role);
-    if (!isHrRole) {
+    if (u.role === "employee") {
+      const [emp] = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
+        .where(eq(hrmsUsersTable.id, u.id));
+      if (!emp) { res.json([]); return; } // Fail closed — no linked employee
+      conds.push(eq(managerEvaluationsTable.employeeId, emp.id));
+    } else if (!isHrRole) {
       const [hodEmp] = await db.select({ id: employeesTable.id }).from(employeesTable)
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id))
         .where(eq(hrmsUsersTable.id, u.id));

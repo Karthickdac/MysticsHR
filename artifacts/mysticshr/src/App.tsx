@@ -44,6 +44,7 @@ import AppraisalsPage from "@/pages/performance/appraisals";
 import EvaluationsPage from "@/pages/performance/evaluations";
 import CalibrationPage from "@/pages/performance/calibration";
 import CycleDetailPage from "@/pages/performance/cycle-detail";
+import PerformanceHistoryPage from "@/pages/performance/history";
 import EssPortalPage from "@/pages/ess/index";
 import HelpdeskPage from "@/pages/helpdesk/index";
 import TicketDetailPage from "@/pages/helpdesk/ticket-detail";
@@ -541,6 +542,14 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive"]}>
                 <CalibrationPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/performance/history">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin", "hr_manager", "hr_executive", "hod", "employee"]}>
+                <PerformanceHistoryPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>
