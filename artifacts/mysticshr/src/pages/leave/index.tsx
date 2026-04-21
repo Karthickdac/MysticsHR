@@ -45,11 +45,12 @@ export default function LeavePage() {
 
   const qc = useQueryClient();
   const year = new Date().getFullYear();
+  const [historyYear, setHistoryYear] = useState<number>(year);
 
   const { data: leaveTypes } = useListLeaveTypes({ isActive: true });
   const { data: applications, isLoading } = useListLeaveApplications({});
   const { data: balances } = useListLeaveBalances({ year });
-  const { data: accrualHistory } = useListLeaveAccrualHistory({ year });
+  const { data: accrualHistory } = useListLeaveAccrualHistory({ year: historyYear });
 
   const submitMutation = useSubmitLeaveApplication();
   const cancelMutation = useCancelLeaveApplication();
@@ -203,9 +204,21 @@ export default function LeavePage() {
 
       {/* Accrual & Carry-Forward History */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Accrual &amp; Carry-Forward History — {year}
-        </h2>
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            Accrual &amp; Carry-Forward History
+          </h2>
+          <Select value={String(historyYear)} onValueChange={(v) => setHistoryYear(Number(v))}>
+            <SelectTrigger className="w-28 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 5 }, (_, i) => year - i).map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {!accrualHistory ? (
           <div className="text-sm text-gray-400">Loading history...</div>
         ) : accrualHistory.length === 0 ? (
