@@ -535,14 +535,22 @@ function parseClientLocalDate(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
-  const candidate = `${m[1]}-${m[2]}-${m[3]}`;
-  // Sanity check: must be within 1 day of server UTC today.
-  const serverToday = new Date();
-  const minMs = serverToday.getTime() - 36 * 60 * 60 * 1000;
-  const maxMs = serverToday.getTime() + 36 * 60 * 60 * 1000;
-  const candidateMs = new Date(`${candidate}T12:00:00Z`).getTime();
-  if (Number.isNaN(candidateMs) || candidateMs < minMs || candidateMs > maxMs) return null;
-  return candidate;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  // Round-trip to reject impossible calendar dates (e.g. 2026-02-31)
+  // that would otherwise silently roll over via JS Date arithmetic.
+  const probe = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) return null;
+  // Sanity check: must be within ±36 h of server UTC today (covers every
+  // real timezone but rejects garbage / backdating attempts).
+  const nowMs = Date.now();
+  if (probe.getTime() < nowMs - 36 * 60 * 60 * 1000 || probe.getTime() > nowMs + 36 * 60 * 60 * 1000) return null;
+  return `${m[1]}-${m[2]}-${m[3]}`;
 }
 
 // Resolve the "today" date for self-service attendance, preferring the
