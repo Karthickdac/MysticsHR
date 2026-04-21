@@ -77,7 +77,7 @@ export default function ExitDetailPage() {
 
   function downloadDoc(docId: number) {
     const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    window.open(`${base}/api/documents/issued/${docId}/download`, "_blank");
+    window.open(`${base}/api/documents/issued/${docId}/download`, "_blank", "noopener,noreferrer");
   }
 
   const updateExit = useUpdateExitRequest();
