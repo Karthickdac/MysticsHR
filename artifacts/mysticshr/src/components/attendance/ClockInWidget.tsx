@@ -53,16 +53,42 @@ export function ClockInWidget() {
   const [now, setNow] = useState(Date.now());
   const [actionError, setActionError] = useState<string>("");
 
-  // Tick every second so the "Elapsed" timer updates smoothly while the
-  // employee is clocked in. Pause the interval otherwise to avoid
-  // unnecessary re-renders. No network calls — purely client-side.
-  const isTicking = data?.attendanceStatus === "Clocked In" && !!data?.record?.signInTime;
+  // Tick every second to drive both the "Elapsed" timer (when clocked in)
+  // and the live wall clock displayed next to it. Pauses cleanly when the
+  // tab is hidden so we don't waste re-renders for an unseen widget.
+  // No network calls — purely client-side.
+  const isClockedIn = data?.attendanceStatus === "Clocked In" && !!data?.record?.signInTime;
   useEffect(() => {
-    if (!isTicking) return;
-    setNow(Date.now());
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [isTicking]);
+    let t: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (t !== null) return;
+      setNow(Date.now());
+      t = setInterval(() => setNow(Date.now()), 1000);
+    };
+    const stop = () => {
+      if (t === null) return;
+      clearInterval(t);
+      t = null;
+    };
+    const onVisibility = () => {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState === "visible") start();
+      else stop();
+    };
+    if (typeof document === "undefined" || document.visibilityState === "visible") start();
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+    return () => {
+      stop();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility);
+      }
+    };
+  }, []);
+
+  // Locale-aware HH:MM:SS so 12h vs 24h follows the user's system.
+  const wallClock = new Date(now).toLocaleTimeString();
 
   // Resolve geolocation if the browser supports it and the user grants
   // permission. Always returns a payload — at minimum the userAgent so HR
@@ -171,12 +197,16 @@ export function ClockInWidget() {
           </div>
           <div className="rounded-md bg-muted/50 p-2">
             <p className="text-[10px] uppercase text-muted-foreground tracking-wide">
-              {status === "Clocked In" ? "Elapsed" : "Worked"}
+              {isClockedIn ? "Now / Elapsed" : "Now / Worked"}
             </p>
-            <p className="text-sm font-semibold mt-0.5">
-              {status === "Clocked In" && signInIso
-                ? fmtElapsed(signInIso, now)
-                : fmtMinutes(record?.totalMinutesWorked)}
+            <p className="text-sm font-semibold mt-0.5 tabular-nums" data-testid="text-attendance-now-elapsed">
+              <span data-testid="text-wall-clock">{wallClock}</span>
+              <span className="text-muted-foreground"> · </span>
+              <span data-testid="text-elapsed-or-worked">
+                {isClockedIn && signInIso
+                  ? fmtElapsed(signInIso, now)
+                  : fmtMinutes(record?.totalMinutesWorked)}
+              </span>
             </p>
           </div>
         </div>
