@@ -22,6 +22,7 @@ import { logAudit } from "../lib/audit";
 import { generatePdf, substituteTemplate } from "../lib/pdf";
 import { dispatchNotification } from "../lib/notification-service";
 import { getUsersByRoles } from "./system-config";
+import { issueDocumentDownloadToken, getAppBaseUrl } from "../lib/document-tokens";
 
 const router = Router();
 
@@ -860,7 +861,15 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
     // If both HR and Finance have approved, move exit request to FnF Approved and auto-generate documents
     const fullyApproved = !!(updated.hrApprovedAt && updated.financeApprovedAt);
     let documentsIssuedCount = 0;
-    if (fullyApproved) {
+    // Collected per-document download tokens — emailed below so the exiting
+    // employee can grab their PDFs without signing back into MysticsHR.
+    const issuedDocLinks: Array<{ documentType: string; downloadUrl: string; expiresAt: Date }> = [];
+    // Only run the heavy side-effects (status flip, doc generation, token
+    // minting) on the *transition* into fully-approved. Without this guard a
+    // repeat approve call by either lane would regenerate documents and mint
+    // fresh public download tokens, expanding the unauthenticated link surface
+    // and spamming the employee's inbox.
+    if (fullyApproved && !wasFullyApprovedBefore) {
       const [exitReq] = await db.select().from(exitRequestsTable).where(eq(exitRequestsTable.id, exitRequestId));
 
       await db.update(exitRequestsTable)
@@ -900,7 +909,7 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
                 title: docType,
               });
               const filename = `${docType.replace(/ /g, "_")}_${emp.employeeCode ?? emp.id}_${Date.now()}.pdf`;
-              await db.insert(issuedDocumentsTable).values({
+              const [insertedDoc] = await db.insert(issuedDocumentsTable).values({
                 employeeId: exitReq.employeeId,
                 templateId: tmpl.id,
                 documentType: docType,
@@ -908,8 +917,24 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
                 generatedBy: u.id,
                 fieldValues: autoFields,
                 fileContent: pdfBuffer.toString("base64"),
-              });
+              }).returning({ id: issuedDocumentsTable.id });
               documentsIssuedCount++;
+
+              // Mint a tokenised public download link for this document so we
+              // can email it to the ex-employee. Failures here must not block
+              // the document issuance — the doc is still available via the
+              // authenticated documents page as a fallback.
+              if (insertedDoc?.id) {
+                try {
+                  const link = await issueDocumentDownloadToken({
+                    issuedDocumentId: insertedDoc.id,
+                    createdByUserId: u.id,
+                  });
+                  issuedDocLinks.push({ documentType: docType, downloadUrl: link.url, expiresAt: link.expiresAt });
+                } catch (tokenErr) {
+                  console.error(`[FnF] Failed to mint download token for ${docType}:`, tokenErr);
+                }
+              }
             } catch (docErr) {
               console.error(`[FnF] Failed to issue ${docType} for employee ${exitReq.employeeId}:`, docErr);
             }
@@ -943,6 +968,33 @@ router.post("/exit/requests/:id/fnf/approve", requireHrmsUser, requireRole(...HR
               },
               entityType: "exit_request", entityId: exitRequestId,
             });
+
+            // Send one email per issued document with its tokenised direct
+            // download link. Sent as separate emails (rather than one combined
+            // mail) so each link's variables are clearly attributable in the
+            // notification log and a single failed dispatch does not lose the
+            // other link. Skip entirely if we don't have an absolute base URL
+            // — sending a relative link in an email would be a broken UX, and
+            // the docs remain available via the authenticated portal as a
+            // fallback.
+            if (!getAppBaseUrl()) {
+              console.error("[exit] APP_URL/REPLIT_DEV_DOMAIN unset — skipping relieving_doc_link emails (would have sent broken links)");
+            } else for (const link of issuedDocLinks) {
+              try {
+                await dispatchNotification({
+                  eventType: "relieving_doc_link", module: "exit",
+                  recipientEmail: empUser.email, recipientName: empUser.name,
+                  recipientEmployeeDbId: exitReqAfter.employeeId,
+                  variables: {
+                    recipientName: empUser.name,
+                    documentType: link.documentType,
+                    downloadUrl: link.downloadUrl,
+                    expiresAt: link.expiresAt.toLocaleDateString("en-IN"),
+                  },
+                  entityType: "exit_request", entityId: exitRequestId,
+                });
+              } catch (e) { console.error("[exit] relieving_doc_link dispatch failed:", e); }
+            }
           }
         } catch (e) { console.error("[exit] fnf_approved notification failed:", e); }
       })();

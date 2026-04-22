@@ -6,11 +6,12 @@ import {
   documentTemplatesTable,
   issuedDocumentsTable,
   documentRequestsTable,
+  documentDownloadTokensTable,
   employeesTable,
   hrmsUsersTable,
   exitRequestsTable,
 } from "@workspace/db/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { generatePdf, substituteTemplate } from "../lib/pdf";
 import { dispatchNotification } from "../lib/notification-service";
 
@@ -266,6 +267,88 @@ router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), as
       generatedAt: issued.generatedAt,
       fieldValues: issued.fieldValues,
     });
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ─── PUBLIC TOKENISED DOWNLOAD (no Clerk session) ─────────────────────────────
+// Used by emailed direct-download links (e.g. relieving documents). The token
+// authorises one specific issued document until the row's `expiresAt` — it
+// cannot be substituted to reach any other document. Each hit increments
+// downloadCount and writes an audit row so HR can see if/when the link was
+// used. We intentionally allow >1 download (the user may legitimately retry
+// or re-download from another device) but cap at HARD_DOWNLOAD_CAP to limit
+// abuse if a token leaks.
+const HARD_DOWNLOAD_CAP = 20;
+router.get("/documents/public/download/:token", async (req, res) => {
+  try {
+    const token = String(req.params.token ?? "");
+    if (!token || token.length < 16) {
+      res.status(400).json({ error: "Invalid token" }); return;
+    }
+
+    // Best-effort client IP capture — proxies may set x-forwarded-for.
+    const fwd = req.headers["x-forwarded-for"];
+    const ipAddress = (Array.isArray(fwd) ? fwd[0] : fwd?.split(",")[0]?.trim())
+      ?? req.socket.remoteAddress
+      ?? null;
+
+    // Atomic claim-and-increment: a single conditional UPDATE serves as both
+    // the validity check (token exists, not expired, under cap) and the
+    // counter bump. Concurrent requests cannot both pass the cap because
+    // only the rows matched here get their count incremented. Whichever
+    // request loses the race gets zero rows back and is rejected.
+    const claimed = await db.update(documentDownloadTokensTable).set({
+      downloadCount: sql`${documentDownloadTokensTable.downloadCount} + 1`,
+      downloadedAt: sql`COALESCE(${documentDownloadTokensTable.downloadedAt}, NOW())`,
+      lastIpAddress: ipAddress,
+    }).where(and(
+      eq(documentDownloadTokensTable.token, token),
+      sql`${documentDownloadTokensTable.expiresAt} > NOW()`,
+      sql`${documentDownloadTokensTable.downloadCount} < ${HARD_DOWNLOAD_CAP}`,
+    )).returning({
+      id: documentDownloadTokensTable.id,
+      issuedDocumentId: documentDownloadTokensTable.issuedDocumentId,
+    });
+    const row = claimed[0];
+    if (!row) {
+      // We can't tell apart not-found / expired / capped without a follow-up
+      // query — keep that follow-up scoped to the same token and only to
+      // distinguish the user-facing message. No data is leaked because the
+      // caller already supplied the token.
+      const [exists] = await db.select({
+        expiresAt: documentDownloadTokensTable.expiresAt,
+        downloadCount: documentDownloadTokensTable.downloadCount,
+      }).from(documentDownloadTokensTable)
+        .where(eq(documentDownloadTokensTable.token, token)).limit(1);
+      if (!exists) { res.status(404).json({ error: "Link not found or has been revoked" }); return; }
+      if (new Date(exists.expiresAt) < new Date()) {
+        res.status(410).json({ error: "This download link has expired" }); return;
+      }
+      res.status(429).json({ error: "Download limit reached for this link" }); return;
+    }
+
+    const [doc] = await db.select().from(issuedDocumentsTable)
+      .where(eq(issuedDocumentsTable.id, row.issuedDocumentId)).limit(1);
+    if (!doc?.fileContent) { res.status(404).json({ error: "Document not found" }); return; }
+
+    await logAudit({
+      // No session user — audit row records the document id, IP, and the
+      // token row id (in newValue) so HR can correlate downloads back to the
+      // emailed link without exposing the token in audit data.
+      action: "public_document_download",
+      module: "documents",
+      recordId: doc.id,
+      ipAddress: ipAddress ?? undefined,
+      newValue: `download_token_id=${row.id}`,
+    });
+
+    const pdfBuffer = Buffer.from(doc.fileContent, "base64");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${doc.filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length.toString());
+    // Don't let browsers/proxies cache an authenticated-style response.
+    res.setHeader("Cache-Control", "private, no-store");
+    res.send(pdfBuffer);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
