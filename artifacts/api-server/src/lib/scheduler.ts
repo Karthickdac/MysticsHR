@@ -1116,7 +1116,7 @@ async function remindPendingPayrollApprovals() {
  * with errorMessage="WhatsApp not configured" when missing. Channels are
  * pinned to ["whatsapp"] so this is a WhatsApp-only nudge.
  */
-async function remindOverdueExitClearanceTasks() {
+export async function remindOverdueExitClearanceTasks() {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const todayStart = new Date(`${today}T00:00:00`);
