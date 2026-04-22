@@ -169,43 +169,91 @@ export function queueUpdateReturn(state: DbMockState, table: unknown, rows: Row[
 
 // ─── DB MOCK SURFACE ────────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// The drizzle chain types we mimic are wide and recursive; faking them with
-// `any` here keeps the harness short without weakening the production code's
-// types (it's only used inside test mocks).
+/**
+ * The drizzle query builder is a chainable + thenable surface. We only mimic
+ * the subset the notification suites actually use, but we type each chain
+ * narrowly so callers (and the harness self-tests) get autocompletion and
+ * type errors stay loud — no `any` casts.
+ */
+export interface SelectChain extends Promise<Row[]> {
+  where(...args: unknown[]): SelectChain;
+  orderBy(...args: unknown[]): SelectChain;
+  limit(...args: unknown[]): SelectChain;
+  offset(...args: unknown[]): SelectChain;
+  leftJoin(...args: unknown[]): SelectChain;
+  innerJoin(...args: unknown[]): SelectChain;
+  groupBy(...args: unknown[]): SelectChain;
+  having(...args: unknown[]): SelectChain;
+}
 
-function buildDbMockSurface(state: DbMockState) {
+export interface InsertChain extends Promise<void> {
+  returning(): Promise<Row[]>;
+  onConflictDoNothing(...args: unknown[]): InsertChain;
+  onConflictDoUpdate(...args: unknown[]): InsertChain;
+}
+
+export interface UpdateWhereChain extends Promise<void> {
+  returning(): Promise<Row[]>;
+}
+
+export interface UpdateChain {
+  set(values: Row): { where(...args: unknown[]): UpdateWhereChain };
+}
+
+export interface DeleteChain {
+  where(...args: unknown[]): Promise<void>;
+}
+
+export interface SelectFrom { from(table: unknown): SelectChain; }
+export interface InsertValues { values(v: Row | Row[]): InsertChain; }
+
+export interface DbMockSurface {
+  select(projection?: unknown): SelectFrom;
+  selectDistinct(projection?: unknown): SelectFrom;
+  selectDistinctOn(cols: unknown, projection?: unknown): SelectFrom;
+  insert(table: unknown): InsertValues;
+  update(table: unknown): UpdateChain;
+  delete(table: unknown): DeleteChain;
+  transaction<T>(fn: (tx: DbMockSurface) => Promise<T>): Promise<T>;
+}
+
+function buildDbMockSurface(state: DbMockState): DbMockSurface {
   function dequeueSelect(table: unknown): Row[] {
     const q = state.selectQueues.get(table);
     return q && q.length ? q.shift()! : [];
   }
-  function makeSelectChain(table: unknown): any {
-    const base: any = Promise.resolve().then(() => dequeueSelect(table));
-    base.where = () => base;
-    base.orderBy = () => base;
-    base.limit = () => base;
-    base.offset = () => base;
-    base.leftJoin = () => base;
-    base.innerJoin = () => base;
-    base.groupBy = () => base;
-    base.having = () => base;
+  function makeSelectChain(table: unknown): SelectChain {
+    // Build the thenable first, then attach the chainable methods. The
+    // double-cast through `unknown` is purely a structural assertion: we
+    // know we're about to assign every method the interface requires.
+    const base = Promise.resolve().then(() => dequeueSelect(table)) as unknown as SelectChain;
+    const self = (): SelectChain => base;
+    base.where = self;
+    base.orderBy = self;
+    base.limit = self;
+    base.offset = self;
+    base.leftJoin = self;
+    base.innerJoin = self;
+    base.groupBy = self;
+    base.having = self;
     return base;
   }
-  function makeInsertChain(table: unknown, values: Row | Row[]): any {
+  function makeInsertChain(table: unknown, values: Row | Row[]): InsertChain {
     const rows = Array.isArray(values) ? values : [values];
     state.inserted.push({ table, rows });
     const generated = rows.map((r) => ({ ...r, id: state.nextId++, createdAt: new Date() }));
-    const base: any = Promise.resolve();
+    const base = Promise.resolve() as unknown as InsertChain;
     base.returning = () => Promise.resolve(generated);
-    base.onConflictDoNothing = () => base;
-    base.onConflictDoUpdate = () => base;
+    const self = (): InsertChain => base;
+    base.onConflictDoNothing = self;
+    base.onConflictDoUpdate = self;
     return base;
   }
-  function makeUpdateChain(table: unknown) {
+  function makeUpdateChain(table: unknown): UpdateChain {
     return {
       set: (values: Row) => {
         state.updated.push({ table, values });
-        const base: any = Promise.resolve();
+        const base = Promise.resolve() as unknown as UpdateWhereChain;
         base.returning = () => {
           const q = state.updateReturnQueues.get(table);
           if (q && q.length) return Promise.resolve(q.shift()!);
@@ -215,8 +263,8 @@ function buildDbMockSurface(state: DbMockState) {
       },
     };
   }
-  const select = (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) });
-  const surface: any = {
+  const select = (_projection?: unknown): SelectFrom => ({ from: (t: unknown) => makeSelectChain(t) });
+  const surface: DbMockSurface = {
     select,
     selectDistinct: select,
     selectDistinctOn: (_cols: unknown, _proj?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
@@ -230,13 +278,13 @@ function buildDbMockSurface(state: DbMockState) {
     }),
     // db.transaction((tx) => fn(tx)) — re-use the same surface so tests don't
     // need to know whether a route runs inside a transaction or not.
-    transaction: <T>(fn: (tx: any) => Promise<T>): Promise<T> => fn(surface),
+    transaction: <T>(fn: (tx: DbMockSurface) => Promise<T>): Promise<T> => fn(surface),
   };
   return surface;
 }
 
 /** Build the module factory you pass to `vi.mock("…/lib/db", () => …)`. */
-export function buildDbMockModule(state: DbMockState) {
+export function buildDbMockModule(state: DbMockState): { db: DbMockSurface } {
   return { db: buildDbMockSurface(state) };
 }
 
