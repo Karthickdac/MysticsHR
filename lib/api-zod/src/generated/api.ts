@@ -7346,6 +7346,15 @@ export const GetSystemSettingsParams = zod.object({
   category: zod.coerce.string(),
 });
 
+export const GetSystemSettingsQueryParams = zod.object({
+  withSource: zod
+    .enum(["true"])
+    .optional()
+    .describe(
+      'When \"true\", returns an envelope with per-key source attribution (db vs server default).',
+    ),
+});
+
 export const GetSystemSettingsResponse = zod.record(
   zod.string(),
   zod.unknown(),

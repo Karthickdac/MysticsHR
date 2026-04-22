@@ -27,7 +27,8 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2, Lock, FormInput, Ban, HardDrive, RefreshCw, Play, AlertTriangle } from "lucide-react";
+import { Settings, Building2, Scale, Banknote, CalendarDays, ShieldCheck, Plus, Pencil, Trash2, Lock, FormInput, Ban, HardDrive, RefreshCw, Play, AlertTriangle, Mail, MessageSquare, Database, Server } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@clerk/react";
@@ -1132,6 +1133,159 @@ function StorageCleanupTab() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+// ─── Notification Credentials Tab ─────────────────────────────────────────────
+// Shows SMTP and WhatsApp credential fields. Each field gets a small badge
+// telling the admin whether the value is sourced from the database (an admin
+// has saved it) or from a server env-var default. The actual default value is
+// never returned to the client — only the source label.
+
+type CredentialSource = "db" | "default";
+type CredentialEnvelope = { values: Record<string, unknown>; sources: Record<string, CredentialSource> };
+
+/**
+ * Small badge that says where a credential's runtime value comes from.
+ * Wrapped in a tooltip so the admin gets a one-line explanation on hover.
+ */
+function SourceBadge({ source }: { source: CredentialSource | undefined }) {
+  if (!source) return null;
+  const isDb = source === "db";
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant={isDb ? "default" : "secondary"}
+            className="ml-2 gap-1 px-1.5 py-0 text-[10px] font-normal cursor-help"
+            data-testid={`badge-source-${isDb ? "db" : "default"}`}
+          >
+            {isDb ? <Database className="w-2.5 h-2.5" /> : <Server className="w-2.5 h-2.5" />}
+            {isDb ? "From database" : "From server default"}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs">
+          {isDb
+            ? "This value is stored in the database (set here in the admin UI). It overrides any server default."
+            : "No DB value is set, so the server falls back to its environment-variable default."}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+const SMTP_FIELDS: { key: string; label: string; placeholder?: string; type?: string }[] = [
+  { key: "host", label: "SMTP Host", placeholder: "smtp.example.com" },
+  { key: "port", label: "Port", placeholder: "587", type: "number" },
+  { key: "secure", label: "Secure (TLS)", placeholder: "true / false" },
+  { key: "username", label: "Username" },
+  { key: "password", label: "Password", type: "password" },
+  { key: "from", label: "From Address", placeholder: "noreply@example.com" },
+];
+
+const WA_FIELDS: { key: string; label: string; placeholder?: string }[] = [
+  { key: "phone_number_id", label: "Phone Number ID" },
+  { key: "access_token", label: "Access Token" },
+];
+
+function CredentialCategoryCard({
+  category, title, icon, fields,
+}: {
+  category: "email" | "whatsapp";
+  title: string;
+  icon: React.ReactNode;
+  fields: { key: string; label: string; placeholder?: string; type?: string }[];
+}) {
+  const queryClient = useQueryClient();
+  // Pull the envelope shape with per-field sources. Cast through unknown
+  // because the OpenAPI response is intentionally loose (additionalProperties:true).
+  const { data, isLoading, refetch } = useGetSystemSettings(category, { withSource: "true" } as never);
+  const envelope = (data as unknown as CredentialEnvelope | undefined);
+  const sources = envelope?.sources ?? {};
+  const saved = envelope?.values ?? {};
+
+  const updateMut = useUpdateSystemSettings();
+  const [form, setForm] = useState<Record<string, string>>({});
+  // Reset the local form whenever the server payload arrives or changes.
+  useEffect(() => {
+    if (!isLoading && envelope) {
+      const next: Record<string, string> = {};
+      for (const f of fields) {
+        const v = saved[f.key];
+        next[f.key] = v == null ? "" : String(v);
+      }
+      setForm(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, data]);
+
+  async function save() {
+    // Send only fields the admin actually filled in (non-empty strings),
+    // so blank fields don't accidentally write empty rows that flip the
+    // badge to "From database" with no real value behind it.
+    const payload: Record<string, string> = {};
+    for (const f of fields) {
+      const v = form[f.key];
+      if (v != null && v !== "") payload[f.key] = v;
+    }
+    await updateMut.mutateAsync({ category, data: payload });
+    toast({ title: `${title} saved` });
+    // Invalidate so the source badges flip immediately on success.
+    await queryClient.invalidateQueries({ queryKey: ["/api/system-settings/" + category] });
+    await refetch();
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">{icon}{title}</CardTitle>
+        <CardDescription>
+          Each field shows whether the running value comes from the database or from a server env-var default.
+          Saving a value here always switches that field to "From database".
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 max-w-lg">
+        {fields.map((f) => (
+          <div key={f.key}>
+            <div className="flex items-center">
+              <Label htmlFor={`cred-${category}-${f.key}`}>{f.label}</Label>
+              <SourceBadge source={sources[f.key]} />
+            </div>
+            <Input
+              id={`cred-${category}-${f.key}`}
+              type={f.type ?? "text"}
+              value={form[f.key] ?? ""}
+              placeholder={f.placeholder}
+              onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+              data-testid={`input-cred-${category}-${f.key}`}
+            />
+          </div>
+        ))}
+        <Button onClick={save} disabled={updateMut.isPending} data-testid={`button-save-cred-${category}`}>
+          {updateMut.isPending ? "Saving…" : `Save ${title}`}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NotificationCredentialsTab() {
+  return (
+    <div className="space-y-6">
+      <CredentialCategoryCard
+        category="email"
+        title="SMTP / Email"
+        icon={<Mail className="w-4 h-4" />}
+        fields={SMTP_FIELDS}
+      />
+      <CredentialCategoryCard
+        category="whatsapp"
+        title="WhatsApp Cloud API"
+        icon={<MessageSquare className="w-4 h-4" />}
+        fields={WA_FIELDS}
+      />
+    </div>
+  );
+}
+
 export default function SystemConfigPage() {
   const { role } = useCurrentHrmsUser();
   const isSuperAdmin = role === "super_admin";
@@ -1154,6 +1308,7 @@ export default function SystemConfigPage() {
             <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
             <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
             <TabsTrigger value="leave-blackouts">Leave Blackouts</TabsTrigger>
+            {isSuperAdmin && <TabsTrigger value="credentials">Notification Credentials</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="storage-cleanup">Storage Cleanup</TabsTrigger>}
           </TabsList>
 
@@ -1166,6 +1321,9 @@ export default function SystemConfigPage() {
           <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
           <TabsContent value="custom-fields" className="mt-4"><CustomEmployeeFieldsTab /></TabsContent>
           <TabsContent value="leave-blackouts" className="mt-4"><LeaveBlackoutsTab /></TabsContent>
+          {isSuperAdmin && (
+            <TabsContent value="credentials" className="mt-4"><NotificationCredentialsTab /></TabsContent>
+          )}
           {isSuperAdmin && (
             <TabsContent value="storage-cleanup" className="mt-4"><StorageCleanupTab /></TabsContent>
           )}

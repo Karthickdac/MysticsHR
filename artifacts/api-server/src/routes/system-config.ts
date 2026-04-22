@@ -13,6 +13,14 @@ const SUPER_ADMIN = ["super_admin"] as const;
 // Sensitive categories: only super_admin may read/write
 const SENSITIVE_CATEGORIES = ["email", "whatsapp"] as const;
 
+// Known fields per credential category. Used to compute the source ("db" vs
+// "default") for every field, even when nothing has been saved yet — so the
+// UI can render an accurate badge for fields the admin hasn't touched.
+const CREDENTIAL_FIELDS: Record<string, readonly string[]> = {
+  email: ["host", "port", "secure", "username", "password", "from"],
+  whatsapp: ["phone_number_id", "access_token"],
+};
+
 // ─── System Settings ──────────────────────────────────────────────────────────
 
 router.get("/system-settings/:category", requireHrmsUser, requireRole(...HR_ROLES), async (req: Request, res: Response): Promise<void> => {
@@ -27,10 +35,26 @@ router.get("/system-settings/:category", requireHrmsUser, requireRole(...HR_ROLE
 
     const rows = await db.select().from(systemSettingsTable).where(eq(systemSettingsTable.category, category));
     const result: Record<string, unknown> = {};
+    const dbKeys = new Set<string>();
     for (const r of rows) {
-      // Mask secrets for log safety — caller gets the value but keys like password/token are masked in logs
       result[r.key] = r.value;
+      dbKeys.add(r.key);
     }
+
+    // When the client requests source attribution (?withSource=true), return
+    // an envelope { values, sources } where each known field is tagged "db"
+    // (a row exists in system_settings) or "default" (the runtime falls back
+    // to a server env var). We never return the actual default value — only
+    // the source label — so server secrets stay on the server.
+    if (req.query["withSource"] === "true") {
+      const knownFields = CREDENTIAL_FIELDS[category] ?? [];
+      const allKeys = new Set<string>([...knownFields, ...dbKeys]);
+      const sources: Record<string, "db" | "default"> = {};
+      for (const k of allKeys) sources[k] = dbKeys.has(k) ? "db" : "default";
+      res.json({ values: result, sources });
+      return;
+    }
+
     res.json(result);
   } catch {
     res.status(500).json({ error: "Failed to load settings" });

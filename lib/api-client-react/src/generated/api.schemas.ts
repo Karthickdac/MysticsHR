@@ -4434,6 +4434,20 @@ export type TestWhatsAppConfig200 = {
   message?: string;
 };
 
+export type GetSystemSettingsParams = {
+  /**
+   * When "true", returns an envelope with per-key source attribution (db vs server default).
+   */
+  withSource?: GetSystemSettingsWithSource;
+};
+
+export type GetSystemSettingsWithSource =
+  (typeof GetSystemSettingsWithSource)[keyof typeof GetSystemSettingsWithSource];
+
+export const GetSystemSettingsWithSource = {
+  true: "true",
+} as const;
+
 export type GetSystemSettings200 = { [key: string]: unknown };
 
 export type UpdateSystemSettingsBody = { [key: string]: unknown };

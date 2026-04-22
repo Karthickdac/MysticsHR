@@ -165,6 +165,7 @@ import type {
   GetStatutoryComplianceReport200,
   GetStatutoryComplianceReportParams,
   GetSystemSettings200,
+  GetSystemSettingsParams,
   GetTdsSummaryReportParams,
   GoalProgress,
   GoalProgressBody,
@@ -26080,22 +26081,47 @@ export const useTestWhatsAppConfig = <
 /**
  * @summary Get all settings for a category
  */
-export const getGetSystemSettingsUrl = (category: string) => {
-  return `/api/system-settings/${category}`;
+export const getGetSystemSettingsUrl = (
+  category: string,
+  params?: GetSystemSettingsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/system-settings/${category}?${stringifiedParams}`
+    : `/api/system-settings/${category}`;
 };
 
 export const getSystemSettings = async (
   category: string,
+  params?: GetSystemSettingsParams,
   options?: RequestInit,
 ): Promise<GetSystemSettings200> => {
-  return customFetch<GetSystemSettings200>(getGetSystemSettingsUrl(category), {
-    ...options,
-    method: "GET",
-  });
+  return customFetch<GetSystemSettings200>(
+    getGetSystemSettingsUrl(category, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
-export const getGetSystemSettingsQueryKey = (category: string) => {
-  return [`/api/system-settings/${category}`] as const;
+export const getGetSystemSettingsQueryKey = (
+  category: string,
+  params?: GetSystemSettingsParams,
+) => {
+  return [
+    `/api/system-settings/${category}`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getGetSystemSettingsQueryOptions = <
@@ -26103,6 +26129,7 @@ export const getGetSystemSettingsQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   category: string,
+  params?: GetSystemSettingsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getSystemSettings>>,
@@ -26115,12 +26142,12 @@ export const getGetSystemSettingsQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getGetSystemSettingsQueryKey(category);
+    queryOptions?.queryKey ?? getGetSystemSettingsQueryKey(category, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getSystemSettings>>
   > = ({ signal }) =>
-    getSystemSettings(category, { signal, ...requestOptions });
+    getSystemSettings(category, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -26148,6 +26175,7 @@ export function useGetSystemSettings<
   TError = ErrorType<unknown>,
 >(
   category: string,
+  params?: GetSystemSettingsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getSystemSettings>>,
@@ -26157,7 +26185,11 @@ export function useGetSystemSettings<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetSystemSettingsQueryOptions(category, options);
+  const queryOptions = getGetSystemSettingsQueryOptions(
+    category,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

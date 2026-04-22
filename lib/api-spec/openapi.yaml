@@ -5898,9 +5898,19 @@ paths:
           name: category
           required: true
           schema: { type: string }
+        - in: query
+          name: withSource
+          required: false
+          description: When "true", returns an envelope with per-key source attribution (db vs server default).
+          schema:
+            type: string
+            enum: ["true"]
       responses:
         '200':
-          description: Settings as key-value map
+          description: |
+            When withSource is omitted: a flat key-value map of settings.
+            When withSource=true: an envelope `{ values: {...}, sources: { key: "db" | "default" } }`.
+            The actual server-default values are NEVER returned — only the source label.
           content:
             application/json:
               schema:

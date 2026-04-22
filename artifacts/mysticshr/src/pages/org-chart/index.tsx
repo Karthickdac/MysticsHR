@@ -644,7 +644,7 @@ export default function OrgChartPage() {
                     next.delete(id);
                     updateFilters({ ...filters, departmentIds: next });
                   }}
-                  aria-label={`Remove ${opt.label} filter`}
+                  aria-label={`Remove ${label} filter`}
                 >
                   <X className="w-3 h-3" />
                 </button>
