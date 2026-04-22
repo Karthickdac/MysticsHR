@@ -11,6 +11,7 @@ import {
   leaveApplicationsTable,
   leaveTypesTable,
   exitRequestsTable,
+  exitClearanceTasksTable,
   payrollRecordsTable,
   payrollRunsTable,
   helpdeskTicketsTable,
@@ -1096,6 +1097,132 @@ async function remindPendingPayrollApprovals() {
 }
 
 /**
+ * Daily WhatsApp nudge for overdue exit clearance tasks.
+ *
+ * Selects exit_clearance_tasks where:
+ *   - dueDate < today (past due)
+ *   - status NOT IN (Completed, Waived)
+ *   - assignedToUserId IS NOT NULL (need a recipient)
+ *
+ * For each task, sends the assignee a WhatsApp message with the employee
+ * name, task name, days overdue, due date, and a deep link to the exit
+ * request. Suppression: skips any (task, assignee phone) pair that already
+ * received an `exit_clearance_task_overdue` notification today (any status,
+ * so failed sends don't get retried within the day either — daily cron
+ * cadence is the retry mechanism).
+ *
+ * WhatsApp gating is delegated to the dispatcher / sendWhatsApp, which
+ * checks the system_settings whatsapp credentials and logs a "failed" row
+ * with errorMessage="WhatsApp not configured" when missing. Channels are
+ * pinned to ["whatsapp"] so this is a WhatsApp-only nudge.
+ */
+async function remindOverdueExitClearanceTasks() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayStart = new Date(`${today}T00:00:00`);
+
+    const overdueTasks = await db.select({
+      id: exitClearanceTasksTable.id,
+      exitRequestId: exitClearanceTasksTable.exitRequestId,
+      taskName: exitClearanceTasksTable.taskName,
+      department: exitClearanceTasksTable.department,
+      dueDate: exitClearanceTasksTable.dueDate,
+      assignedToUserId: exitClearanceTasksTable.assignedToUserId,
+      assigneeEmail: hrmsUsersTable.email,
+      assigneeName: hrmsUsersTable.name,
+      assigneeEmployeeId: hrmsUsersTable.employeeId,
+      employeeId: exitRequestsTable.employeeId,
+      employeeFirstName: employeesTable.firstName,
+      employeeLastName: employeesTable.lastName,
+      employeeCode: employeesTable.employeeId,
+    }).from(exitClearanceTasksTable)
+      .innerJoin(exitRequestsTable, eq(exitClearanceTasksTable.exitRequestId, exitRequestsTable.id))
+      .innerJoin(employeesTable, eq(exitRequestsTable.employeeId, employeesTable.id))
+      .innerJoin(hrmsUsersTable, eq(exitClearanceTasksTable.assignedToUserId, hrmsUsersTable.id))
+      .where(and(
+        isNotNull(exitClearanceTasksTable.dueDate),
+        lt(exitClearanceTasksTable.dueDate, today),
+        sql`${exitClearanceTasksTable.status} NOT IN ('Completed', 'Waived')`,
+        eq(hrmsUsersTable.isActive, true),
+      ));
+
+    if (overdueTasks.length === 0) return;
+
+    // Pre-load today's overdue notification logs to suppress repeat sends
+    // for the same task. Key by `${entityId}__${recipientPhone||recipientEmail}`.
+    const todaysLogs = await db.select({
+      entityId: notificationLogsTable.entityId,
+      recipientPhone: notificationLogsTable.recipientPhone,
+      recipientEmail: notificationLogsTable.recipientEmail,
+    }).from(notificationLogsTable)
+      .where(and(
+        eq(notificationLogsTable.eventType, "exit_clearance_task_overdue"),
+        eq(notificationLogsTable.entityType, "exit_clearance_task"),
+        eq(notificationLogsTable.channel, "whatsapp"),
+        gte(notificationLogsTable.sentAt, todayStart),
+      ));
+    const sentSet = new Set(todaysLogs.map(l => `${l.entityId}__${l.recipientPhone ?? l.recipientEmail ?? ""}`));
+
+    const { dispatchNotification } = await import("./notification-service");
+    const baseUrl = (process.env["APP_URL"] ?? (process.env["REPLIT_DEV_DOMAIN"] ? `https://${process.env["REPLIT_DEV_DOMAIN"]}` : "")).replace(/\/$/, "");
+    const buildAppUrl = (path: string) => baseUrl ? `${baseUrl}${path.startsWith("/") ? path : `/${path}`}` : path;
+
+    let processed = 0;
+    for (const t of overdueTasks) {
+      // Resolve assignee phone (used for both dispatch and suppression key)
+      const assigneePhone = await resolveAssigneePhone(t.assigneeEmployeeId);
+      const suppressionKey = `${t.id}__${assigneePhone ?? t.assigneeEmail ?? ""}`;
+      if (sentSet.has(suppressionKey)) continue;
+
+      const dueDateStr = String(t.dueDate);
+      const daysOverdue = Math.max(1, Math.floor(
+        (new Date(`${today}T00:00:00`).getTime() - new Date(`${dueDateStr}T00:00:00`).getTime()) / (24 * 60 * 60 * 1000),
+      ));
+      const employeeName = `${t.employeeFirstName ?? ""} ${t.employeeLastName ?? ""}`.trim();
+      const actionUrl = buildAppUrl(`/exit/requests/${t.exitRequestId}`);
+
+      await dispatchNotification({
+        eventType: "exit_clearance_task_overdue",
+        module: "exit",
+        recipientEmail: t.assigneeEmail ?? undefined,
+        recipientName: t.assigneeName ?? undefined,
+        recipientEmployeeDbId: t.assigneeEmployeeId,
+        recipientPhone: assigneePhone,
+        variables: {
+          recipientName: t.assigneeName ?? "",
+          employeeName: employeeName || "an employee",
+          employeeId: t.employeeCode ?? "",
+          taskName: t.taskName,
+          department: t.department,
+          dueDate: dueDateStr,
+          daysOverdue: String(daysOverdue),
+          actionUrl,
+        },
+        entityType: "exit_clearance_task",
+        entityId: t.id,
+        channels: ["whatsapp"],
+      }).catch((err) => logger.warn({ err, taskId: t.id }, "[scheduler] exit_clearance_task_overdue dispatch failed"));
+      processed++;
+
+      // Mark as processed in the in-memory set so we don't re-dispatch within this tick
+      sentSet.add(suppressionKey);
+    }
+
+    logger.info({ overdue: overdueTasks.length, processed }, "[scheduler] remindOverdueExitClearanceTasks completed");
+  } catch (e) {
+    logger.error({ err: e }, "[scheduler] remindOverdueExitClearanceTasks error");
+  }
+}
+
+/** Resolve an HRMS user's phone via their linked employee record. */
+async function resolveAssigneePhone(employeeId: number | null | undefined): Promise<string | undefined> {
+  if (!employeeId) return undefined;
+  const [row] = await db.select({ phone: employeesTable.phone })
+    .from(employeesTable).where(eq(employeesTable.id, employeeId)).limit(1);
+  return row?.phone ?? undefined;
+}
+
+/**
  * Annual Form 16 dispatch — runs in early April. For every active employee
  * who had at least one payroll record in the just-finished financial year
  * (April `year` → March `year+1`), email a link to download their Form 16 PDF.
@@ -1255,6 +1382,13 @@ export function startScheduler(_port: number) {
   // beyond the configured threshold (system_settings payroll.approval_reminder_hours, default 24h).
   cron.schedule("15 */4 * * *", () => {
     void remindPendingPayrollApprovals();
+  });
+  // At 10:15 daily — WhatsApp nudge to assignees of overdue exit clearance tasks.
+  // Runs after the every-2h exit escalation job (`processConfiguredEscalations`).
+  // Per-task suppression prevents same assignee/task pair being messaged more
+  // than once per day.
+  cron.schedule("15 10 * * *", () => {
+    void remindOverdueExitClearanceTasks();
   });
   // April 5 at 09:00 — annual Form 16 dispatch for the just-finished FY
   // (FY runs Apr `year` → Mar `year+1`; in early April we email for FY = year-1).
