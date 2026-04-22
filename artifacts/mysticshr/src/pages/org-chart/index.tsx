@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearch, useLocation } from "wouter";
 import { useListOrgChart, type OrgChartEmployee } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, Users, Network, TrendingUp, FileImage, FileDown, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronDown, ChevronRight, Search, Users, Network, TrendingUp, FileImage, FileDown, Loader2, Filter, X } from "lucide-react";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
 import { toast } from "sonner";
 import { exportOrgChartPng, exportOrgChartPdf } from "./export-utils";
@@ -237,6 +241,127 @@ function TreeNode({
   );
 }
 
+/**
+ * Restrict the employee list to those matching every active filter PLUS all
+ * of their ancestors up to the root. Ancestor preservation keeps the chart
+ * readable as a hierarchy — a deep IC on a different department still shows
+ * the chain of managers above them, so context isn't lost.
+ */
+function filterEmployeesPreservingAncestors(
+  employees: OrgChartEmployee[],
+  predicate: (e: OrgChartEmployee) => boolean,
+): OrgChartEmployee[] {
+  const byId = new Map(employees.map((e) => [e.id, e]));
+  const keep = new Set<number>();
+  for (const e of employees) {
+    if (!predicate(e)) continue;
+    let cur: OrgChartEmployee | undefined = e;
+    const seen = new Set<number>();
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      keep.add(cur.id);
+      cur = cur.managerId ? byId.get(cur.managerId) : undefined;
+    }
+  }
+  return employees.filter((e) => keep.has(e.id));
+}
+
+type FilterState = {
+  departmentIds: Set<number>;
+  locations: Set<string>;
+  employmentTypes: Set<string>;
+};
+
+const EMPTY_FILTERS: FilterState = {
+  departmentIds: new Set<number>(),
+  locations: new Set<string>(),
+  employmentTypes: new Set<string>(),
+};
+
+function isFiltersEmpty(f: FilterState): boolean {
+  return f.departmentIds.size === 0 && f.locations.size === 0 && f.employmentTypes.size === 0;
+}
+
+function parseFiltersFromSearch(search: string): FilterState {
+  const sp = new URLSearchParams(search);
+  const dept = sp.getAll("dept").flatMap((v) => v.split(",")).filter(Boolean);
+  const loc = sp.getAll("loc").flatMap((v) => v.split(",")).filter(Boolean);
+  const type = sp.getAll("type").flatMap((v) => v.split(",")).filter(Boolean);
+  return {
+    departmentIds: new Set(dept.map((d) => Number(d)).filter((n) => Number.isFinite(n))),
+    locations: new Set(loc),
+    employmentTypes: new Set(type),
+  };
+}
+
+function serialiseFiltersToSearch(filters: FilterState, otherSearch: string): string {
+  const sp = new URLSearchParams(otherSearch);
+  sp.delete("dept"); sp.delete("loc"); sp.delete("type");
+  if (filters.departmentIds.size) sp.set("dept", [...filters.departmentIds].join(","));
+  if (filters.locations.size) sp.set("loc", [...filters.locations].join(","));
+  if (filters.employmentTypes.size) sp.set("type", [...filters.employmentTypes].join(","));
+  return sp.toString();
+}
+
+/** Generic multi-select dropdown using Popover + Command + Checkbox. */
+function MultiSelectFilter({
+  label, icon, options, selected, onToggle, onClear, testId,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  options: { value: string; label: string }[];
+  selected: Set<string>;
+  onToggle: (value: string) => void;
+  onClear: () => void;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const count = selected.size;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" data-testid={testId}>
+          {icon}
+          <span className="ml-1">{label}</span>
+          {count > 0 && (
+            <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{count}</Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <Command>
+          <CommandInput placeholder={`Filter ${label.toLowerCase()}…`} />
+          <CommandList>
+            <CommandEmpty>No options.</CommandEmpty>
+            <CommandGroup>
+              {options.map((o) => {
+                const isOn = selected.has(o.value);
+                return (
+                  <CommandItem
+                    key={o.value}
+                    value={o.label}
+                    onSelect={() => onToggle(o.value)}
+                    className="cursor-pointer"
+                  >
+                    <Checkbox checked={isOn} className="mr-2 pointer-events-none" />
+                    <span className="truncate">{o.label}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+          {count > 0 && (
+            <div className="border-t p-2 flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">{count} selected</span>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onClear}>Clear</Button>
+            </div>
+          )}
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function OrgChartPage() {
   const [search, setSearch] = useState("");
 
@@ -248,7 +373,76 @@ export default function OrgChartPage() {
   const { data, isLoading } = useListOrgChart();
   const employees = (data?.data ?? []) as OrgChartEmployee[];
 
-  const { roots, orphans, cycles } = useMemo(() => buildTree(employees), [employees]);
+  // ─── URL-backed filter state ───────────────────────────────────────────────
+  // Filter state lives in the URL so it survives navigation and can be
+  // bookmarked / shared. We hydrate from URL on mount and write back via
+  // setLocation whenever the user changes filters.
+  const urlSearch = useSearch();
+  const [, setLocation] = useLocation();
+  const [filters, setFilters] = useState<FilterState>(() => parseFiltersFromSearch(urlSearch));
+
+  // Re-hydrate when the URL changes externally (back button etc.)
+  useEffect(() => {
+    setFilters(parseFiltersFromSearch(urlSearch));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearch]);
+
+  const updateFilters = useCallback((next: FilterState) => {
+    setFilters(next);
+    const newSearch = serialiseFiltersToSearch(next, urlSearch);
+    // wouter setLocation accepts a path; preserve the current pathname.
+    const path = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+    setLocation(path, { replace: true });
+  }, [setLocation, urlSearch]);
+
+  // ─── Build option lists from the employee data ─────────────────────────────
+  const departmentOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    employees.forEach((e) => {
+      if (e.departmentId != null && e.departmentName) map.set(e.departmentId, e.departmentName);
+    });
+    return [...map.entries()]
+      .map(([id, name]) => ({ value: String(id), label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [employees]);
+
+  const locationOptions = useMemo(() => {
+    const set = new Set<string>();
+    employees.forEach((e) => { if (e.location) set.add(e.location); });
+    return [...set].sort().map((l) => ({ value: l, label: l }));
+  }, [employees]);
+
+  const employmentTypeOptions = useMemo(() => {
+    const set = new Set<string>();
+    employees.forEach((e) => { if (e.employmentType) set.add(e.employmentType); });
+    return [...set].sort().map((t) => ({ value: t, label: t }));
+  }, [employees]);
+
+  // ─── Apply filters with ancestor preservation ──────────────────────────────
+  const filteredEmployees = useMemo(() => {
+    if (isFiltersEmpty(filters)) return employees;
+    const predicate = (e: OrgChartEmployee) => {
+      if (filters.departmentIds.size && !(e.departmentId != null && filters.departmentIds.has(e.departmentId))) return false;
+      if (filters.locations.size && !(e.location && filters.locations.has(e.location))) return false;
+      if (filters.employmentTypes.size && !(e.employmentType && filters.employmentTypes.has(e.employmentType))) return false;
+      return true;
+    };
+    return filterEmployeesPreservingAncestors(employees, predicate);
+  }, [employees, filters]);
+
+  // Track which employees actually match the filter (vs. just kept as ancestor
+  // context) so we can show an accurate count in the summary.
+  const directMatchCount = useMemo(() => {
+    if (isFiltersEmpty(filters)) return employees.length;
+    return employees.filter((e) => {
+      if (filters.departmentIds.size && !(e.departmentId != null && filters.departmentIds.has(e.departmentId))) return false;
+      if (filters.locations.size && !(e.location && filters.locations.has(e.location))) return false;
+      if (filters.employmentTypes.size && !(e.employmentType && filters.employmentTypes.has(e.employmentType))) return false;
+      return true;
+    }).length;
+  }, [employees, filters]);
+
+  const { roots, orphans, cycles } = useMemo(() => buildTree(filteredEmployees), [filteredEmployees]);
 
   // By default, expand the top two levels so users see structure without clicking.
   const defaultExpanded = useMemo(() => {
@@ -279,11 +473,12 @@ export default function OrgChartPage() {
   const filteredOrphans = useMemo(() => filterTree(orphans, search.trim()), [orphans, search]);
   const filteredCycles = useMemo(() => filterTree(cycles, search.trim()), [cycles, search]);
 
-  // When searching, force-expand all matching subtrees
+  // When searching OR when filters are active, force-expand all matching subtrees
+  // so users can see the chain context (ancestors) and matched leaves at once.
   const effectiveExpanded = useMemo(() => {
-    if (!search.trim()) return expandedIds;
+    if (!search.trim() && isFiltersEmpty(filters)) return expandedIds;
     return collectIds([...filteredRoots, ...filteredOrphans, ...filteredCycles]);
-  }, [search, expandedIds, filteredRoots, filteredOrphans, filteredCycles]);
+  }, [search, expandedIds, filteredRoots, filteredOrphans, filteredCycles, filters]);
 
   const expandAll = () => setExpandedIds(collectIds([...roots, ...orphans, ...cycles]));
   const collapseAll = () => setExpandedIds(new Set());
@@ -291,7 +486,9 @@ export default function OrgChartPage() {
   const chartRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
 
-  const exportScope = search.trim() ? `search-${search.trim()}` : "all";
+  const filterScopeLabel = !isFiltersEmpty(filters) ? "filtered" : "";
+  const searchScopeLabel = search.trim() ? `search-${search.trim()}` : "";
+  const exportScope = [searchScopeLabel, filterScopeLabel].filter(Boolean).join("-") || "all";
   const canExport =
     !isLoading &&
     (filteredRoots.length + filteredOrphans.length + filteredCycles.length) > 0;
@@ -325,7 +522,7 @@ export default function OrgChartPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Network className="w-6 h-6 text-primary" />
@@ -333,9 +530,14 @@ export default function OrgChartPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Live reporting structure across {employees.length} employee{employees.length === 1 ? "" : "s"}.
+            {!isFiltersEmpty(filters) && (
+              <span className="ml-1">
+                — showing {directMatchCount} match{directMatchCount === 1 ? "" : "es"} (with reporting chain).
+              </span>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-2 top-2.5 text-muted-foreground" />
             <Input
@@ -343,8 +545,49 @@ export default function OrgChartPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 w-64"
+              data-testid="input-org-chart-search"
             />
           </div>
+          <MultiSelectFilter
+            label="Department"
+            icon={<Filter className="w-3.5 h-3.5" />}
+            options={departmentOptions}
+            selected={new Set([...filters.departmentIds].map(String))}
+            onToggle={(v) => {
+              const id = Number(v);
+              const next = new Set(filters.departmentIds);
+              if (next.has(id)) next.delete(id); else next.add(id);
+              updateFilters({ ...filters, departmentIds: next });
+            }}
+            onClear={() => updateFilters({ ...filters, departmentIds: new Set() })}
+            testId="filter-department"
+          />
+          <MultiSelectFilter
+            label="Location"
+            icon={<Filter className="w-3.5 h-3.5" />}
+            options={locationOptions}
+            selected={filters.locations}
+            onToggle={(v) => {
+              const next = new Set(filters.locations);
+              if (next.has(v)) next.delete(v); else next.add(v);
+              updateFilters({ ...filters, locations: next });
+            }}
+            onClear={() => updateFilters({ ...filters, locations: new Set() })}
+            testId="filter-location"
+          />
+          <MultiSelectFilter
+            label="Type"
+            icon={<Filter className="w-3.5 h-3.5" />}
+            options={employmentTypeOptions}
+            selected={filters.employmentTypes}
+            onToggle={(v) => {
+              const next = new Set(filters.employmentTypes);
+              if (next.has(v)) next.delete(v); else next.add(v);
+              updateFilters({ ...filters, employmentTypes: next });
+            }}
+            onClear={() => updateFilters({ ...filters, employmentTypes: new Set() })}
+            testId="filter-employment-type"
+          />
           <Button variant="outline" size="sm" onClick={expandAll}>
             Expand all
           </Button>
@@ -381,6 +624,76 @@ export default function OrgChartPage() {
           </Button>
         </div>
       </div>
+
+      {/* Active filter chips — render only when at least one filter is set. */}
+      {!isFiltersEmpty(filters) && (
+        <div className="flex flex-wrap items-center gap-2" data-testid="org-chart-filter-chips">
+          {[...filters.departmentIds].map((id) => {
+            const opt = departmentOptions.find((o) => o.value === String(id));
+            if (!opt) return null;
+            return (
+              <Badge key={`d-${id}`} variant="secondary" className="gap-1 pr-1">
+                <span>Dept: {opt.label}</span>
+                <button
+                  type="button"
+                  className="ml-1 rounded hover:bg-muted-foreground/20 p-0.5"
+                  onClick={() => {
+                    const next = new Set(filters.departmentIds);
+                    next.delete(id);
+                    updateFilters({ ...filters, departmentIds: next });
+                  }}
+                  aria-label={`Remove ${opt.label} filter`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            );
+          })}
+          {[...filters.locations].map((loc) => (
+            <Badge key={`l-${loc}`} variant="secondary" className="gap-1 pr-1">
+              <span>Location: {loc}</span>
+              <button
+                type="button"
+                className="ml-1 rounded hover:bg-muted-foreground/20 p-0.5"
+                onClick={() => {
+                  const next = new Set(filters.locations);
+                  next.delete(loc);
+                  updateFilters({ ...filters, locations: next });
+                }}
+                aria-label={`Remove ${loc} filter`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+          {[...filters.employmentTypes].map((t) => (
+            <Badge key={`t-${t}`} variant="secondary" className="gap-1 pr-1">
+              <span>Type: {t}</span>
+              <button
+                type="button"
+                className="ml-1 rounded hover:bg-muted-foreground/20 p-0.5"
+                onClick={() => {
+                  const next = new Set(filters.employmentTypes);
+                  next.delete(t);
+                  updateFilters({ ...filters, employmentTypes: next });
+                }}
+                aria-label={`Remove ${t} filter`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => updateFilters(EMPTY_FILTERS)}
+            data-testid="button-clear-org-chart-filters"
+          >
+            Clear all
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center text-muted-foreground py-12">Loading org chart…</div>

@@ -312,8 +312,11 @@ export const ListOrgChartResponse = zod.object({
         lastName: zod.string(),
         avatarUrl: zod.string().nullish(),
         managerId: zod.number().nullish(),
+        departmentId: zod.number().nullish(),
         departmentName: zod.string().nullish(),
         designationTitle: zod.string().nullish(),
+        location: zod.string().nullish(),
+        employmentType: zod.string().nullish(),
       }),
     )
     .optional(),

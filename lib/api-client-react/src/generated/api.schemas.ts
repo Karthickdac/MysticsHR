@@ -557,9 +557,15 @@ export interface OrgChartEmployee {
   /** @nullable */
   managerId?: number | null;
   /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
   departmentName?: string | null;
   /** @nullable */
   designationTitle?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  employmentType?: string | null;
 }
 
 export interface EmployeeListResponse {

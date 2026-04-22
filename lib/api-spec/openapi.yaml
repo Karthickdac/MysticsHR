@@ -6654,9 +6654,15 @@ components:
           type: ["string", "null"]
         managerId:
           type: ["integer", "null"]
+        departmentId:
+          type: ["integer", "null"]
         departmentName:
           type: ["string", "null"]
         designationTitle:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        employmentType:
           type: ["string", "null"]
       required:
         - id

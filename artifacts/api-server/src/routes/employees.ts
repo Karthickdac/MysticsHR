@@ -141,8 +141,11 @@ router.get("/employees/org-chart", requireHrmsUser, async (_req, res) => {
         lastName: employeesTable.lastName,
         avatarUrl: employeesTable.avatarUrl,
         managerId: employeesTable.managerId,
+        departmentId: employeesTable.departmentId,
         departmentName: departmentsTable.name,
         designationTitle: designationsTable.title,
+        location: employeesTable.location,
+        employmentType: employeesTable.employmentType,
       })
       .from(employeesTable)
       .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
