@@ -1195,9 +1195,11 @@ function CredentialCategoryCard({
   fields: { key: string; label: string; placeholder?: string; type?: string }[];
 }) {
   const queryClient = useQueryClient();
-  // Pull the envelope shape with per-field sources. Cast through unknown
-  // because the OpenAPI response is intentionally loose (additionalProperties:true).
-  const { data, isLoading, refetch } = useGetSystemSettings(category, { withSource: "true" } as never);
+  // Pull the envelope shape with per-field sources. The OpenAPI response is
+  // intentionally loose (additionalProperties:true) so we narrow it here on
+  // the client through `unknown`. The query params themselves are properly
+  // typed via the generated GetSystemSettingsParams.
+  const { data, isLoading, refetch } = useGetSystemSettings(category, { withSource: "true" });
   const envelope = (data as unknown as CredentialEnvelope | undefined);
   const sources = envelope?.sources ?? {};
   const saved = envelope?.values ?? {};
