@@ -210,10 +210,12 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
     // buddy-punch / forgotten-permission patterns at a glance. Rules and
     // thresholds are configurable in system_settings.attendance_suspicion.
     const suspicionConfig = await loadAttendanceSuspicionConfig();
-    const annotated = scoped.map((r) => ({
-      ...r,
-      suspicionFlags: evaluateSuspicion(r, suspicionConfig),
-    }));
+    const annotated = scoped.map((r) => {
+      const flags = evaluateSuspicion(r, suspicionConfig);
+      const { employeeLocation: _drop, ...rest } = r;
+      void _drop;
+      return { ...rest, suspicionFlags: flags };
+    });
 
     if (req.query.suspiciousOnly === "true" || req.query.suspiciousOnly === "1") {
       res.json(annotated.filter((r) => r.suspicionFlags.length > 0));
