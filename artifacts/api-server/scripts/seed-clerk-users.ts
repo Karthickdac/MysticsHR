@@ -53,6 +53,25 @@ async function main() {
     }
 
     if (clerkUserId) {
+      // Force-verify every email on the demo account so sign-in (and any
+      // future sign-up confirmation) is skipped. Clerk creates emails as
+      // unverified by default when you pass them as plain strings to
+      // `createUser`, which is why the super admin was being prompted for
+      // a verification code.
+      try {
+        const fresh = await clerk.users.getUser(clerkUserId);
+        for (const ea of fresh.emailAddresses ?? []) {
+          if (!ea.verification || ea.verification.status !== "verified") {
+            await clerk.emailAddresses.updateEmailAddress(ea.id, {
+              verified: true,
+            } as any);
+            console.log(`  ↪ email verified: ${ea.emailAddress}`);
+          }
+        }
+      } catch (e: any) {
+        console.log(`  ! could not verify email for ${u.email}: ${e?.message ?? e}`);
+      }
+
       const result = await db
         .update(hrmsUsersTable)
         .set({ clerkUserId, updatedAt: new Date() })
