@@ -9,6 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Link } from "wouter";
 import { useAuth } from "@clerk/react";
 import { ArrowLeft, AlertTriangle, CheckCircle, Clock, BarChart3, Download } from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 
 type RangePreset = "all" | "this_week" | "this_month" | "custom";
 
@@ -70,8 +82,50 @@ export function SlaReportContent() {
   const resolvedTickets = report?.resolvedTickets ?? 0;
   const byPriority = report?.byPriority ?? [];
   const byCategory = report?.byCategory ?? [];
+  const trend = report?.trend ?? [];
+  const byAssignee = report?.byAssignee ?? [];
 
   const breachRate = totalTickets > 0 ? Math.round((slaBreachedCount / totalTickets) * 100) : 0;
+
+  // Decorate the server-provided daily trend with a short axis label so the
+  // chart x-axis stays compact even when the window spans many days.
+  const trendData = useMemo(
+    () =>
+      trend.map((d) => ({
+        ...d,
+        label: new Date(d.date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+      })),
+    [trend],
+  );
+
+  // Stacked bar data: within-SLA vs breached counts per priority. Pulled
+  // straight from the server breakdown so the chart numbers always match the
+  // "By priority" list below.
+  const priorityChartData = useMemo(
+    () =>
+      byPriority.map((p) => {
+        const total = p.count;
+        const breached = p.breached;
+        return {
+          priority: p.priority,
+          withinSla: Math.max(0, total - breached),
+          breached,
+        };
+      }),
+    [byPriority],
+  );
+
+  // Per-assignee % within SLA, sorted worst-first so the bars HR needs to act
+  // on appear at the top of the chart. "Unassigned" tickets are excluded —
+  // they're a triage problem, not an assignee performance signal.
+  const assigneeChartData = useMemo(
+    () =>
+      byAssignee
+        .filter((a) => a.assigneeUserId !== null)
+        .map((a) => ({ name: a.assigneeName, total: a.total, withinPct: a.withinPct }))
+        .sort((a, b) => a.withinPct - b.withinPct),
+    [byAssignee],
+  );
 
   async function handleExportCsv() {
     setDownloading(true);
@@ -207,6 +261,128 @@ export function SlaReportContent() {
               </CardContent>
             </Card>
           )}
+
+          {/* Trend: average resolution time per day across the selected window. */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Resolution time trend</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Average time to resolve, bucketed by the day a ticket was resolved.
+              </p>
+            </CardHeader>
+            <CardContent className="pt-2">
+              {trendData.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No resolved tickets in this window yet.</p>
+              ) : (
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 11 }}
+                        interval="preserveStartEnd"
+                        angle={trendData.length > 8 ? -25 : 0}
+                        textAnchor={trendData.length > 8 ? "end" : "middle"}
+                        height={trendData.length > 8 ? 50 : 30}
+                      />
+                      <YAxis tick={{ fontSize: 11 }} width={40} unit="h" />
+                      <Tooltip
+                        formatter={(value: number, name: string) =>
+                          name === "avgHours"
+                            ? [fmtHrs(value), "Avg resolution"]
+                            : [value, "Tickets resolved"]
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="avgHours"
+                        name="avgHours"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                        isAnimationActive={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Stacked bar: within-SLA vs breached counts per priority. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Breaches by priority</CardTitle>
+                <p className="text-xs text-muted-foreground">Within-SLA vs breached, stacked per priority.</p>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {priorityChartData.every((p) => p.withinSla + p.breached === 0) ? (
+                  <p className="text-sm text-muted-foreground">No tickets in this window.</p>
+                ) : (
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={priorityChartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis dataKey="priority" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} width={32} allowDecimals={false} />
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="withinSla" name="Within SLA" stackId="sla" fill="#10b981" />
+                        <Bar dataKey="breached" name="Breached" stackId="sla" fill="#ef4444" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Per-assignee % within SLA, sorted worst-first. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">% within SLA by assignee</CardTitle>
+                <p className="text-xs text-muted-foreground">Lower bars deserve a closer look.</p>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {assigneeChartData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No assigned tickets in this window.</p>
+                ) : (
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={assigneeChartData}
+                        layout="vertical"
+                        margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis
+                          type="number"
+                          domain={[0, 100]}
+                          tick={{ fontSize: 11 }}
+                          unit="%"
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          tick={{ fontSize: 11 }}
+                          width={120}
+                        />
+                        <Tooltip
+                          formatter={(value: number, _name, item) => {
+                            const total = (item?.payload as { total?: number } | undefined)?.total ?? 0;
+                            return [`${value}% (${total} tickets)`, "Within SLA"];
+                          }}
+                        />
+                        <Bar dataKey="withinPct" name="Within SLA %" fill="hsl(var(--primary))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <Card>

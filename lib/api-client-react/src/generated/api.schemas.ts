@@ -2788,6 +2788,21 @@ export type HelpdeskSlaReportByCategoryItem = {
   avgResolutionHours?: number | null;
 };
 
+export type HelpdeskSlaReportTrendItem = {
+  date: string;
+  avgHours: number;
+  resolved: number;
+};
+
+export type HelpdeskSlaReportByAssigneeItem = {
+  /** @nullable */
+  assigneeUserId?: number | null;
+  assigneeName: string;
+  total: number;
+  breached: number;
+  withinPct: number;
+};
+
 export interface HelpdeskSlaReport {
   totalTickets: number;
   openTickets: number;
@@ -2801,6 +2816,10 @@ export interface HelpdeskSlaReport {
   rangeTo?: string | null;
   byPriority: HelpdeskSlaReportByPriorityItem[];
   byCategory: HelpdeskSlaReportByCategoryItem[];
+  /** Daily buckets of average resolution time (hours), in chronological order. Days with no resolutions are omitted. */
+  trend: HelpdeskSlaReportTrendItem[];
+  /** Per-assignee SLA performance. Tickets without an assignee appear as "Unassigned". */
+  byAssignee: HelpdeskSlaReportByAssigneeItem[];
 }
 
 export interface FnfApproveBody {

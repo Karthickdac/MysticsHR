@@ -5883,6 +5883,30 @@ export const GetHelpdeskSlaReportResponse = zod.object({
       avgResolutionHours: zod.number().nullish(),
     }),
   ),
+  trend: zod
+    .array(
+      zod.object({
+        date: zod.coerce.date(),
+        avgHours: zod.number(),
+        resolved: zod.number(),
+      }),
+    )
+    .describe(
+      "Daily buckets of average resolution time (hours), in chronological order. Days with no resolutions are omitted.",
+    ),
+  byAssignee: zod
+    .array(
+      zod.object({
+        assigneeUserId: zod.number().nullish(),
+        assigneeName: zod.string(),
+        total: zod.number(),
+        breached: zod.number(),
+        withinPct: zod.number(),
+      }),
+    )
+    .describe(
+      'Per-assignee SLA performance. Tickets without an assignee appear as \"Unassigned\".',
+    ),
 });
 
 /**

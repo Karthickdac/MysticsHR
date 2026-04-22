@@ -8986,7 +8986,29 @@ components:
               breached: { type: integer }
               avgResolutionHours: { type: ['number', 'null'] }
             required: [category, count]
-      required: [totalTickets, openTickets, resolvedTickets, slaBreachedCount, byPriority, byCategory]
+        trend:
+          type: array
+          description: Daily buckets of average resolution time (hours), in chronological order. Days with no resolutions are omitted.
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              avgHours: { type: number }
+              resolved: { type: integer }
+            required: [date, avgHours, resolved]
+        byAssignee:
+          type: array
+          description: Per-assignee SLA performance. Tickets without an assignee appear as "Unassigned".
+          items:
+            type: object
+            properties:
+              assigneeUserId: { type: ['integer', 'null'] }
+              assigneeName: { type: string }
+              total: { type: integer }
+              breached: { type: integer }
+              withinPct: { type: integer }
+            required: [assigneeName, total, breached, withinPct]
+      required: [totalTickets, openTickets, resolvedTickets, slaBreachedCount, byPriority, byCategory, trend, byAssignee]
 
     FnfApproveBody:
       type: object

@@ -790,6 +790,56 @@ async function computeSlaReport(from?: Date, to?: Date) {
   }
 
   const round1 = (n: number | null) => n === null ? null : Math.round(n * 10) / 10;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
+  // Daily trend: average resolution hours bucketed by the day a ticket was
+  // resolved. Days with no resolutions are omitted, so the chart renders a
+  // continuous line across active days only.
+  const trendBuckets = new Map<string, { sum: number; n: number }>();
+  for (const t of inRange) {
+    const completedAt = completionTime(t);
+    if (!completedAt || !t.createdAt) continue;
+    const hrs = (completedAt.getTime() - new Date(t.createdAt).getTime()) / 3_600_000;
+    const day = completedAt.toISOString().slice(0, 10);
+    const b = trendBuckets.get(day) ?? { sum: 0, n: 0 };
+    b.sum += hrs;
+    b.n += 1;
+    trendBuckets.set(day, b);
+  }
+  const trend = [...trendBuckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, b]) => ({
+      date,
+      avgHours: round2(b.sum / b.n),
+      resolved: b.n,
+    }));
+
+  // Per-assignee aggregation. Resolves user IDs to display names in one batch
+  // so the chart can render names directly. Tickets without an assignee are
+  // grouped under "Unassigned" so they're visible (but typically excluded
+  // from the chart on the client).
+  const assigneeMap = new Map<number | null, { total: number; breached: number }>();
+  for (const t of inRange) {
+    const key: number | null = t.assignedToUserId ?? null;
+    const m = assigneeMap.get(key) ?? { total: 0, breached: 0 };
+    m.total += 1;
+    if (isBreached(t)) m.breached += 1;
+    assigneeMap.set(key, m);
+  }
+  const assigneeIds = [...assigneeMap.keys()].filter((k): k is number => k !== null);
+  const userRows = assigneeIds.length > 0
+    ? await db.select({ id: hrmsUsersTable.id, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable)
+        .where(inArray(hrmsUsersTable.id, assigneeIds))
+    : [];
+  const idToName = new Map(userRows.map(u => [u.id, u.name]));
+  const byAssignee = [...assigneeMap.entries()].map(([id, v]) => ({
+    assigneeUserId: id,
+    assigneeName: id === null ? "Unassigned" : (idToName.get(id) ?? `User #${id}`),
+    total: v.total,
+    breached: v.breached,
+    withinPct: v.total > 0 ? Math.round(((v.total - v.breached) / v.total) * 100) : 0,
+  }));
 
   return {
     totalTickets,
@@ -805,6 +855,8 @@ async function computeSlaReport(from?: Date, to?: Date) {
       category, count: v.count, breached: v.breached,
       avgResolutionHours: v.resolvedCount > 0 ? round1(v.resolvedSumHrs / v.resolvedCount) : null,
     })),
+    trend,
+    byAssignee,
     rangeFrom: from?.toISOString() ?? null,
     rangeTo: to?.toISOString() ?? null,
     tickets: inRange, // used by CSV exporter; not serialised by JSON endpoint
