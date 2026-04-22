@@ -285,6 +285,17 @@ export interface AttendanceSuspicionConfig {
 }
 
 /**
+ * Partial update; omitted fields keep their current value.
+ */
+export interface AttendanceSuspicionConfigUpdate {
+  /** @minimum 0 */
+  maxAccuracyMeters?: number;
+  /** @minimum 0 */
+  maxRadiusMeters?: number;
+  offices?: AttendanceSuspicionOffice[];
+}
+
+/**
  * Optional client-supplied context for self-service punches (geolocation, device, and the employee's local date).
  */
 export interface ClockPunchTelemetry {

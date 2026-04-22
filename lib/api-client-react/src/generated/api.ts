@@ -34,6 +34,7 @@ import type {
   AttendanceRecord,
   AttendanceRegularization,
   AttendanceSuspicionConfig,
+  AttendanceSuspicionConfigUpdate,
   AuditLogListResponse,
   BackfillLeaveAttendanceBody,
   BlackoutDate,
@@ -20075,6 +20076,7 @@ export function useGetAttendanceSuspicionConfig<
 }
 
 /**
+ * Accepts a partial config; omitted fields are left at their current values.
  * @summary Update suspicion thresholds and registered offices
  */
 export const getUpdateAttendanceSuspicionConfigUrl = () => {
@@ -20082,7 +20084,7 @@ export const getUpdateAttendanceSuspicionConfigUrl = () => {
 };
 
 export const updateAttendanceSuspicionConfig = async (
-  attendanceSuspicionConfig: AttendanceSuspicionConfig,
+  attendanceSuspicionConfigUpdate: AttendanceSuspicionConfigUpdate,
   options?: RequestInit,
 ): Promise<AttendanceSuspicionConfig> => {
   return customFetch<AttendanceSuspicionConfig>(
@@ -20091,7 +20093,7 @@ export const updateAttendanceSuspicionConfig = async (
       ...options,
       method: "PUT",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(attendanceSuspicionConfig),
+      body: JSON.stringify(attendanceSuspicionConfigUpdate),
     },
   );
 };
@@ -20103,14 +20105,14 @@ export const getUpdateAttendanceSuspicionConfigMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
     TError,
-    { data: BodyType<AttendanceSuspicionConfig> },
+    { data: BodyType<AttendanceSuspicionConfigUpdate> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
   TError,
-  { data: BodyType<AttendanceSuspicionConfig> },
+  { data: BodyType<AttendanceSuspicionConfigUpdate> },
   TContext
 > => {
   const mutationKey = ["updateAttendanceSuspicionConfig"];
@@ -20124,7 +20126,7 @@ export const getUpdateAttendanceSuspicionConfigMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
-    { data: BodyType<AttendanceSuspicionConfig> }
+    { data: BodyType<AttendanceSuspicionConfigUpdate> }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -20138,7 +20140,7 @@ export type UpdateAttendanceSuspicionConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>
 >;
 export type UpdateAttendanceSuspicionConfigMutationBody =
-  BodyType<AttendanceSuspicionConfig>;
+  BodyType<AttendanceSuspicionConfigUpdate>;
 export type UpdateAttendanceSuspicionConfigMutationError = ErrorType<unknown>;
 
 /**
@@ -20151,14 +20153,14 @@ export const useUpdateAttendanceSuspicionConfig = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
     TError,
-    { data: BodyType<AttendanceSuspicionConfig> },
+    { data: BodyType<AttendanceSuspicionConfigUpdate> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
   TError,
-  { data: BodyType<AttendanceSuspicionConfig> },
+  { data: BodyType<AttendanceSuspicionConfigUpdate> },
   TContext
 > => {
   return useMutation(

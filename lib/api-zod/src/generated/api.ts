@@ -5672,6 +5672,7 @@ export const GetAttendanceSuspicionConfigResponse = zod.object({
 });
 
 /**
+ * Accepts a partial config; omitted fields are left at their current values.
  * @summary Update suspicion thresholds and registered offices
  */
 export const updateAttendanceSuspicionConfigBodyMaxAccuracyMetersMin = 0;
@@ -5684,37 +5685,39 @@ export const updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMax = 90;
 export const updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMin = -180;
 export const updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMax = 180;
 
-export const UpdateAttendanceSuspicionConfigBody = zod.object({
-  maxAccuracyMeters: zod
-    .number()
-    .min(updateAttendanceSuspicionConfigBodyMaxAccuracyMetersMin)
-    .describe("Worse GPS accuracy than this is flagged."),
-  maxRadiusMeters: zod
-    .number()
-    .min(updateAttendanceSuspicionConfigBodyMaxRadiusMetersMin)
-    .describe(
-      "Distance from every registered office above which the punch is flagged.",
-    ),
-  offices: zod.array(
-    zod.object({
-      name: zod.string(),
-      latitude: zod
-        .number()
-        .min(updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMin)
-        .max(updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMax),
-      longitude: zod
-        .number()
-        .min(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMin)
-        .max(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMax),
-      location: zod
-        .string()
-        .nullish()
-        .describe(
-          "Optional employee work-location this office anchors. Empty\/null = global fallback. Matched case-insensitively against employee_profiles.work_location.",
-        ),
-    }),
-  ),
-});
+export const UpdateAttendanceSuspicionConfigBody = zod
+  .object({
+    maxAccuracyMeters: zod
+      .number()
+      .min(updateAttendanceSuspicionConfigBodyMaxAccuracyMetersMin)
+      .optional(),
+    maxRadiusMeters: zod
+      .number()
+      .min(updateAttendanceSuspicionConfigBodyMaxRadiusMetersMin)
+      .optional(),
+    offices: zod
+      .array(
+        zod.object({
+          name: zod.string(),
+          latitude: zod
+            .number()
+            .min(updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMin)
+            .max(updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMax),
+          longitude: zod
+            .number()
+            .min(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMin)
+            .max(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMax),
+          location: zod
+            .string()
+            .nullish()
+            .describe(
+              "Optional employee work-location this office anchors. Empty\/null = global fallback. Matched case-insensitively against employee_profiles.work_location.",
+            ),
+        }),
+      )
+      .optional(),
+  })
+  .describe("Partial update; omitted fields keep their current value.");
 
 export const updateAttendanceSuspicionConfigResponseMaxAccuracyMetersMin = 0;
 

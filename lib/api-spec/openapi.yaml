@@ -4516,11 +4516,12 @@ paths:
       operationId: updateAttendanceSuspicionConfig
       tags: [system-config]
       summary: Update suspicion thresholds and registered offices
+      description: Accepts a partial config; omitted fields are left at their current values.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/AttendanceSuspicionConfig" }
+            schema: { $ref: "#/components/schemas/AttendanceSuspicionConfigUpdate" }
       responses:
         "200":
           description: Saved configuration
@@ -6397,6 +6398,16 @@ components:
           type: array
           items: { $ref: "#/components/schemas/AttendanceSuspicionOffice" }
       required: [maxAccuracyMeters, maxRadiusMeters, offices]
+
+    AttendanceSuspicionConfigUpdate:
+      type: object
+      description: Partial update; omitted fields keep their current value.
+      properties:
+        maxAccuracyMeters: { type: number, minimum: 0 }
+        maxRadiusMeters: { type: number, minimum: 0 }
+        offices:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceSuspicionOffice" }
 
     ClockPunchTelemetry:
       type: object
