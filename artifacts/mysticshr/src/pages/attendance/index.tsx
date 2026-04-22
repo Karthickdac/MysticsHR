@@ -94,7 +94,7 @@ function HrAttendanceView() {
   const { data: records = [], isLoading } = useGetAttendance({
     date: filterDate,
     ...(showSuspiciousOnly ? { suspiciousOnly: true } : {}),
-  } as Parameters<typeof useGetAttendance>[0]);
+  });
 
   const createAtt = usePostAttendance();
   const overrideAtt = usePatchAttendanceId();
