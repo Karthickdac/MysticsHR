@@ -794,11 +794,15 @@ async function computeSlaReport(from?: Date, to?: Date) {
 
   // Daily trend: average resolution hours bucketed by the day a ticket was
   // resolved. Days with no resolutions are omitted, so the chart renders a
-  // continuous line across active days only.
+  // continuous line across active days only. Bucket day is also clamped to the
+  // requested [from, to] window so a ticket created in-range but resolved well
+  // after the window doesn't produce a trend point outside the report range.
   const trendBuckets = new Map<string, { sum: number; n: number }>();
   for (const t of inRange) {
     const completedAt = completionTime(t);
     if (!completedAt || !t.createdAt) continue;
+    if (from && completedAt < from) continue;
+    if (to && completedAt > to) continue;
     const hrs = (completedAt.getTime() - new Date(t.createdAt).getTime()) / 3_600_000;
     const day = completedAt.toISOString().slice(0, 10);
     const b = trendBuckets.get(day) ?? { sum: 0, n: 0 };
