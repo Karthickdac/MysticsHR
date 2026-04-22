@@ -217,7 +217,13 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
       return { ...rest, suspicionFlags: flags };
     });
 
-    if (req.query.suspiciousOnly === "true" || req.query.suspiciousOnly === "1") {
+    const suspiciousOnlyRaw = req.query.suspiciousOnly;
+    const suspiciousOnly =
+      suspiciousOnlyRaw === true ||
+      suspiciousOnlyRaw === "true" ||
+      suspiciousOnlyRaw === "1" ||
+      suspiciousOnlyRaw === "yes";
+    if (suspiciousOnly) {
       res.json(annotated.filter((r) => r.suspicionFlags.length > 0));
       return;
     }

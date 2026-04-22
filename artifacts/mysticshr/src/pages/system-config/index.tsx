@@ -1557,6 +1557,7 @@ function NotificationCredentialsTab() {
 export default function SystemConfigPage() {
   const { role } = useCurrentHrmsUser();
   const isSuperAdmin = role === "super_admin";
+  const canSeeAttendanceSuspicion = ["super_admin", "hr_manager", "hr_executive", "hod"].includes(role ?? "");
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -1576,7 +1577,7 @@ export default function SystemConfigPage() {
             <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
             <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
             <TabsTrigger value="leave-blackouts">Leave Blackouts</TabsTrigger>
-            <TabsTrigger value="attendance-suspicion">Attendance Suspicion</TabsTrigger>
+            {canSeeAttendanceSuspicion && <TabsTrigger value="attendance-suspicion">Attendance Suspicion</TabsTrigger>}
             <TabsTrigger value="notification-defaults">Notification Defaults</TabsTrigger>
             {isSuperAdmin && <TabsTrigger value="credentials">Notification Credentials</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="storage-cleanup">Storage Cleanup</TabsTrigger>}
@@ -1591,7 +1592,9 @@ export default function SystemConfigPage() {
           <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
           <TabsContent value="custom-fields" className="mt-4"><CustomEmployeeFieldsTab /></TabsContent>
           <TabsContent value="leave-blackouts" className="mt-4"><LeaveBlackoutsTab /></TabsContent>
-          <TabsContent value="attendance-suspicion" className="mt-4"><AttendanceSuspicionTab /></TabsContent>
+          {canSeeAttendanceSuspicion && (
+            <TabsContent value="attendance-suspicion" className="mt-4"><AttendanceSuspicionTab /></TabsContent>
+          )}
           <TabsContent value="notification-defaults" className="mt-4"><NotificationDefaultsTab /></TabsContent>
           {isSuperAdmin && (
             <TabsContent value="credentials" className="mt-4"><NotificationCredentialsTab /></TabsContent>
