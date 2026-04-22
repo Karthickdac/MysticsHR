@@ -1,0 +1,85 @@
+0|mysticsh | node:internal/modules/cjs/loader:1386
+0|mysticsh |   throw err;
+0|mysticsh |   ^
+0|mysticsh | 
+0|mysticsh | Error: Cannot find module '/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/dist/index.mjs'
+0|mysticsh |     at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+0|mysticsh |     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+0|mysticsh |     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+0|mysticsh |     at Function._load (node:internal/modules/cjs/loader:1192:37)
+0|mysticsh |     at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+0|mysticsh |     at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+0|mysticsh |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+0|mysticsh |     at node:internal/main/run_main_module:36:49 {
+0|mysticsh |   code: 'MODULE_NOT_FOUND',
+0|mysticsh |   requireStack: []
+0|mysticsh | }
+0|mysticsh | 
+0|mysticsh | Node.js v22.22.2
+0|mysticsh | node:internal/modules/cjs/loader:1386
+0|mysticsh |   throw err;
+0|mysticsh |   ^
+0|mysticsh | 
+0|mysticsh | Error: Cannot find module '/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/dist/index.mjs'
+0|mysticsh |     at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+0|mysticsh |     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+0|mysticsh |     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+0|mysticsh |     at Function._load (node:internal/modules/cjs/loader:1192:37)
+0|mysticsh |     at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+0|mysticsh |     at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+0|mysticsh |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+0|mysticsh |     at node:internal/main/run_main_module:36:49 {
+0|mysticsh |   code: 'MODULE_NOT_FOUND',
+0|mysticsh |   requireStack: []
+0|mysticsh | }
+0|mysticsh | 
+0|mysticsh | Node.js v22.22.2
+0|mysticsh | (node:55375) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+0|mysticsh | (Use `node --trace-deprecation ...` to show where the warning was created)
+0|mysticsh | (node:56245) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+0|mysticsh | (Use `node --trace-deprecation ...` to show where the warning was created)
+
+/home/automystics-mysticshr/.pm2/logs/mysticshr-out.log last 40 lines:
+0|mysticsh | {"level":40,"time":1776878216870,"pid":55375,"hostname":"srv1609330","tried":["/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","/home/automystics-mysticshr/htdocs/mysticshr/dist/public","/home/automystics-mysticshr/mysticshr/dist/public"],"msg":"NODE_ENV=production but built SPA not found; only /api will be served"}
+0|mysticsh | {"level":30,"time":1776878216873,"pid":55375,"hostname":"srv1609330","port":8080,"msg":"Server listening"}
+0|mysticsh | {"level":30,"time":1776878216908,"pid":55375,"hostname":"srv1609330","msg":"[scheduler] started — runs every hour at :00 + notification jobs"}
+0|mysticsh | {"level":30,"time":1776878218571,"pid":55375,"hostname":"srv1609330","req":{"id":1,"method":"GET","url":"/api/healthz"},"res":{"statusCode":200},"responseTime":9,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878218581,"pid":55375,"hostname":"srv1609330","req":{"id":2,"method":"HEAD","url":"/"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878231928,"pid":55375,"hostname":"srv1609330","fy":"2025-26","eligible":7,"sent":7,"skipped":0,"msg":"[scheduler] dispatchForm16ForFy completed"}
+0|mysticsh | {"level":30,"time":1776878515795,"pid":55375,"hostname":"srv1609330","req":{"id":3,"method":"GET","url":"/"},"res":{"statusCode":307},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878516840,"pid":55375,"hostname":"srv1609330","req":{"id":4,"method":"GET","url":"/"},"res":{"statusCode":307},"responseTime":367,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878517006,"pid":55375,"hostname":"srv1609330","req":{"id":5,"method":"GET","url":"/"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878685223,"pid":55375,"hostname":"srv1609330","req":{"id":6,"method":"HEAD","url":"/"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878685236,"pid":55375,"hostname":"srv1609330","req":{"id":7,"method":"HEAD","url":"/api/healthz"},"res":{"statusCode":200},"responseTime":1,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878720125,"pid":55375,"hostname":"srv1609330","req":{"id":8,"method":"HEAD","url":"/"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878720137,"pid":55375,"hostname":"srv1609330","req":{"id":9,"method":"HEAD","url":"/api/healthz"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878761317,"pid":55375,"hostname":"srv1609330","req":{"id":10,"method":"HEAD","url":"/"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776878893770,"pid":55375,"hostname":"srv1609330","req":{"id":11,"method":"HEAD","url":"/"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|mysticsh | {"level":50,"time":1776879000028,"pid":55375,"hostname":"srv1609330","err":{"type":"_DrizzleQueryError","message":"Failed query: select \"id\", \"email\", \"name\", \"employee_id\" from \"hrms_users\" where (\"hrms_users\".\"is_active\" = $1 and \"hrms_users\".\"role\" = ANY(($2, $3, $4)))\nparams: true,super_admin,hr_manager,hr_executive: op ANY/ALL (array) requires array on right side","stack":"Error: Failed query: select \"id\", \"email\", \"name\", \"employee_id\" from \"hrms_users\" where (\"hrms_users\".\"is_active\" = $1 and \"hrms_users\".\"role\" = ANY(($2, $3, $4)))\nparams: true,super_admin,hr_manager,hr_executive\n    at NodePgPreparedQuery.queryWithCache (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:73:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async <anonymous> (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19)\n    at async getUsersByRoles (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/src/routes/system-config.ts:407:17)\n    at async escalateSlaBreaches (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/src/lib/scheduler.ts:490:24)\ncaused by: error: op ANY/ALL (array) requires array on right side\n    at <anonymous> (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js:45:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async <anonymous> (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:161:13)\n    at async NodePgPreparedQuery.queryWithCache (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.18.0_pg@8.20.0/node_modules/src/pg-core/session.ts:71:12)\n    at async <anonymous> (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/session.ts:154:19)\n    at async getUsersByRoles (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/src/routes/system-config.ts:407:17)\n    at async escalateSlaBreaches (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/src/lib/scheduler.ts:490:24)","query":"select \"id\", \"email\", \"name\", \"employee_id\" from \"hrms_users\" where (\"hrms_users\".\"is_active\" = $1 and \"hrms_users\".\"role\" = ANY(($2, $3, $4)))","params":[true,"super_admin","hr_manager","hr_executive"]},"msg":"[scheduler] escalateSlaBreaches error"}
+0|mysticsh | {"level":30,"time":1776879017541,"pid":56245,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+0|mysticsh | {"level":30,"time":1776879017544,"pid":56245,"hostname":"srv1609330","port":8080,"msg":"Server listening"}
+0|mysticsh | {"level":30,"time":1776879017577,"pid":56245,"hostname":"srv1609330","msg":"[scheduler] started — runs every hour at :00 + notification jobs"}
+0|mysticsh | {"level":30,"time":1776879017963,"pid":56245,"hostname":"srv1609330","req":{"id":1,"method":"HEAD","url":"/"},"res":{"statusCode":200},"responseTime":14,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776879022548,"pid":56245,"hostname":"srv1609330","req":{"id":2,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776879022731,"pid":56245,"hostname":"srv1609330","req":{"id":3,"method":"GET","url":"/assets/index-D3jdpR8E.css"},"res":{"statusCode":200},"responseTime":4,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776879022735,"pid":56245,"hostname":"srv1609330","req":{"id":4,"method":"GET","url":"/assets/index-DZbDeKLO.js"},"res":{"statusCode":200},"responseTime":7,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776879023705,"pid":56245,"hostname":"srv1609330","req":{"id":5,"method":"GET","url":"/favicon.svg"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776879024423,"pid":56245,"hostname":"srv1609330","req":{"id":6,"method":"GET","url":"/logo.svg"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776879030003,"pid":56245,"hostname":"srv1609330","req":{"id":7,"method":"GET","url":"/logo.svg"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+0|mysticsh | {"level":30,"time":1776879032596,"pid":56245,"hostname":"srv1609330","fy":"2025-26","eligible":7,"sent":7,"skipped":0,"msg":"[scheduler] dispatchForm16ForFy completed"}
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+x-clerk-auth-reason: dev-browser-missing
+x-clerk-auth-status: signed-out
+Accept-Ranges: bytes
+Cache-Control: public, max-age=0
+Last-Modified: Wed, 22 Apr 2026 17:30:16 GMT
+ETag: W/"325-19db63e1a40"
+Content-Type: text/html; charset=utf-8
+Content-Length: 805
+Date: Wed, 22 Apr 2026 17:32:31 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
