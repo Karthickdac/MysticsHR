@@ -14,7 +14,6 @@ import {
   getListNotificationTemplatesQueryKey,
   type NotificationTemplate,
 } from "@workspace/api-client-react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -465,8 +464,7 @@ function WhatsAppConfigTab() {
 
 export default function CommunicationsPage() {
   return (
-    <MainLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Bell className="w-6 h-6" />Communications & Notifications</h1>
           <p className="text-muted-foreground mt-1">Manage email and WhatsApp notifications across all HR workflows.</p>
@@ -503,6 +501,5 @@ export default function CommunicationsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </MainLayout>
   );
 }

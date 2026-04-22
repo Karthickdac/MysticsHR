@@ -20,7 +20,6 @@ import {
   type RolePermissions,
   type RolePermissionsItem,
 } from "@workspace/api-client-react";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -1594,8 +1593,7 @@ export default function SystemConfigPage() {
   const isSuperAdmin = role === "super_admin";
   const canSeeAttendanceSuspicion = ["super_admin", "hr_manager", "hr_executive", "hod"].includes(role ?? "");
   return (
-    <MainLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Settings className="w-6 h-6" />System Configuration</h1>
           <p className="text-muted-foreground mt-1">Configure organization settings, statutory rates, approval workflows, and system preferences.</p>
@@ -1639,6 +1637,5 @@ export default function SystemConfigPage() {
           )}
         </Tabs>
       </div>
-    </MainLayout>
   );
 }
