@@ -1,0 +1,78 @@
+
+Last login: Wed Apr 22 16:32:28 2026 from 169.254.0.1
+root@srv1609330:~# # Switch to the kuralai site user
+su - automystics-kuralai
+
+# What's PM2 doing here?
+pm2 list
+pm2 logs --lines 60 --nostream
+automystics-kuralai@srv1609330:~$ # Switch to the kuralai site user
+su - automystics-kuralai
+
+# What's PM2 doing here?
+pm2 list
+pm2 logs --lines 60 --nostream
+-bash: /usr/bin/su: Permission denied
+
+                        -------------
+
+__/\\\\\\\\\\\\\____/\\\\____________/\\\\____/\\\\\\\\\_____
+ _\/\\\/////////\\\_\/\\\\\\________/\\\\\\__/\\\///////\\\___
+  _\/\\\_______\/\\\_\/\\\//\\\____/\\\//\\\_\///______\//\\\__
+   _\/\\\\\\\\\\\\\/__\/\\\\///\\\/\\\/_\/\\\___________/\\\/___
+    _\/\\\/////////____\/\\\__\///\\\/___\/\\\________/\\\//_____
+     _\/\\\_____________\/\\\____\///_____\/\\\_____/\\\//________
+      _\/\\\_____________\/\\\_____________\/\\\___/\\\/___________
+       _\/\\\_____________\/\\\_____________\/\\\__/\\\\\\\\\\\\\\\_
+        _\///______________\///______________\///__\///////////////__
+
+
+                          Runtime Edition
+
+        PM2 is a Production Process Manager for Node.js applications
+                     with a built-in Load Balancer.
+
+                Start and Daemonize any application:
+                $ pm2 start app.js
+
+                Load Balance 4 instances of api.js:
+                $ pm2 start api.js -i 4
+
+                Monitor in production:
+                $ pm2 monitor
+
+                Make pm2 auto-boot at server restart:
+                $ pm2 startup
+
+                To go further checkout:
+                http://pm2.io/
+
+
+                        -------------
+
+[PM2] Spawning PM2 daemon with pm2_home=/home/automystics-kuralai/.pm2
+[PM2] PM2 Successfully daemonized
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[TAILING] Tailing last 60 lines for [all] processes (change the value with --lines option)
+/home/automystics-kuralai/.pm2/pm2.log last 60 lines:
+PM2        | 2026-04-22T17:20:31: PM2 log: ===============================================================================
+PM2        | 2026-04-22T17:20:31: PM2 log: --- New PM2 Daemon started ----------------------------------------------------
+PM2        | 2026-04-22T17:20:31: PM2 log: Time                 : Wed Apr 22 2026 17:20:31 GMT+0000 (Coordinated Universal Time)
+PM2        | 2026-04-22T17:20:31: PM2 log: PM2 version          : 6.0.14
+PM2        | 2026-04-22T17:20:31: PM2 log: Node.js version      : 20.20.2
+PM2        | 2026-04-22T17:20:31: PM2 log: Current arch         : x64
+PM2        | 2026-04-22T17:20:31: PM2 log: PM2 home             : /home/automystics-kuralai/.pm2
+PM2        | 2026-04-22T17:20:31: PM2 log: PM2 PID file         : /home/automystics-kuralai/.pm2/pm2.pid
+PM2        | 2026-04-22T17:20:31: PM2 log: RPC socket file      : /home/automystics-kuralai/.pm2/rpc.sock
+PM2        | 2026-04-22T17:20:31: PM2 log: BUS socket file      : /home/automystics-kuralai/.pm2/pub.sock
+PM2        | 2026-04-22T17:20:31: PM2 log: Application log path : /home/automystics-kuralai/.pm2/logs
+PM2        | 2026-04-22T17:20:31: PM2 log: Worker Interval      : 30000
+PM2        | 2026-04-22T17:20:31: PM2 log: Process dump file    : /home/automystics-kuralai/.pm2/dump.pm2
+PM2        | 2026-04-22T17:20:31: PM2 log: Concurrent actions   : 2
+PM2        | 2026-04-22T17:20:31: PM2 log: SIGTERM timeout      : 1600
+PM2        | 2026-04-22T17:20:31: PM2 log: Runtime Binary       : /home/automystics-kuralai/.nvm/versions/node/v20.20.2/bin/node
+PM2        | 2026-04-22T17:20:31: PM2 log: ===============================================================================
+
+automystics-kuralai@srv1609330:~$ 
