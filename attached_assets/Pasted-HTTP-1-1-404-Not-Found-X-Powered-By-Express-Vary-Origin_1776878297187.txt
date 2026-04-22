@@ -1,0 +1,46 @@
+HTTP/1.1 404 Not Found
+X-Powered-By: Express
+Vary: Origin
+automystics-mysticshr@srv1609330:~/htdocs/mysticshr.automystics.tech$ # 1. What user does the kuralai site run as?
+ls -la /home | grep -i kural
+
+# 2. nginx vhost — is it still there and valid?
+nginx -t
+ls /etc/nginx/sites-enabled/ | grep -i kural
+
+# 3. Is anything listening on the port kuralai uses?
+ss -tlnp | grep -v 127.0.0.53 | head -20
+
+# 4. nginx error log for that site
+tail -50 /home/*/logs/kuralai.automystics.tech/nginx/error.log 2>/dev/null
+tail -50 /var/log/nginx/error.log
+drwxrwx---  9 automystics-kuralai   automystics-kuralai         4096 Apr 22 15:03 automystics-kuralai
+Command 'nginx' is available in the following places
+ * /sbin/nginx
+ * /usr/sbin/nginx
+The command could not be located because '/usr/sbin:/sbin' is not included in the PATH environment variable.
+This is most likely caused by the lack of administrative privileges associated with your user account.
+nginx: command not found
+ls: cannot access '/etc/nginx/sites-enabled/': Permission denied
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                          
+LISTEN 0      4096       127.0.0.1:14000      0.0.0.0:*                                    
+LISTEN 0      200        127.0.0.1:5432       0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:13000      0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:65529      0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:16000      0.0.0.0:*                                    
+LISTEN 0      100          0.0.0.0:25         0.0.0.0:*                                    
+LISTEN 0      128          0.0.0.0:21         0.0.0.0:*                                    
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*                                    
+LISTEN 0      511          0.0.0.0:80         0.0.0.0:*                                    
+LISTEN 0      511          0.0.0.0:8443       0.0.0.0:*                                    
+LISTEN 0      511          0.0.0.0:443        0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:15000      0.0.0.0:*                                    
+LISTEN 0      511        127.0.0.1:6379       0.0.0.0:*                                    
+LISTEN 0      4096      127.0.0.54:53         0.0.0.0:*                                    
+LISTEN 0      10         127.0.0.1:42761      0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:18000      0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:17000      0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:20000      0.0.0.0:*                                    
+LISTEN 0      4096       127.0.0.1:12000      0.0.0.0:*                                    
+tail: cannot open '/var/log/nginx/error.log' for reading: Permission denied
+automystics-mysticshr@srv1609330:~/htdocs/mysticshr.automystics.tech$ 
