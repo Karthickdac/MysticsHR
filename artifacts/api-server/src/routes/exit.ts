@@ -300,6 +300,33 @@ router.post("/exit/requests", requireHrmsUser, requireRole(...ALL_ROLES), async 
 
     await logAudit({ user: u, action: "create_exit_request", module: "exit", recordId: exitReq.id });
 
+    // Notify HR roles that a new exit request was raised so they can pick it
+    // up for review. Fire-and-forget so notification failures cannot block
+    // the submission response. Sent to super_admin / hr_manager / hr_executive
+    // — payroll_admin / hod do not need to be notified at submission time
+    // (they get involved later at FnF compute and clearance assignment).
+    (async () => {
+      const empName = `${emp.firstName ?? ""} ${emp.lastName ?? ""}`.trim() || "an employee";
+      const empCodeStr = emp.employeeId ?? String(empId);
+      const hrRecipients = await getUsersByRoles(["super_admin", "hr_manager", "hr_executive"]);
+      await Promise.allSettled(hrRecipients.map((r) =>
+        dispatchNotification({
+          eventType: "exit_request_submitted", module: "exit",
+          recipientEmail: r.email, recipientName: r.name,
+          recipientEmployeeDbId: r.employeeId,
+          variables: {
+            recipientName: r.name,
+            employeeName: empName,
+            employeeId: empCodeStr,
+            exitType: String(exitType),
+            requestedLwd: String(requestedLwd),
+            reason: String(reason ?? ""),
+          },
+          entityType: "exit_request", entityId: exitReq.id,
+        })
+      ));
+    })().catch(() => {});
+
     res.status(201).json(await enrichExitRequest(exitReq));
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

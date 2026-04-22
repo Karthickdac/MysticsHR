@@ -546,12 +546,17 @@ describe("POST /exit/requests/:id/fnf/approve — dual-lane approval", () => {
 });
 
 describe("POST /exit/requests — submission stage", () => {
-  it("does NOT dispatch any notification on a fresh resignation submission (current product behavior)", async () => {
-    // The "request raised" stage is intentionally silent in the current design
-    // — notifications start at the Clearance Pending transition. This test
-    // pins that contract so any future addition of a submit-stage notification
-    // is an explicit, reviewed change.
+  it("dispatches exit_request_submitted to all HR roles with the right variables", async () => {
     const employee: TestUser = { id: 30, role: "employee", name: "Asha Raiser" };
+
+    // Two HR users + one super_admin should be notified at submission time;
+    // payroll_admin and hod must NOT be queued here because the route only
+    // requests super_admin / hr_manager / hr_executive at this stage.
+    systemConfigState.hrUsers = [
+      { id: 1, name: "Super Admin", email: "admin@a.test", employeeId: 100 },
+      { id: 2, name: "HR Manager", email: "hrm@a.test", employeeId: 101 },
+      { id: 3, name: "HR Executive", email: "hre@a.test", employeeId: 102 },
+    ];
 
     // getEmployeeForUser does TWO selects: first hrmsUsersTable for employeeId,
     // then employeesTable for the employee record.
@@ -559,9 +564,10 @@ describe("POST /exit/requests — submission stage", () => {
     queueSelect(employeesTable, [{
       id: 11, dateOfJoining: "2020-01-01", employmentType: "Permanent", departmentId: 3,
     }]);
-    // Then the route re-selects the employee row by id (line ~252)
+    // Then the route re-selects the employee row by id
     queueSelect(employeesTable, [{
-      id: 11, dateOfJoining: "2020-01-01", employmentType: "Permanent", departmentId: 3,
+      id: 11, firstName: "Asha", lastName: "Raiser", employeeId: "E11",
+      dateOfJoining: "2020-01-01", employmentType: "Permanent", departmentId: 3,
     }]);
     // employeeProfilesTable for contractual notice period override (set to 0
     // so the notice-period gate does not reject the request)
@@ -580,7 +586,24 @@ describe("POST /exit/requests — submission stage", () => {
     expect(res.status).toBe(201);
     await flushAsyncDeep();
 
-    expect(dispatchCalls).toHaveLength(0);
+    const submitted = dispatchCalls.filter((c) => c.eventType === "exit_request_submitted");
+    expect(submitted).toHaveLength(3);
+
+    // Recipients cover every HR role; no payroll_admin / hod here.
+    const emails = submitted.map((c) => c.recipientEmail).sort();
+    expect(emails).toEqual(["admin@a.test", "hre@a.test", "hrm@a.test"]);
+
+    // Variables carry the employee identity, exit type, and requested LWD so
+    // the templates can render meaningful subject/body/whatsapp content.
+    for (const call of submitted) {
+      expect(call.module).toBe("exit");
+      expect(call.entityType).toBe("exit_request");
+      expect(call.variables.employeeName).toBe("Asha Raiser");
+      expect(call.variables.employeeId).toBe("E11");
+      expect(call.variables.exitType).toBe("Resignation");
+      expect(call.variables.requestedLwd).toBe(futureLwd);
+      expect(call.variables.reason).toBe("Personal");
+    }
   });
 });
 
