@@ -574,6 +574,49 @@ router.put("/leave/applications/:id", requireHrmsUser, requireRole(...HR_ROLES),
       ipAddress: req.ip,
     });
 
+    // Notify the applicant + the approver chain (HOD + HR) that recorded the
+    // original approval. Variables include before/after dates so recipients
+    // can see exactly what changed.
+    try {
+      const [leaveTypeRow] = await db.select({ name: leaveTypesTable.name })
+        .from(leaveTypesTable).where(eq(leaveTypesTable.id, app.leaveTypeId));
+      const recipientUserIds = new Set<number>();
+      const [empUser] = await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, app.employeeId));
+      if (app.hodActionedById) recipientUserIds.add(app.hodActionedById);
+      if (app.hrActionedById) recipientUserIds.add(app.hrActionedById);
+      const approvers = recipientUserIds.size > 0
+        ? await db.select({ id: hrmsUsersTable.id, email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
+            .from(hrmsUsersTable).where(inArray(hrmsUsersTable.id, [...recipientUserIds]))
+        : [];
+      const sharedVars = {
+        leaveType: leaveTypeRow?.name ?? "leave",
+        oldFromDate: String(oldFrom), oldToDate: String(oldTo), oldDays: String(oldTotalDays),
+        newFromDate: String(fromDate), newToDate: String(toDate), newDays: String(newTotalDays),
+        editedBy: req.hrmsUser?.name ?? req.hrmsUser?.email ?? "HR",
+        editReason: reason ?? "",
+      };
+      if (empUser?.email) {
+        dispatchNotification({
+          eventType: "leave_dates_edited", module: "leave",
+          recipientEmail: empUser.email, recipientName: empUser.name ?? undefined,
+          recipientEmployeeDbId: app.employeeId,
+          variables: { ...sharedVars, recipientName: empUser.name ?? "Team Member" },
+          entityType: "leave_application", entityId: appId,
+        }).catch(() => {});
+      }
+      for (const ap of approvers) {
+        if (!ap.email) continue;
+        dispatchNotification({
+          eventType: "leave_dates_edited", module: "leave",
+          recipientEmail: ap.email, recipientName: ap.name ?? undefined,
+          recipientEmployeeDbId: ap.employeeId ?? null,
+          variables: { ...sharedVars, recipientName: ap.name ?? "Team Member" },
+          entityType: "leave_application", entityId: appId,
+        }).catch(() => {});
+      }
+    } catch (e) { console.error("[leave] edit-dates notification dispatch failed:", e); }
+
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });

@@ -8,6 +8,7 @@ import {
   getGetLeaveUsageTrendQueryKey,
   useSubmitLeaveApplication,
   useCancelLeaveApplication,
+  useEditLeaveApplicationDates,
   getListLeaveApplicationsQueryKey,
   getListLeaveBalancesQueryKey,
 } from "@workspace/api-client-react";
@@ -66,6 +67,52 @@ export default function LeavePage() {
 
   const submitMutation = useSubmitLeaveApplication();
   const cancelMutation = useCancelLeaveApplication();
+  const editDatesMutation = useEditLeaveApplicationDates();
+
+  // HR-only edit-dates dialog
+  type EditingApp = {
+    id: number; fromDate: string; toDate: string; isHalfDay: boolean;
+    halfDaySession?: string | null; leaveTypeName?: string | null;
+    leaveTypeCode?: string | null;
+  };
+  const [editingApp, setEditingApp] = useState<EditingApp | null>(null);
+  const [editForm, setEditForm] = useState({
+    fromDate: "", toDate: "", isHalfDay: false, halfDaySession: "First Half", reason: "",
+  });
+  function openEditDates(app: EditingApp) {
+    setEditingApp(app);
+    setEditForm({
+      fromDate: String(app.fromDate),
+      toDate: String(app.toDate),
+      isHalfDay: !!app.isHalfDay,
+      halfDaySession: app.halfDaySession ?? "First Half",
+      reason: "",
+    });
+  }
+  async function handleEditDates() {
+    if (!editingApp) return;
+    if (!editForm.fromDate || !editForm.toDate) { alert("Both dates are required"); return; }
+    if (!editForm.reason.trim()) { alert("A reason is required for the edit"); return; }
+    if (editForm.isHalfDay && editForm.fromDate !== editForm.toDate) {
+      alert("Half-day leave must have the same from and to date"); return;
+    }
+    try {
+      await editDatesMutation.mutateAsync({
+        id: editingApp.id,
+        data: {
+          fromDate: editForm.fromDate,
+          toDate: editForm.toDate,
+          isHalfDay: editForm.isHalfDay,
+          halfDaySession: editForm.isHalfDay ? editForm.halfDaySession : null,
+          reason: editForm.reason,
+        },
+      });
+      invalidate();
+      setEditingApp(null);
+    } catch (err: any) {
+      alert(err?.response?.data?.error ?? "Failed to update leave dates");
+    }
+  }
 
   const [myView, setMyView] = useState<"list" | "calendar">("list");
   const [showApply, setShowApply] = useState(false);
@@ -370,6 +417,20 @@ export default function LeavePage() {
                           Cancel
                         </Button>
                       )}
+                      {isHr && app.status === "Approved" && (
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+                          onClick={() => openEditDates({
+                            id: app.id,
+                            fromDate: String(app.fromDate),
+                            toDate: String(app.toDate),
+                            isHalfDay: !!app.isHalfDay,
+                            halfDaySession: app.halfDaySession ?? null,
+                            leaveTypeName: app.leaveTypeName ?? null,
+                            leaveTypeCode: app.leaveTypeCode ?? null,
+                          })}>
+                          Edit dates
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -433,6 +494,64 @@ export default function LeavePage() {
             <Button variant="outline" onClick={() => { setShowApply(false); resetForm(); }}>Cancel</Button>
             <Button onClick={() => handleSubmit(false)} disabled={submitMutation.isPending || !form.leaveTypeId || !form.fromDate || !form.toDate || !form.reason.trim()}>
               {submitMutation.isPending ? "Submitting..." : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* HR — Edit Approved Leave Dates Dialog */}
+      <Dialog open={!!editingApp} onOpenChange={(o) => { if (!o) setEditingApp(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Approved Leave Dates</DialogTitle>
+          </DialogHeader>
+          {editingApp && (
+            <div className="space-y-4">
+              <div className="text-xs text-gray-500 bg-gray-50 rounded p-2 space-y-0.5">
+                <div><span className="font-medium">{editingApp.leaveTypeName ?? editingApp.leaveTypeCode ?? "Leave"}</span></div>
+                <div>Currently: {fmtDate(editingApp.fromDate)} — {fmtDate(editingApp.toDate)}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>From *</Label>
+                  <Input type="date" value={editForm.fromDate} onChange={e => setEditForm(f => ({ ...f, fromDate: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>To *</Label>
+                  <Input type="date" value={editForm.toDate} onChange={e => setEditForm(f => ({ ...f, toDate: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="edit-half-day" checked={editForm.isHalfDay}
+                  onCheckedChange={(v) => setEditForm(f => ({ ...f, isHalfDay: !!v, toDate: v ? f.fromDate : f.toDate }))} />
+                <Label htmlFor="edit-half-day" className="text-sm font-normal cursor-pointer">Half-day</Label>
+              </div>
+              {editForm.isHalfDay && (
+                <div>
+                  <Label>Session</Label>
+                  <Select value={editForm.halfDaySession} onValueChange={(v) => setEditForm(f => ({ ...f, halfDaySession: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="First Half">First Half</SelectItem>
+                      <SelectItem value="Second Half">Second Half</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div>
+                <Label>Reason for edit *</Label>
+                <Textarea rows={3} placeholder="e.g. Employee requested to shift dates by 2 days due to travel"
+                  value={editForm.reason} onChange={e => setEditForm(f => ({ ...f, reason: e.target.value }))} />
+              </div>
+              <div className="text-xs text-amber-700 bg-amber-50 rounded p-2">
+                Saving will adjust the leave balance and re-sync attendance for changed days. The applicant and approvers will be notified.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingApp(null)} disabled={editDatesMutation.isPending}>Cancel</Button>
+            <Button onClick={handleEditDates} disabled={editDatesMutation.isPending}>
+              {editDatesMutation.isPending ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
