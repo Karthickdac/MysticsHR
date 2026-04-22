@@ -5661,6 +5661,12 @@ export const GetAttendanceSuspicionConfigResponse = zod.object({
         .number()
         .min(getAttendanceSuspicionConfigResponseOfficesItemLongitudeMin)
         .max(getAttendanceSuspicionConfigResponseOfficesItemLongitudeMax),
+      location: zod
+        .string()
+        .nullish()
+        .describe(
+          "Optional employee work-location this office anchors. Empty\/null = global fallback. Matched case-insensitively against employee_profiles.work_location.",
+        ),
     }),
   ),
 });
@@ -5700,6 +5706,12 @@ export const UpdateAttendanceSuspicionConfigBody = zod.object({
         .number()
         .min(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMin)
         .max(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMax),
+      location: zod
+        .string()
+        .nullish()
+        .describe(
+          "Optional employee work-location this office anchors. Empty\/null = global fallback. Matched case-insensitively against employee_profiles.work_location.",
+        ),
     }),
   ),
 });
@@ -5738,6 +5750,12 @@ export const UpdateAttendanceSuspicionConfigResponse = zod.object({
         .number()
         .min(updateAttendanceSuspicionConfigResponseOfficesItemLongitudeMin)
         .max(updateAttendanceSuspicionConfigResponseOfficesItemLongitudeMax),
+      location: zod
+        .string()
+        .nullish()
+        .describe(
+          "Optional employee work-location this office anchors. Empty\/null = global fallback. Matched case-insensitively against employee_profiles.work_location.",
+        ),
     }),
   ),
 });

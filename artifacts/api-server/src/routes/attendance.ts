@@ -11,6 +11,7 @@ import {
   shiftAssignmentsTable,
   employeesTable,
   hrmsUsersTable,
+  employeeProfilesTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, isNull, sql, or, SQL, desc } from "drizzle-orm";
 import { evaluateSuspicion, loadAttendanceSuspicionConfig } from "../lib/attendance-suspicion";
@@ -190,9 +191,11 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
         signOutUserAgent: attendanceRecordsTable.signOutUserAgent,
         createdAt: attendanceRecordsTable.createdAt,
         updatedAt: attendanceRecordsTable.updatedAt,
+        employeeLocation: employeeProfilesTable.workLocation,
       })
       .from(attendanceRecordsTable)
       .leftJoin(employeesTable, eq(attendanceRecordsTable.employeeId, employeesTable.id))
+      .leftJoin(employeeProfilesTable, eq(attendanceRecordsTable.employeeId, employeeProfilesTable.employeeId))
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(attendanceRecordsTable.attendanceDate, attendanceRecordsTable.employeeId);
 

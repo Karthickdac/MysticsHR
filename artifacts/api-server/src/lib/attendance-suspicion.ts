@@ -12,6 +12,13 @@ export interface AttendanceSuspicionOffice {
   name: string;
   latitude: number;
   longitude: number;
+  /**
+   * Optional employee work-location this office anchors. When set, only
+   * employees whose `workLocation` matches (case-insensitive) are evaluated
+   * against this office. Offices with an empty/null location are global and
+   * apply as a fallback when no location-specific office matches.
+   */
+  location?: string | null;
 }
 
 export interface AttendanceSuspicionConfig {
@@ -46,10 +53,15 @@ function normalizeOffices(value: unknown): AttendanceSuspicionOffice[] {
       const name = String((o as { name?: unknown }).name ?? "").trim();
       const latitude = Number((o as { latitude?: unknown }).latitude);
       const longitude = Number((o as { longitude?: unknown }).longitude);
+      const rawLocation = (o as { location?: unknown }).location;
+      const location =
+        typeof rawLocation === "string" && rawLocation.trim() !== ""
+          ? rawLocation.trim()
+          : null;
       if (!name) return null;
       if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
       if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
-      return { name, latitude, longitude };
+      return { name, latitude, longitude, location };
     })
     .filter((o): o is AttendanceSuspicionOffice => o !== null);
 }
@@ -115,6 +127,29 @@ export interface AttendanceLikeRecord {
   signInLatitude: string | number | null | undefined;
   signInLongitude: string | number | null | undefined;
   signInAccuracyMeters: number | null | undefined;
+  /** The employee's `workLocation` (employee_profiles.work_location). */
+  employeeLocation?: string | null | undefined;
+}
+
+/**
+ * Pick the offices that apply to an employee. Offices whose `location`
+ * matches the employee's `workLocation` (case-insensitive) are preferred;
+ * if none match, offices without a location act as a global fallback.
+ * Returning an empty array means the radius rule is skipped for that
+ * employee — better than producing a false-positive flag.
+ */
+export function selectOfficesForEmployee(
+  config: AttendanceSuspicionConfig,
+  employeeLocation: string | null | undefined,
+): AttendanceSuspicionOffice[] {
+  if (config.offices.length === 0) return [];
+  const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+  const empLoc = norm(employeeLocation);
+  if (empLoc) {
+    const scoped = config.offices.filter((o) => norm(o.location) === empLoc);
+    if (scoped.length > 0) return scoped;
+  }
+  return config.offices.filter((o) => !o.location || o.location.trim() === "");
 }
 
 /**
@@ -146,10 +181,11 @@ export function evaluateSuspicion(record: AttendanceLikeRecord, config: Attendan
     });
   }
 
-  if (config.offices.length > 0) {
+  const applicableOffices = selectOfficesForEmployee(config, record.employeeLocation);
+  if (applicableOffices.length > 0) {
     let nearest = Infinity;
     let nearestName = "";
-    for (const office of config.offices) {
+    for (const office of applicableOffices) {
       const d = haversineMeters(lat as number, lng as number, office.latitude, office.longitude);
       if (d < nearest) {
         nearest = d;

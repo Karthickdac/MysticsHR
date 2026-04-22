@@ -6383,6 +6383,9 @@ components:
         name: { type: string }
         latitude: { type: number, minimum: -90, maximum: 90 }
         longitude: { type: number, minimum: -180, maximum: 180 }
+        location:
+          type: ["string", "null"]
+          description: "Optional employee work-location this office anchors. Empty/null = global fallback. Matched case-insensitively against employee_profiles.work_location."
       required: [name, latitude, longitude]
 
     AttendanceSuspicionConfig:

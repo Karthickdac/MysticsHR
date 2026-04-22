@@ -1392,7 +1392,7 @@ function AttendanceSuspicionTab() {
 
   const [maxAccuracy, setMaxAccuracy] = useState<string>("200");
   const [maxRadius, setMaxRadius] = useState<string>("500");
-  const [offices, setOffices] = useState<Array<{ name: string; latitude: number; longitude: number }>>([]);
+  const [offices, setOffices] = useState<Array<{ name: string; latitude: number; longitude: number; location?: string | null }>>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -1405,12 +1405,12 @@ function AttendanceSuspicionTab() {
   }, [data, loaded]);
 
   function addOffice() {
-    setOffices((p) => [...p, { name: "", latitude: 0, longitude: 0 }]);
+    setOffices((p) => [...p, { name: "", latitude: 0, longitude: 0, location: "" }]);
   }
   function removeOffice(idx: number) {
     setOffices((p) => p.filter((_, i) => i !== idx));
   }
-  function updateOffice(idx: number, patch: Partial<{ name: string; latitude: number; longitude: number }>) {
+  function updateOffice(idx: number, patch: Partial<{ name: string; latitude: number; longitude: number; location: string | null }>) {
     setOffices((p) => p.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
   }
 
@@ -1483,11 +1483,21 @@ function AttendanceSuspicionTab() {
                 <div className="space-y-2">
                   {offices.map((o, idx) => (
                     <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded-md p-3" data-testid={`row-office-${idx}`}>
-                      <div className="col-span-12 md:col-span-5">
+                      <div className="col-span-12 md:col-span-3">
                         <Label className="text-xs">Name</Label>
                         <Input value={o.name} onChange={(e) => updateOffice(idx, { name: e.target.value })} disabled={!canWrite} />
                       </div>
-                      <div className="col-span-6 md:col-span-3">
+                      <div className="col-span-12 md:col-span-3">
+                        <Label className="text-xs">Applies to work location</Label>
+                        <Input
+                          value={o.location ?? ""}
+                          placeholder="(global fallback)"
+                          onChange={(e) => updateOffice(idx, { location: e.target.value })}
+                          disabled={!canWrite}
+                          data-testid={`input-office-location-${idx}`}
+                        />
+                      </div>
+                      <div className="col-span-6 md:col-span-2">
                         <Label className="text-xs">Latitude</Label>
                         <Input type="number" step="any" value={o.latitude}
                           onChange={(e) => updateOffice(idx, { latitude: Number(e.target.value) })} disabled={!canWrite} />

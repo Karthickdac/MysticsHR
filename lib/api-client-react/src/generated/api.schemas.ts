@@ -263,6 +263,11 @@ export interface AttendanceSuspicionOffice {
    * @maximum 180
    */
   longitude: number;
+  /**
+   * Optional employee work-location this office anchors. Empty/null = global fallback. Matched case-insensitively against employee_profiles.work_location.
+   * @nullable
+   */
+  location?: string | null;
 }
 
 export interface AttendanceSuspicionConfig {
