@@ -1,0 +1,74 @@
+automystics-mysticshr@srv1609330:~/htdocs/mysticshr.automystics.tech$ pm2 list
+pm2 logs --lines 30 --nostream
+┌────┬──────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name         │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼──────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ mysticshr    │ default     │ N/A     │ fork    │ 0        │ 0      │ 15   │ errored   │ 0%       │ 0b       │ aut… │ disabled │
+└────┴──────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[TAILING] Tailing last 30 lines for [all] processes (change the value with --lines option)
+/home/automystics-mysticshr/.pm2/pm2.log last 30 lines:
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] starting in -fork mode-
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] online
+PM2        | 2026-04-22T17:14:05: PM2 log: App [mysticshr:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-04-22T17:14:05: PM2 log: Script /usr/bin/bash had too many unstable restarts (16). Stopped. "errored"
+
+/home/automystics-mysticshr/.pm2/logs/mysticshr-out.log last 30 lines:
+/home/automystics-mysticshr/.pm2/logs/mysticshr-error.log last 30 lines:
+0|mysticsh |     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+0|mysticsh |     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+0|mysticsh |     at Function._load (node:internal/modules/cjs/loader:1192:37)
+0|mysticsh |     at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+0|mysticsh |     at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+0|mysticsh |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+0|mysticsh |     at node:internal/main/run_main_module:36:49 {
+0|mysticsh |   code: 'MODULE_NOT_FOUND',
+0|mysticsh |   requireStack: []
+0|mysticsh | }
+0|mysticsh | 
+0|mysticsh | Node.js v22.22.2
+0|mysticsh | node:internal/modules/cjs/loader:1386
+0|mysticsh |   throw err;
+0|mysticsh |   ^
+0|mysticsh | 
+0|mysticsh | Error: Cannot find module '/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/dist/index.mjs'
+0|mysticsh |     at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+0|mysticsh |     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+0|mysticsh |     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+0|mysticsh |     at Function._load (node:internal/modules/cjs/loader:1192:37)
+0|mysticsh |     at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+0|mysticsh |     at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+0|mysticsh |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+0|mysticsh |     at node:internal/main/run_main_module:36:49 {
+0|mysticsh |   code: 'MODULE_NOT_FOUND',
+0|mysticsh |   requireStack: []
+0|mysticsh | }
+0|mysticsh | 
+0|mysticsh | Node.js v22.22.2
+
+automystics-mysticshr@srv1609330:~/htdocs/mysticshr.automystics.tech$ 
