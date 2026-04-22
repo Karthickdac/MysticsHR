@@ -15,6 +15,7 @@ import {
   getGetRolePermissionsQueryKey,
   useGetAttendanceSuspicionConfig,
   useUpdateAttendanceSuspicionConfig,
+  getGetAttendanceSuspicionConfigQueryKey,
   type ApprovalChainConfig,
   type RolePermissions,
   type RolePermissionsItem,
@@ -1428,7 +1429,7 @@ function AttendanceSuspicionTab() {
     }
     await update.mutateAsync({ data: { maxAccuracyMeters: acc, maxRadiusMeters: rad, offices } });
     toast({ title: "Suspicion settings saved" });
-    void qc.invalidateQueries({ queryKey: ["/attendance-suspicion-config"] });
+    void qc.invalidateQueries({ queryKey: getGetAttendanceSuspicionConfigQueryKey() });
   }
 
   return (
