@@ -19,7 +19,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Calendar, ArrowRight } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Pencil, Calendar, ArrowRight, AlertTriangle } from "lucide-react";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 import { Link } from "wouter";
 
@@ -67,6 +69,7 @@ function HrAttendanceView() {
   const today = new Date().toISOString().split("T")[0];
   const [filterDate, setFilterDate] = useState(today);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [showSuspiciousOnly, setShowSuspiciousOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showOverride, setShowOverride] = useState(false);
   const [editingRecord, setEditingRecord] = useState<{
@@ -88,7 +91,10 @@ function HrAttendanceView() {
 
   const { data: _empResponse } = useListEmployees({});
   const employees = _empResponse?.data ?? [];
-  const { data: records = [], isLoading } = useGetAttendance({ date: filterDate });
+  const { data: records = [], isLoading } = useGetAttendance({
+    date: filterDate,
+    ...(showSuspiciousOnly ? { suspiciousOnly: true } : {}),
+  } as Parameters<typeof useGetAttendance>[0]);
 
   const createAtt = usePostAttendance();
   const overrideAtt = usePatchAttendanceId();
@@ -176,6 +182,14 @@ function HrAttendanceView() {
             </SelectContent>
           </Select>
         </div>
+        <label className="flex items-center gap-2 h-9 px-3 rounded-md border bg-background cursor-pointer text-sm" data-testid="toggle-suspicious-only">
+          <Checkbox
+            checked={showSuspiciousOnly}
+            onCheckedChange={(v) => setShowSuspiciousOnly(v === true)}
+          />
+          <AlertTriangle className="w-4 h-4 text-amber-600" />
+          Show only flagged
+        </label>
       </div>
 
       {isLoading ? <p className="text-muted-foreground">Loading...</p> : (
@@ -211,8 +225,35 @@ function HrAttendanceView() {
                       <td className="px-4 py-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[r.status ?? ""] ?? ""}`}>{r.status}</span>
                       </td>
-                      <td className="px-4 py-2">
+                      <td className="px-4 py-2 space-y-1">
                         {r.isHrOverride && <Badge variant="outline" className="text-xs">HR Override</Badge>}
+                        {(() => {
+                          const flags = (r as { suspicionFlags?: Array<{ code: string; reason: string }> }).suspicionFlags ?? [];
+                          if (flags.length === 0) return null;
+                          return (
+                            <TooltipProvider delayDuration={150}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs gap-1 border-amber-500 text-amber-700 bg-amber-50 cursor-help"
+                                    data-testid={`badge-suspicious-${r.id}`}
+                                  >
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Suspicious
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <ul className="text-xs space-y-1 list-disc pl-4">
+                                    {flags.map((f) => (
+                                      <li key={f.code}>{f.reason}</li>
+                                    ))}
+                                  </ul>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()}
                       </td>
                       {canManage && (
                         <td className="px-4 py-2">

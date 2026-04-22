@@ -2552,6 +2552,12 @@ export const GetAttendanceQueryParams = zod.object({
   employeeId: zod.coerce.number().optional(),
   departmentId: zod.coerce.number().optional(),
   status: zod.coerce.string().optional(),
+  suspiciousOnly: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "When true, only rows with at least one suspicion flag are returned.",
+    ),
 });
 
 export const GetAttendanceResponseItem = zod.object({
@@ -2591,6 +2597,17 @@ export const GetAttendanceResponseItem = zod.object({
   signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  suspicionFlags: zod
+    .array(
+      zod.object({
+        code: zod.enum(["MISSING_GPS", "LOW_ACCURACY", "OUT_OF_RADIUS"]),
+        reason: zod.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged.",
+    ),
 });
 export const GetAttendanceResponse = zod.array(GetAttendanceResponseItem);
 
@@ -2651,6 +2668,17 @@ export const GetAttendanceIdResponse = zod.object({
   signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  suspicionFlags: zod
+    .array(
+      zod.object({
+        code: zod.enum(["MISSING_GPS", "LOW_ACCURACY", "OUT_OF_RADIUS"]),
+        reason: zod.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged.",
+    ),
 });
 
 /**
@@ -2706,6 +2734,17 @@ export const PatchAttendanceIdResponse = zod.object({
   signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  suspicionFlags: zod
+    .array(
+      zod.object({
+        code: zod.enum(["MISSING_GPS", "LOW_ACCURACY", "OUT_OF_RADIUS"]),
+        reason: zod.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged.",
+    ),
 });
 
 /**
@@ -2756,6 +2795,17 @@ export const GetEmployeesIdAttendanceResponseItem = zod.object({
   signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  suspicionFlags: zod
+    .array(
+      zod.object({
+        code: zod.enum(["MISSING_GPS", "LOW_ACCURACY", "OUT_OF_RADIUS"]),
+        reason: zod.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged.",
+    ),
 });
 export const GetEmployeesIdAttendanceResponse = zod.array(
   GetEmployeesIdAttendanceResponseItem,
@@ -2841,6 +2891,17 @@ export const GetMyAttendanceTodayResponse = zod.object({
         signOutUserAgent: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
+        suspicionFlags: zod
+          .array(
+            zod.object({
+              code: zod.enum(["MISSING_GPS", "LOW_ACCURACY", "OUT_OF_RADIUS"]),
+              reason: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged.",
+          ),
       }),
       zod.null(),
     ])
@@ -2979,6 +3040,17 @@ export const ClockOutMyAttendanceResponse = zod.object({
   signOutUserAgent: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  suspicionFlags: zod
+    .array(
+      zod.object({
+        code: zod.enum(["MISSING_GPS", "LOW_ACCURACY", "OUT_OF_RADIUS"]),
+        reason: zod.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged.",
+    ),
 });
 
 /**
@@ -5552,6 +5624,122 @@ export const UpdateMyNotificationPreferencesBody = zod.object({
 export const UpdateMyNotificationPreferencesResponse = zod.object({
   success: zod.boolean(),
   count: zod.number(),
+});
+
+/**
+ * @summary Read the thresholds + registered offices used to flag suspicious clock-ins
+ */
+export const getAttendanceSuspicionConfigResponseMaxAccuracyMetersMin = 0;
+
+export const getAttendanceSuspicionConfigResponseMaxRadiusMetersMin = 0;
+
+export const getAttendanceSuspicionConfigResponseOfficesItemLatitudeMin = -90;
+export const getAttendanceSuspicionConfigResponseOfficesItemLatitudeMax = 90;
+
+export const getAttendanceSuspicionConfigResponseOfficesItemLongitudeMin = -180;
+export const getAttendanceSuspicionConfigResponseOfficesItemLongitudeMax = 180;
+
+export const GetAttendanceSuspicionConfigResponse = zod.object({
+  maxAccuracyMeters: zod
+    .number()
+    .min(getAttendanceSuspicionConfigResponseMaxAccuracyMetersMin)
+    .describe("Worse GPS accuracy than this is flagged."),
+  maxRadiusMeters: zod
+    .number()
+    .min(getAttendanceSuspicionConfigResponseMaxRadiusMetersMin)
+    .describe(
+      "Distance from every registered office above which the punch is flagged.",
+    ),
+  offices: zod.array(
+    zod.object({
+      name: zod.string(),
+      latitude: zod
+        .number()
+        .min(getAttendanceSuspicionConfigResponseOfficesItemLatitudeMin)
+        .max(getAttendanceSuspicionConfigResponseOfficesItemLatitudeMax),
+      longitude: zod
+        .number()
+        .min(getAttendanceSuspicionConfigResponseOfficesItemLongitudeMin)
+        .max(getAttendanceSuspicionConfigResponseOfficesItemLongitudeMax),
+    }),
+  ),
+});
+
+/**
+ * @summary Update suspicion thresholds and registered offices
+ */
+export const updateAttendanceSuspicionConfigBodyMaxAccuracyMetersMin = 0;
+
+export const updateAttendanceSuspicionConfigBodyMaxRadiusMetersMin = 0;
+
+export const updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMin = -90;
+export const updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMax = 90;
+
+export const updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMin = -180;
+export const updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMax = 180;
+
+export const UpdateAttendanceSuspicionConfigBody = zod.object({
+  maxAccuracyMeters: zod
+    .number()
+    .min(updateAttendanceSuspicionConfigBodyMaxAccuracyMetersMin)
+    .describe("Worse GPS accuracy than this is flagged."),
+  maxRadiusMeters: zod
+    .number()
+    .min(updateAttendanceSuspicionConfigBodyMaxRadiusMetersMin)
+    .describe(
+      "Distance from every registered office above which the punch is flagged.",
+    ),
+  offices: zod.array(
+    zod.object({
+      name: zod.string(),
+      latitude: zod
+        .number()
+        .min(updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMin)
+        .max(updateAttendanceSuspicionConfigBodyOfficesItemLatitudeMax),
+      longitude: zod
+        .number()
+        .min(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMin)
+        .max(updateAttendanceSuspicionConfigBodyOfficesItemLongitudeMax),
+    }),
+  ),
+});
+
+export const updateAttendanceSuspicionConfigResponseMaxAccuracyMetersMin = 0;
+
+export const updateAttendanceSuspicionConfigResponseMaxRadiusMetersMin = 0;
+
+export const updateAttendanceSuspicionConfigResponseOfficesItemLatitudeMin =
+  -90;
+export const updateAttendanceSuspicionConfigResponseOfficesItemLatitudeMax = 90;
+
+export const updateAttendanceSuspicionConfigResponseOfficesItemLongitudeMin =
+  -180;
+export const updateAttendanceSuspicionConfigResponseOfficesItemLongitudeMax = 180;
+
+export const UpdateAttendanceSuspicionConfigResponse = zod.object({
+  maxAccuracyMeters: zod
+    .number()
+    .min(updateAttendanceSuspicionConfigResponseMaxAccuracyMetersMin)
+    .describe("Worse GPS accuracy than this is flagged."),
+  maxRadiusMeters: zod
+    .number()
+    .min(updateAttendanceSuspicionConfigResponseMaxRadiusMetersMin)
+    .describe(
+      "Distance from every registered office above which the punch is flagged.",
+    ),
+  offices: zod.array(
+    zod.object({
+      name: zod.string(),
+      latitude: zod
+        .number()
+        .min(updateAttendanceSuspicionConfigResponseOfficesItemLatitudeMin)
+        .max(updateAttendanceSuspicionConfigResponseOfficesItemLatitudeMax),
+      longitude: zod
+        .number()
+        .min(updateAttendanceSuspicionConfigResponseOfficesItemLongitudeMin)
+        .max(updateAttendanceSuspicionConfigResponseOfficesItemLongitudeMax),
+    }),
+  ),
 });
 
 /**

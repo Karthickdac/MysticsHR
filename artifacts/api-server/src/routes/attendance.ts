@@ -13,6 +13,7 @@ import {
   hrmsUsersTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, isNull, sql, or, SQL, desc } from "drizzle-orm";
+import { evaluateSuspicion, loadAttendanceSuspicionConfig } from "../lib/attendance-suspicion";
 
 const router = Router();
 
@@ -195,13 +196,27 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(attendanceRecordsTable.attendanceDate, attendanceRecordsTable.employeeId);
 
+    let scoped = rows;
     if (departmentId) {
       const deptEmps = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.departmentId, Number(departmentId)));
       const ids = new Set(deptEmps.map((e) => e.id));
-      res.json(rows.filter((r) => ids.has(r.employeeId)));
+      scoped = rows.filter((r) => ids.has(r.employeeId));
+    }
+
+    // Annotate every row with computed suspicion flags so HR can spot
+    // buddy-punch / forgotten-permission patterns at a glance. Rules and
+    // thresholds are configurable in system_settings.attendance_suspicion.
+    const suspicionConfig = await loadAttendanceSuspicionConfig();
+    const annotated = scoped.map((r) => ({
+      ...r,
+      suspicionFlags: evaluateSuspicion(r, suspicionConfig),
+    }));
+
+    if (req.query.suspiciousOnly === "true" || req.query.suspiciousOnly === "1") {
+      res.json(annotated.filter((r) => r.suspicionFlags.length > 0));
       return;
     }
-    res.json(rows);
+    res.json(annotated);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

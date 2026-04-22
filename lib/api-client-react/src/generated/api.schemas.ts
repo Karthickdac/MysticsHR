@@ -179,6 +179,20 @@ export interface ShiftSwapActionBody {
   remarks?: string | null;
 }
 
+export type AttendanceRecordSuspicionFlagsItemCode =
+  (typeof AttendanceRecordSuspicionFlagsItemCode)[keyof typeof AttendanceRecordSuspicionFlagsItemCode];
+
+export const AttendanceRecordSuspicionFlagsItemCode = {
+  MISSING_GPS: "MISSING_GPS",
+  LOW_ACCURACY: "LOW_ACCURACY",
+  OUT_OF_RADIUS: "OUT_OF_RADIUS",
+} as const;
+
+export type AttendanceRecordSuspicionFlagsItem = {
+  code: AttendanceRecordSuspicionFlagsItemCode;
+  reason: string;
+};
+
 export interface AttendanceRecord {
   id: number;
   employeeId: number;
@@ -233,6 +247,36 @@ export interface AttendanceRecord {
   signOutUserAgent?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged. */
+  suspicionFlags?: AttendanceRecordSuspicionFlagsItem[];
+}
+
+export interface AttendanceSuspicionOffice {
+  name: string;
+  /**
+   * @minimum -90
+   * @maximum 90
+   */
+  latitude: number;
+  /**
+   * @minimum -180
+   * @maximum 180
+   */
+  longitude: number;
+}
+
+export interface AttendanceSuspicionConfig {
+  /**
+   * Worse GPS accuracy than this is flagged.
+   * @minimum 0
+   */
+  maxAccuracyMeters: number;
+  /**
+   * Distance from every registered office above which the punch is flagged.
+   * @minimum 0
+   */
+  maxRadiusMeters: number;
+  offices: AttendanceSuspicionOffice[];
 }
 
 /**
@@ -3676,6 +3720,10 @@ export type GetAttendanceParams = {
   employeeId?: number;
   departmentId?: number;
   status?: string;
+  /**
+   * When true, only rows with at least one suspicion flag are returned.
+   */
+  suspiciousOnly?: boolean;
 };
 
 export type GetEmployeesIdAttendanceParams = {

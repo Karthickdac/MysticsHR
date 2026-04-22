@@ -2168,6 +2168,7 @@ paths:
         - { name: employeeId, in: query, schema: { type: integer } }
         - { name: departmentId, in: query, schema: { type: integer } }
         - { name: status, in: query, schema: { type: string } }
+        - { name: suspiciousOnly, in: query, description: "When true, only rows with at least one suspicion flag are returned.", schema: { type: boolean } }
       responses:
         "200":
           description: Attendance records
@@ -4500,6 +4501,33 @@ paths:
                   count: { type: integer }
                 required: [success, count]
 
+  /attendance-suspicion-config:
+    get:
+      operationId: getAttendanceSuspicionConfig
+      tags: [system-config]
+      summary: Read the thresholds + registered offices used to flag suspicious clock-ins
+      responses:
+        "200":
+          description: Current suspicion configuration
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttendanceSuspicionConfig" }
+    put:
+      operationId: updateAttendanceSuspicionConfig
+      tags: [system-config]
+      summary: Update suspicion thresholds and registered offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AttendanceSuspicionConfig" }
+      responses:
+        "200":
+          description: Saved configuration
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttendanceSuspicionConfig" }
+
   /my-preferences/notifications/silenced:
     get:
       operationId: getMySilencedNotifications
@@ -6338,7 +6366,34 @@ components:
         signOutUserAgent: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        suspicionFlags:
+          type: array
+          description: Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged.
+          items:
+            type: object
+            properties:
+              code: { type: string, enum: [MISSING_GPS, LOW_ACCURACY, OUT_OF_RADIUS] }
+              reason: { type: string }
+            required: [code, reason]
       required: [id, employeeId, attendanceDate, status, isHrOverride, createdAt, updatedAt]
+
+    AttendanceSuspicionOffice:
+      type: object
+      properties:
+        name: { type: string }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+      required: [name, latitude, longitude]
+
+    AttendanceSuspicionConfig:
+      type: object
+      properties:
+        maxAccuracyMeters: { type: number, minimum: 0, description: "Worse GPS accuracy than this is flagged." }
+        maxRadiusMeters: { type: number, minimum: 0, description: "Distance from every registered office above which the punch is flagged." }
+        offices:
+          type: array
+          items: { $ref: "#/components/schemas/AttendanceSuspicionOffice" }
+      required: [maxAccuracyMeters, maxRadiusMeters, offices]
 
     ClockPunchTelemetry:
       type: object

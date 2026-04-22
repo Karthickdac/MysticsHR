@@ -4,6 +4,7 @@ import { systemSettingsTable, approvalChainConfigsTable, hrmsUsersTable, storage
 import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { cleanupOrphanedAttachments } from "../lib/orphan-attachment-cleanup";
+import { loadAttendanceSuspicionConfig, saveAttendanceSuspicionConfig } from "../lib/attendance-suspicion";
 
 const router = Router();
 
@@ -335,6 +336,34 @@ router.delete("/leave-blackouts/:id", requireHrmsUser, requireRole("super_admin"
       .where(and(eq(systemSettingsTable.category, "leave_blackout_dates"), eq(systemSettingsTable.key, key)));
     res.status(204).end();
   } catch { res.status(500).json({ error: "Failed to delete leave blackout" }); }
+});
+
+// ─── Attendance Suspicion Config ──────────────────────────────────────────────
+// Thresholds + registered office coordinates that drive the "Suspicious"
+// badge on attendance rows. Stored in system_settings under category
+// "attendance_suspicion", key "config".
+
+router.get("/attendance-suspicion-config", requireHrmsUser, requireRole("super_admin", "hr_manager", "hr_executive", "hod"), async (_req, res) => {
+  try {
+    const cfg = await loadAttendanceSuspicionConfig();
+    res.json(cfg);
+  } catch {
+    res.status(500).json({ error: "Failed to load attendance suspicion config" });
+  }
+});
+
+router.put("/attendance-suspicion-config", requireHrmsUser, requireRole("super_admin", "hr_manager"), async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const saved = await saveAttendanceSuspicionConfig({
+      maxAccuracyMeters: body.maxAccuracyMeters as number | undefined,
+      maxRadiusMeters: body.maxRadiusMeters as number | undefined,
+      offices: Array.isArray(body.offices) ? (body.offices as Array<{ name: string; latitude: number; longitude: number }>) : undefined,
+    });
+    res.json(saved);
+  } catch {
+    res.status(500).json({ error: "Failed to save attendance suspicion config" });
+  }
 });
 
 // ─── Storage Cleanup Activity ─────────────────────────────────────────────────

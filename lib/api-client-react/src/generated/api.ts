@@ -33,6 +33,7 @@ import type {
   AttendanceOverrideBody,
   AttendanceRecord,
   AttendanceRegularization,
+  AttendanceSuspicionConfig,
   AuditLogListResponse,
   BackfillLeaveAttendanceBody,
   BlackoutDate,
@@ -19990,6 +19991,178 @@ export const useUpdateMyNotificationPreferences = <
 > => {
   return useMutation(
     getUpdateMyNotificationPreferencesMutationOptions(options),
+  );
+};
+
+/**
+ * @summary Read the thresholds + registered offices used to flag suspicious clock-ins
+ */
+export const getGetAttendanceSuspicionConfigUrl = () => {
+  return `/api/attendance-suspicion-config`;
+};
+
+export const getAttendanceSuspicionConfig = async (
+  options?: RequestInit,
+): Promise<AttendanceSuspicionConfig> => {
+  return customFetch<AttendanceSuspicionConfig>(
+    getGetAttendanceSuspicionConfigUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAttendanceSuspicionConfigQueryKey = () => {
+  return [`/api/attendance-suspicion-config`] as const;
+};
+
+export const getGetAttendanceSuspicionConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAttendanceSuspicionConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendanceSuspicionConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAttendanceSuspicionConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAttendanceSuspicionConfig>>
+  > = ({ signal }) =>
+    getAttendanceSuspicionConfig({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendanceSuspicionConfig>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAttendanceSuspicionConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAttendanceSuspicionConfig>>
+>;
+export type GetAttendanceSuspicionConfigQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Read the thresholds + registered offices used to flag suspicious clock-ins
+ */
+
+export function useGetAttendanceSuspicionConfig<
+  TData = Awaited<ReturnType<typeof getAttendanceSuspicionConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendanceSuspicionConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAttendanceSuspicionConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update suspicion thresholds and registered offices
+ */
+export const getUpdateAttendanceSuspicionConfigUrl = () => {
+  return `/api/attendance-suspicion-config`;
+};
+
+export const updateAttendanceSuspicionConfig = async (
+  attendanceSuspicionConfig: AttendanceSuspicionConfig,
+  options?: RequestInit,
+): Promise<AttendanceSuspicionConfig> => {
+  return customFetch<AttendanceSuspicionConfig>(
+    getUpdateAttendanceSuspicionConfigUrl(),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(attendanceSuspicionConfig),
+    },
+  );
+};
+
+export const getUpdateAttendanceSuspicionConfigMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
+    TError,
+    { data: BodyType<AttendanceSuspicionConfig> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
+  TError,
+  { data: BodyType<AttendanceSuspicionConfig> },
+  TContext
+> => {
+  const mutationKey = ["updateAttendanceSuspicionConfig"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
+    { data: BodyType<AttendanceSuspicionConfig> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateAttendanceSuspicionConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAttendanceSuspicionConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>
+>;
+export type UpdateAttendanceSuspicionConfigMutationBody =
+  BodyType<AttendanceSuspicionConfig>;
+export type UpdateAttendanceSuspicionConfigMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update suspicion thresholds and registered offices
+ */
+export const useUpdateAttendanceSuspicionConfig = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
+    TError,
+    { data: BodyType<AttendanceSuspicionConfig> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAttendanceSuspicionConfig>>,
+  TError,
+  { data: BodyType<AttendanceSuspicionConfig> },
+  TContext
+> => {
+  return useMutation(
+    getUpdateAttendanceSuspicionConfigMutationOptions(options),
   );
 };
 

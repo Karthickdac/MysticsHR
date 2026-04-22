@@ -13,6 +13,8 @@ import {
   useGetRolePermissions,
   useUpdateRolePermissions,
   getGetRolePermissionsQueryKey,
+  useGetAttendanceSuspicionConfig,
+  useUpdateAttendanceSuspicionConfig,
   type ApprovalChainConfig,
   type RolePermissions,
   type RolePermissionsItem,
@@ -1381,6 +1383,147 @@ function NotificationDefaultsTab() {
   );
 }
 
+function AttendanceSuspicionTab() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useGetAttendanceSuspicionConfig();
+  const update = useUpdateAttendanceSuspicionConfig();
+  const { role } = useCurrentHrmsUser();
+  const canWrite = role === "super_admin" || role === "hr_manager";
+
+  const [maxAccuracy, setMaxAccuracy] = useState<string>("200");
+  const [maxRadius, setMaxRadius] = useState<string>("500");
+  const [offices, setOffices] = useState<Array<{ name: string; latitude: number; longitude: number }>>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (data && !loaded) {
+      setMaxAccuracy(String(data.maxAccuracyMeters ?? 200));
+      setMaxRadius(String(data.maxRadiusMeters ?? 500));
+      setOffices(data.offices ?? []);
+      setLoaded(true);
+    }
+  }, [data, loaded]);
+
+  function addOffice() {
+    setOffices((p) => [...p, { name: "", latitude: 0, longitude: 0 }]);
+  }
+  function removeOffice(idx: number) {
+    setOffices((p) => p.filter((_, i) => i !== idx));
+  }
+  function updateOffice(idx: number, patch: Partial<{ name: string; latitude: number; longitude: number }>) {
+    setOffices((p) => p.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
+  }
+
+  async function save() {
+    const acc = Number(maxAccuracy);
+    const rad = Number(maxRadius);
+    if (!Number.isFinite(acc) || acc < 0 || !Number.isFinite(rad) || rad < 0) {
+      toast({ title: "Invalid thresholds", description: "Accuracy and radius must be non-negative numbers.", variant: "destructive" });
+      return;
+    }
+    for (const o of offices) {
+      if (!o.name.trim()) { toast({ title: "Office name required", variant: "destructive" }); return; }
+      if (!Number.isFinite(o.latitude) || o.latitude < -90 || o.latitude > 90) { toast({ title: `Invalid latitude for ${o.name}`, variant: "destructive" }); return; }
+      if (!Number.isFinite(o.longitude) || o.longitude < -180 || o.longitude > 180) { toast({ title: `Invalid longitude for ${o.name}`, variant: "destructive" }); return; }
+    }
+    await update.mutateAsync({ data: { maxAccuracyMeters: acc, maxRadiusMeters: rad, offices } });
+    toast({ title: "Suspicion settings saved" });
+    void qc.invalidateQueries({ queryKey: ["/attendance-suspicion-config"] });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Attendance Suspicion Rules</CardTitle>
+        <CardDescription>
+          Clock-ins that have no GPS, low accuracy, or are far from every registered office will be flagged for HR review.
+          Distances use straight-line (haversine) calculation in metres.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Max acceptable GPS accuracy (metres)</Label>
+                <Input
+                  type="number" min={0} value={maxAccuracy} onChange={(e) => setMaxAccuracy(e.target.value)}
+                  disabled={!canWrite} data-testid="input-max-accuracy"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Punches with worse accuracy than this are flagged.</p>
+              </div>
+              <div>
+                <Label className="text-xs">Max distance from any office (metres)</Label>
+                <Input
+                  type="number" min={0} value={maxRadius} onChange={(e) => setMaxRadius(e.target.value)}
+                  disabled={!canWrite} data-testid="input-max-radius"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Punches farther than this from every registered office are flagged.</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium">Registered office locations</h3>
+                  <p className="text-xs text-muted-foreground">Used as anchor points for the radius check. With no offices registered, the distance check is skipped (only missing-GPS and low-accuracy flags apply).</p>
+                </div>
+                {canWrite && (
+                  <Button size="sm" variant="outline" onClick={addOffice} className="gap-1" data-testid="button-add-office">
+                    <Plus className="w-4 h-4" />Add office
+                  </Button>
+                )}
+              </div>
+
+              {offices.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No offices registered.</p>
+              ) : (
+                <div className="space-y-2">
+                  {offices.map((o, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-end border rounded-md p-3" data-testid={`row-office-${idx}`}>
+                      <div className="col-span-12 md:col-span-5">
+                        <Label className="text-xs">Name</Label>
+                        <Input value={o.name} onChange={(e) => updateOffice(idx, { name: e.target.value })} disabled={!canWrite} />
+                      </div>
+                      <div className="col-span-6 md:col-span-3">
+                        <Label className="text-xs">Latitude</Label>
+                        <Input type="number" step="any" value={o.latitude}
+                          onChange={(e) => updateOffice(idx, { latitude: Number(e.target.value) })} disabled={!canWrite} />
+                      </div>
+                      <div className="col-span-6 md:col-span-3">
+                        <Label className="text-xs">Longitude</Label>
+                        <Input type="number" step="any" value={o.longitude}
+                          onChange={(e) => updateOffice(idx, { longitude: Number(e.target.value) })} disabled={!canWrite} />
+                      </div>
+                      <div className="col-span-12 md:col-span-1 flex md:justify-end">
+                        {canWrite && (
+                          <Button size="icon" variant="ghost" onClick={() => removeOffice(idx)} data-testid={`button-remove-office-${idx}`}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {canWrite && (
+              <div className="flex justify-end">
+                <Button onClick={() => void save()} disabled={update.isPending} data-testid="button-save-suspicion">
+                  {update.isPending ? "Saving…" : "Save settings"}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function NotificationCredentialsTab() {
   return (
     <div className="space-y-6">
@@ -1422,6 +1565,7 @@ export default function SystemConfigPage() {
             <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
             <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
             <TabsTrigger value="leave-blackouts">Leave Blackouts</TabsTrigger>
+            <TabsTrigger value="attendance-suspicion">Attendance Suspicion</TabsTrigger>
             <TabsTrigger value="notification-defaults">Notification Defaults</TabsTrigger>
             {isSuperAdmin && <TabsTrigger value="credentials">Notification Credentials</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="storage-cleanup">Storage Cleanup</TabsTrigger>}
@@ -1436,6 +1580,7 @@ export default function SystemConfigPage() {
           <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
           <TabsContent value="custom-fields" className="mt-4"><CustomEmployeeFieldsTab /></TabsContent>
           <TabsContent value="leave-blackouts" className="mt-4"><LeaveBlackoutsTab /></TabsContent>
+          <TabsContent value="attendance-suspicion" className="mt-4"><AttendanceSuspicionTab /></TabsContent>
           <TabsContent value="notification-defaults" className="mt-4"><NotificationDefaultsTab /></TabsContent>
           {isSuperAdmin && (
             <TabsContent value="credentials" className="mt-4"><NotificationCredentialsTab /></TabsContent>
