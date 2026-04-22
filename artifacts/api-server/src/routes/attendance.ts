@@ -219,10 +219,8 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
 
     const suspiciousOnlyRaw = req.query.suspiciousOnly;
     const suspiciousOnly =
-      suspiciousOnlyRaw === true ||
-      suspiciousOnlyRaw === "true" ||
-      suspiciousOnlyRaw === "1" ||
-      suspiciousOnlyRaw === "yes";
+      typeof suspiciousOnlyRaw === "string" &&
+      ["true", "1", "yes"].includes(suspiciousOnlyRaw.toLowerCase());
     if (suspiciousOnly) {
       res.json(annotated.filter((r) => r.suspicionFlags.length > 0));
       return;
