@@ -245,6 +245,21 @@ export interface AttendanceRecord {
   signOutAccuracyMeters?: number | null;
   /** @nullable */
   signOutUserAgent?: string | null;
+  /**
+   * IANA timezone the employee was in at clock-in (e.g. Asia/Kolkata)
+   * @nullable
+   */
+  signInTimezone?: string | null;
+  /**
+   * IANA timezone the employee was in at clock-out
+   * @nullable
+   */
+  signOutTimezone?: string | null;
+  /**
+   * Employee's preferred IANA timezone (from employees.timezone)
+   * @nullable
+   */
+  employeeTimezone?: string | null;
   createdAt: string;
   updatedAt: string;
   /** Computed flags for HR review (missing GPS, low accuracy, far from any registered office). Empty when nothing was flagged. */
@@ -327,6 +342,12 @@ export interface ClockPunchTelemetry {
    * @nullable
    */
   clientDate?: string | null;
+  /**
+   * IANA timezone the employee is in at the moment of the punch (e.g. Asia/Kolkata). Persisted on the attendance row so HR can disambiguate edits in the override dialog.
+   * @maxLength 100
+   * @nullable
+   */
+  timezone?: string | null;
 }
 
 export interface CreateAttendanceBody {

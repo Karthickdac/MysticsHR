@@ -43,6 +43,23 @@ function fmt(dt: string | null | undefined): string {
   return new Date(dt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Render the timestamp in the timezone it was captured in and append the
+// short zone abbreviation (e.g. "09:14 IST"). Falls back to the local
+// browser time when no zone was recorded.
+function fmtInZone(dt: string | null | undefined, zone: string | null | undefined): string {
+  if (!dt) return "—";
+  const d = new Date(dt);
+  if (!zone) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  try {
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: zone });
+    const parts = new Intl.DateTimeFormat([], { timeZone: zone, timeZoneName: "short" }).formatToParts(d);
+    const abbr = parts.find((p) => p.type === "timeZoneName")?.value ?? zone;
+    return `${time} ${abbr}`;
+  } catch {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+}
+
 function fmtMins(mins: number | null | undefined): string {
   if (!mins) return "—";
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
@@ -86,6 +103,11 @@ function HrAttendanceView() {
     signOutLongitude?: string | null;
     signOutAccuracyMeters?: number | null;
     signOutUserAgent?: string | null;
+    signInTime?: string | null;
+    signOutTime?: string | null;
+    signInTimezone?: string | null;
+    signOutTimezone?: string | null;
+    employeeTimezone?: string | null;
   } | null>(null);
   const [formError, setFormError] = useState("");
 
@@ -264,6 +286,8 @@ function HrAttendanceView() {
                               signInAccuracyMeters?: number | null; signInUserAgent?: string | null;
                               signOutLatitude?: string | null; signOutLongitude?: string | null;
                               signOutAccuracyMeters?: number | null; signOutUserAgent?: string | null;
+                              signInTimezone?: string | null; signOutTimezone?: string | null;
+                              employeeTimezone?: string | null;
                             };
                             setEditingRecord({
                               id: r.id, attendanceDate: r.attendanceDate,
@@ -277,6 +301,11 @@ function HrAttendanceView() {
                               signOutLongitude: rt.signOutLongitude ?? null,
                               signOutAccuracyMeters: rt.signOutAccuracyMeters ?? null,
                               signOutUserAgent: rt.signOutUserAgent ?? null,
+                              signInTime: r.signInTime ?? null,
+                              signOutTime: r.signOutTime ?? null,
+                              signInTimezone: rt.signInTimezone ?? null,
+                              signOutTimezone: rt.signOutTimezone ?? null,
+                              employeeTimezone: rt.employeeTimezone ?? null,
                             });
                             setOverrideForm({ signInTime: "", signOutTime: "", breakDurationMinutes: r.breakDurationMinutes ?? 0, status: r.status ?? "", overrideReason: "", notes: r.notes ?? "" });
                             setFormError("");
@@ -343,6 +372,29 @@ function HrAttendanceView() {
           <DialogHeader><DialogTitle>HR Override — {editingRecord?.attendanceDate}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {formError && <p className="text-red-500 text-sm">{formError}</p>}
+            {editingRecord && (editingRecord.signInTime || editingRecord.signOutTime) && (
+              <div className="rounded border bg-muted/30 p-3 text-xs space-y-1">
+                <div className="font-medium text-muted-foreground uppercase tracking-wide text-[10px]">Originally captured</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>Clock-in: <span className="font-mono">{fmtInZone(editingRecord.signInTime, editingRecord.signInTimezone)}</span></div>
+                  <div>Clock-out: <span className="font-mono">{fmtInZone(editingRecord.signOutTime, editingRecord.signOutTimezone)}</span></div>
+                </div>
+                {editingRecord.employeeTimezone && (() => {
+                  const inDiff = editingRecord.signInTimezone && editingRecord.signInTimezone !== editingRecord.employeeTimezone;
+                  const outDiff = editingRecord.signOutTimezone && editingRecord.signOutTimezone !== editingRecord.employeeTimezone;
+                  let note: string | null = null;
+                  if (inDiff && outDiff) note = "differs from both clock-in and clock-out zones";
+                  else if (inDiff) note = "differs from clock-in zone";
+                  else if (outDiff) note = "differs from clock-out zone";
+                  return (
+                    <div className="text-muted-foreground pt-1">
+                      Employee's preferred timezone: <span className="font-mono">{editingRecord.employeeTimezone}</span>
+                      {note && <span className="ml-1 text-amber-600">({note})</span>}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div><Label>Sign In</Label><Input type="time" value={overrideForm.signInTime} onChange={e => setOverrideForm({ ...overrideForm, signInTime: e.target.value })} /></div>
               <div><Label>Sign Out</Label><Input type="time" value={overrideForm.signOutTime} onChange={e => setOverrideForm({ ...overrideForm, signOutTime: e.target.value })} /></div>

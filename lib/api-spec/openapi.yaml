@@ -6394,6 +6394,9 @@ components:
         signOutLongitude: { type: ["string", "null"] }
         signOutAccuracyMeters: { type: ["integer", "null"] }
         signOutUserAgent: { type: ["string", "null"] }
+        signInTimezone: { type: ["string", "null"], description: "IANA timezone the employee was in at clock-in (e.g. Asia/Kolkata)" }
+        signOutTimezone: { type: ["string", "null"], description: "IANA timezone the employee was in at clock-out" }
+        employeeTimezone: { type: ["string", "null"], description: "Employee's preferred IANA timezone (from employees.timezone)" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         suspicionFlags:
@@ -6447,6 +6450,7 @@ components:
         accuracy: { type: ["number", "null"], minimum: 0, description: "Geolocation accuracy in metres" }
         userAgent: { type: ["string", "null"], maxLength: 500 }
         clientDate: { type: ["string", "null"], format: date, description: "Employee's local calendar date (YYYY-MM-DD). Used as the attendance day instead of server UTC when present." }
+        timezone: { type: ["string", "null"], maxLength: 100, description: "IANA timezone the employee is in at the moment of the punch (e.g. Asia/Kolkata). Persisted on the attendance row so HR can disambiguate edits in the override dialog." }
 
     CreateAttendanceBody:
       type: object

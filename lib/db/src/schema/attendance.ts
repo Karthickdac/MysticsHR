@@ -42,6 +42,12 @@ export const attendanceRecordsTable = pgTable("attendance_records", {
   signOutLongitude: numeric("sign_out_longitude", { precision: 9, scale: 6 }),
   signOutAccuracyMeters: integer("sign_out_accuracy_meters"),
   signOutUserAgent: text("sign_out_user_agent"),
+  // IANA timezone the employee was in at the moment of each punch
+  // (e.g. "Asia/Kolkata"). Captured client-side so HR can disambiguate
+  // off-by-an-hour edits in the override dialog (Task #147). Optional
+  // because legacy rows pre-date this column.
+  signInTimezone: text("sign_in_timezone"),
+  signOutTimezone: text("sign_out_timezone"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

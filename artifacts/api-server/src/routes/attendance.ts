@@ -189,6 +189,9 @@ router.get("/attendance", requireHrmsUser, requireRole(...HR_READ_ROLES), async 
         signOutLongitude: attendanceRecordsTable.signOutLongitude,
         signOutAccuracyMeters: attendanceRecordsTable.signOutAccuracyMeters,
         signOutUserAgent: attendanceRecordsTable.signOutUserAgent,
+        signInTimezone: attendanceRecordsTable.signInTimezone,
+        signOutTimezone: attendanceRecordsTable.signOutTimezone,
+        employeeTimezone: employeesTable.timezone,
         createdAt: attendanceRecordsTable.createdAt,
         updatedAt: attendanceRecordsTable.updatedAt,
         employeeLocation: employeeProfilesTable.workLocation,
@@ -593,14 +596,26 @@ function resolveAttendanceDate(clientValue: unknown): string {
 function parseClockTelemetry(
   body: unknown,
   headerUserAgent: string | undefined,
-): { latitude: string | null; longitude: string | null; accuracy: number | null; userAgent: string | null } {
-  const b = (body ?? {}) as { latitude?: unknown; longitude?: unknown; accuracy?: unknown; userAgent?: unknown };
+): { latitude: string | null; longitude: string | null; accuracy: number | null; userAgent: string | null; timezone: string | null } {
+  const b = (body ?? {}) as { latitude?: unknown; longitude?: unknown; accuracy?: unknown; userAgent?: unknown; timezone?: unknown };
   const lat = typeof b.latitude === "number" && Number.isFinite(b.latitude) && b.latitude >= -90 && b.latitude <= 90 ? b.latitude : null;
   const lng = typeof b.longitude === "number" && Number.isFinite(b.longitude) && b.longitude >= -180 && b.longitude <= 180 ? b.longitude : null;
   const accRaw = typeof b.accuracy === "number" && Number.isFinite(b.accuracy) && b.accuracy >= 0 ? b.accuracy : null;
   const ua = typeof b.userAgent === "string" && b.userAgent.trim().length > 0
     ? b.userAgent.trim().slice(0, 500)
     : (headerUserAgent ? String(headerUserAgent).slice(0, 500) : null);
+  // Validate the IANA timezone via Intl. Silently drop garbage so a bad
+  // client value doesn't break the punch — the override dialog will just
+  // omit the abbreviation for that side.
+  let tz: string | null = null;
+  if (typeof b.timezone === "string" && b.timezone.trim().length > 0 && b.timezone.length <= 100) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: b.timezone });
+      tz = b.timezone;
+    } catch {
+      tz = null;
+    }
+  }
   // Persist lat/lng paired or not at all to avoid orphaned half-coords.
   const haveBoth = lat !== null && lng !== null;
   return {
@@ -608,6 +623,7 @@ function parseClockTelemetry(
     longitude: haveBoth ? lng!.toFixed(6) : null,
     accuracy: accRaw !== null ? Math.round(accRaw) : null,
     userAgent: ua,
+    timezone: tz,
   };
 }
 
@@ -663,6 +679,7 @@ router.post("/attendance/me/clock-in", requireHrmsUser, requireRole(...ALL_ROLES
           signInTime: now, status: "Present", updatedAt: new Date(),
           signInLatitude: telemetry.latitude, signInLongitude: telemetry.longitude,
           signInAccuracyMeters: telemetry.accuracy, signInUserAgent: telemetry.userAgent,
+          signInTimezone: telemetry.timezone,
         })
         .where(eq(attendanceRecordsTable.id, existing.id)).returning();
     } else {
@@ -670,6 +687,7 @@ router.post("/attendance/me/clock-in", requireHrmsUser, requireRole(...ALL_ROLES
         employeeId: empId, attendanceDate: today, signInTime: now, breakDurationMinutes: 0, status: "Present",
         signInLatitude: telemetry.latitude, signInLongitude: telemetry.longitude,
         signInAccuracyMeters: telemetry.accuracy, signInUserAgent: telemetry.userAgent,
+        signInTimezone: telemetry.timezone,
       }).returning();
     }
     if (record) {
@@ -713,6 +731,7 @@ router.post("/attendance/me/clock-out", requireHrmsUser, requireRole(...ALL_ROLE
         signOutTime: signOut, totalMinutesWorked: totalMins, overtimeMinutes: overtimeMins, status: newStatus, updatedAt: new Date(),
         signOutLatitude: telemetry.latitude, signOutLongitude: telemetry.longitude,
         signOutAccuracyMeters: telemetry.accuracy, signOutUserAgent: telemetry.userAgent,
+        signOutTimezone: telemetry.timezone,
       })
       .where(eq(attendanceRecordsTable.id, existing.id)).returning();
     if (updated) {
@@ -752,6 +771,9 @@ router.get("/attendance/:id", requireHrmsUser, requireRole(...HR_READ_ROLES), as
         signOutLongitude: attendanceRecordsTable.signOutLongitude,
         signOutAccuracyMeters: attendanceRecordsTable.signOutAccuracyMeters,
         signOutUserAgent: attendanceRecordsTable.signOutUserAgent,
+        signInTimezone: attendanceRecordsTable.signInTimezone,
+        signOutTimezone: attendanceRecordsTable.signOutTimezone,
+        employeeTimezone: employeesTable.timezone,
         createdAt: attendanceRecordsTable.createdAt,
         updatedAt: attendanceRecordsTable.updatedAt,
       })

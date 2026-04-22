@@ -2672,6 +2672,20 @@ export const GetAttendanceResponseItem = zod.object({
   signOutLongitude: zod.string().nullish(),
   signOutAccuracyMeters: zod.number().nullish(),
   signOutUserAgent: zod.string().nullish(),
+  signInTimezone: zod
+    .string()
+    .nullish()
+    .describe(
+      "IANA timezone the employee was in at clock-in (e.g. Asia\/Kolkata)",
+    ),
+  signOutTimezone: zod
+    .string()
+    .nullish()
+    .describe("IANA timezone the employee was in at clock-out"),
+  employeeTimezone: zod
+    .string()
+    .nullish()
+    .describe("Employee's preferred IANA timezone (from employees.timezone)"),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   suspicionFlags: zod
@@ -2743,6 +2757,20 @@ export const GetAttendanceIdResponse = zod.object({
   signOutLongitude: zod.string().nullish(),
   signOutAccuracyMeters: zod.number().nullish(),
   signOutUserAgent: zod.string().nullish(),
+  signInTimezone: zod
+    .string()
+    .nullish()
+    .describe(
+      "IANA timezone the employee was in at clock-in (e.g. Asia\/Kolkata)",
+    ),
+  signOutTimezone: zod
+    .string()
+    .nullish()
+    .describe("IANA timezone the employee was in at clock-out"),
+  employeeTimezone: zod
+    .string()
+    .nullish()
+    .describe("Employee's preferred IANA timezone (from employees.timezone)"),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   suspicionFlags: zod
@@ -2809,6 +2837,20 @@ export const PatchAttendanceIdResponse = zod.object({
   signOutLongitude: zod.string().nullish(),
   signOutAccuracyMeters: zod.number().nullish(),
   signOutUserAgent: zod.string().nullish(),
+  signInTimezone: zod
+    .string()
+    .nullish()
+    .describe(
+      "IANA timezone the employee was in at clock-in (e.g. Asia\/Kolkata)",
+    ),
+  signOutTimezone: zod
+    .string()
+    .nullish()
+    .describe("IANA timezone the employee was in at clock-out"),
+  employeeTimezone: zod
+    .string()
+    .nullish()
+    .describe("Employee's preferred IANA timezone (from employees.timezone)"),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   suspicionFlags: zod
@@ -2870,6 +2912,20 @@ export const GetEmployeesIdAttendanceResponseItem = zod.object({
   signOutLongitude: zod.string().nullish(),
   signOutAccuracyMeters: zod.number().nullish(),
   signOutUserAgent: zod.string().nullish(),
+  signInTimezone: zod
+    .string()
+    .nullish()
+    .describe(
+      "IANA timezone the employee was in at clock-in (e.g. Asia\/Kolkata)",
+    ),
+  signOutTimezone: zod
+    .string()
+    .nullish()
+    .describe("IANA timezone the employee was in at clock-out"),
+  employeeTimezone: zod
+    .string()
+    .nullish()
+    .describe("Employee's preferred IANA timezone (from employees.timezone)"),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   suspicionFlags: zod
@@ -2966,6 +3022,22 @@ export const GetMyAttendanceTodayResponse = zod.object({
         signOutLongitude: zod.string().nullish(),
         signOutAccuracyMeters: zod.number().nullish(),
         signOutUserAgent: zod.string().nullish(),
+        signInTimezone: zod
+          .string()
+          .nullish()
+          .describe(
+            "IANA timezone the employee was in at clock-in (e.g. Asia\/Kolkata)",
+          ),
+        signOutTimezone: zod
+          .string()
+          .nullish()
+          .describe("IANA timezone the employee was in at clock-out"),
+        employeeTimezone: zod
+          .string()
+          .nullish()
+          .describe(
+            "Employee's preferred IANA timezone (from employees.timezone)",
+          ),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
         suspicionFlags: zod
@@ -3009,6 +3081,8 @@ export const clockInMyAttendanceBodyAccuracyMin = 0;
 
 export const clockInMyAttendanceBodyUserAgentMax = 500;
 
+export const clockInMyAttendanceBodyTimezoneMax = 100;
+
 export const ClockInMyAttendanceBody = zod
   .object({
     latitude: zod
@@ -3033,6 +3107,13 @@ export const ClockInMyAttendanceBody = zod
       .describe(
         "Employee's local calendar date (YYYY-MM-DD). Used as the attendance day instead of server UTC when present.",
       ),
+    timezone: zod
+      .string()
+      .max(clockInMyAttendanceBodyTimezoneMax)
+      .nullish()
+      .describe(
+        "IANA timezone the employee is in at the moment of the punch (e.g. Asia\/Kolkata). Persisted on the attendance row so HR can disambiguate edits in the override dialog.",
+      ),
   })
   .describe(
     "Optional client-supplied context for self-service punches (geolocation, device, and the employee's local date).",
@@ -3050,6 +3131,8 @@ export const clockOutMyAttendanceBodyLongitudeMax = 180;
 export const clockOutMyAttendanceBodyAccuracyMin = 0;
 
 export const clockOutMyAttendanceBodyUserAgentMax = 500;
+
+export const clockOutMyAttendanceBodyTimezoneMax = 100;
 
 export const ClockOutMyAttendanceBody = zod
   .object({
@@ -3074,6 +3157,13 @@ export const ClockOutMyAttendanceBody = zod
       .nullish()
       .describe(
         "Employee's local calendar date (YYYY-MM-DD). Used as the attendance day instead of server UTC when present.",
+      ),
+    timezone: zod
+      .string()
+      .max(clockOutMyAttendanceBodyTimezoneMax)
+      .nullish()
+      .describe(
+        "IANA timezone the employee is in at the moment of the punch (e.g. Asia\/Kolkata). Persisted on the attendance row so HR can disambiguate edits in the override dialog.",
       ),
   })
   .describe(
@@ -3115,6 +3205,20 @@ export const ClockOutMyAttendanceResponse = zod.object({
   signOutLongitude: zod.string().nullish(),
   signOutAccuracyMeters: zod.number().nullish(),
   signOutUserAgent: zod.string().nullish(),
+  signInTimezone: zod
+    .string()
+    .nullish()
+    .describe(
+      "IANA timezone the employee was in at clock-in (e.g. Asia\/Kolkata)",
+    ),
+  signOutTimezone: zod
+    .string()
+    .nullish()
+    .describe("IANA timezone the employee was in at clock-out"),
+  employeeTimezone: zod
+    .string()
+    .nullish()
+    .describe("Employee's preferred IANA timezone (from employees.timezone)"),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   suspicionFlags: zod

@@ -94,16 +94,25 @@ export function ClockInWidget() {
   // permission. Always returns a payload — at minimum the userAgent so HR
   // gets device info even if location is denied. We never block the punch
   // on this lookup and cap it at 8s so a stalled GPS doesn't lock the UI.
-  async function collectTelemetry(): Promise<{ latitude?: number; longitude?: number; accuracy?: number; userAgent: string; clientDate: string }> {
+  async function collectTelemetry(): Promise<{ latitude?: number; longitude?: number; accuracy?: number; userAgent: string; clientDate: string; timezone: string }> {
     const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
     const clientDate = localDateStr(new Date());
-    if (typeof navigator === "undefined" || !navigator.geolocation) return { userAgent, clientDate };
+    // Best-effort capture of the browser's IANA zone so HR can disambiguate
+    // the timestamp later in the override dialog (Task #147). Falls back
+    // to "UTC" if the runtime can't report one.
+    let timezone = "UTC";
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+      timezone = "UTC";
+    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) return { userAgent, clientDate, timezone };
     return new Promise((resolve) => {
       let settled = false;
       const finish = (extra: Partial<{ latitude: number; longitude: number; accuracy: number }> = {}) => {
         if (settled) return;
         settled = true;
-        resolve({ ...extra, userAgent, clientDate });
+        resolve({ ...extra, userAgent, clientDate, timezone });
       };
       const t = setTimeout(() => finish(), 8000);
       navigator.geolocation.getCurrentPosition(
