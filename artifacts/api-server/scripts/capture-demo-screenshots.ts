@@ -4,7 +4,11 @@ import { createClerkClient } from "@clerk/express";
 import path from "node:path";
 import fs from "node:fs";
 
-const BASE_URL = process.env.DEMO_BASE_URL ?? "http://localhost:19153";
+const BASE_URL =
+  process.env.DEMO_BASE_URL ??
+  (process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : "http://localhost:19153");
 const OUT_DIR = path.resolve(process.cwd(), "docs/demo-screenshots");
 const PASSWORD = "DemoTest123!@#";
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
