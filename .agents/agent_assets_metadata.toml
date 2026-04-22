@@ -48,3 +48,9 @@ id = "YD_XSrna6gBJVTXwi0iIo"
 uri = "file://docs/role-demos/employee.pdf"
 type = "pdf"
 title = "Employee (ESS) — Demo"
+
+[[outputs]]
+id = "fO1amiPuSG0NX6Mk1vUMU"
+uri = "file://docs/DEPLOY-VPS.md"
+type = "text"
+title = "MysticsHR — VPS Deployment Guide (CloudPanel)"
