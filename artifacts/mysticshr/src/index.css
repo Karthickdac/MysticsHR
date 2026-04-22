@@ -66,89 +66,102 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/*
+ * Premium "Executive" theme.
+ *  - Pearl background, deep-ink foreground for editorial contrast.
+ *  - Primary: deep midnight ink (corporate, trustworthy).
+ *  - Accent: champagne gold (premium signal — used sparingly for highlights).
+ *  - Sidebar: near-black midnight with cool gradient feel.
+ *  - Slightly larger radius (0.625rem) and softer borders for refinement.
+ */
 :root {
-  --background: 210 20% 98%;
-  --foreground: 220 80% 10%;
-  --border: 210 20% 85%;
+  --background: 30 25% 98%;            /* warm pearl */
+  --foreground: 222 35% 11%;           /* deep ink */
+  --border: 220 16% 88%;
   --card: 0 0% 100%;
-  --card-foreground: 220 80% 10%;
-  --card-border: 210 20% 90%;
+  --card-foreground: 222 35% 11%;
+  --card-border: 220 16% 92%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 80% 10%;
-  --popover-border: 210 20% 90%;
-  --primary: 222 47% 25%;
-  --primary-foreground: 210 20% 98%;
-  --secondary: 210 20% 90%;
-  --secondary-foreground: 222 47% 25%;
-  --muted: 210 20% 94%;
-  --muted-foreground: 215 16% 47%;
-  --accent: 30 90% 50%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 20% 98%;
-  --input: 210 20% 85%;
-  --ring: 222 47% 25%;
-  --chart-1: 222 47% 25%;
-  --chart-2: 30 90% 50%;
-  --chart-3: 160 60% 40%;
-  --chart-4: 280 60% 50%;
-  --chart-5: 340 60% 50%;
-  --sidebar: 222 47% 25%;
-  --sidebar-foreground: 210 20% 98%;
-  --sidebar-border: 222 47% 20%;
-  --sidebar-primary: 30 90% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 222 47% 30%;
-  --sidebar-accent-foreground: 210 20% 98%;
-  --sidebar-ring: 30 90% 50%;
-  
-  --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: Georgia, serif;
-  --app-font-mono: Menlo, monospace;
-  --radius: 0.5rem;
+  --popover-foreground: 222 35% 11%;
+  --popover-border: 220 16% 92%;
+  --primary: 222 38% 14%;              /* midnight ink */
+  --primary-foreground: 30 25% 98%;
+  --secondary: 220 16% 94%;
+  --secondary-foreground: 222 38% 14%;
+  --muted: 220 18% 96%;
+  --muted-foreground: 220 12% 42%;
+  --accent: 38 58% 50%;                /* champagne gold */
+  --accent-foreground: 222 38% 14%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 30 25% 98%;
+  --input: 220 16% 88%;
+  --ring: 38 58% 50%;
+  --chart-1: 222 38% 14%;
+  --chart-2: 38 58% 50%;
+  --chart-3: 175 55% 35%;              /* refined teal */
+  --chart-4: 264 35% 45%;              /* deep amethyst */
+  --chart-5: 12 60% 48%;               /* burnished copper */
+  --sidebar: 224 38% 9%;               /* near-black midnight */
+  --sidebar-foreground: 30 25% 95%;
+  --sidebar-border: 224 30% 16%;
+  --sidebar-primary: 38 58% 55%;
+  --sidebar-primary-foreground: 224 38% 9%;
+  --sidebar-accent: 224 30% 15%;
+  --sidebar-accent-foreground: 38 58% 60%;
+  --sidebar-ring: 38 58% 55%;
 
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --app-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --app-font-serif: 'Playfair Display', Georgia, serif;
+  --app-font-mono: 'JetBrains Mono', Menlo, monospace;
+  --radius: 0.625rem;
+
+  --button-outline: rgba(15, 23, 42, .08);
+  --badge-outline: rgba(15, 23, 42, .04);
   --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  --elevate-1: rgba(15, 23, 42, .04);
+  --elevate-2: rgba(15, 23, 42, .08);
 }
 
 .dark {
-  --background: 222 47% 10%;
-  --foreground: 210 20% 98%;
-  --border: 222 47% 20%;
-  --card: 222 47% 13%;
-  --card-foreground: 210 20% 98%;
-  --card-border: 222 47% 20%;
-  --popover: 222 47% 13%;
-  --popover-foreground: 210 20% 98%;
-  --popover-border: 222 47% 20%;
-  --primary: 30 90% 50%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 222 47% 20%;
-  --secondary-foreground: 210 20% 98%;
-  --muted: 222 47% 20%;
-  --muted-foreground: 215 16% 65%;
-  --accent: 30 90% 50%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 20% 98%;
-  --input: 222 47% 20%;
-  --ring: 30 90% 50%;
-  --chart-1: 30 90% 50%;
-  --chart-2: 222 47% 60%;
-  --chart-3: 160 60% 50%;
-  --chart-4: 280 60% 60%;
-  --chart-5: 340 60% 60%;
-  --sidebar: 222 47% 13%;
-  --sidebar-foreground: 210 20% 98%;
-  --sidebar-border: 222 47% 20%;
-  --sidebar-primary: 30 90% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 222 47% 20%;
-  --sidebar-accent-foreground: 210 20% 98%;
-  --sidebar-ring: 30 90% 50%;
+  --background: 224 30% 7%;            /* deep slate */
+  --foreground: 30 20% 96%;
+  --border: 224 22% 18%;
+  --card: 224 28% 10%;
+  --card-foreground: 30 20% 96%;
+  --card-border: 224 22% 18%;
+  --popover: 224 28% 10%;
+  --popover-foreground: 30 20% 96%;
+  --popover-border: 224 22% 18%;
+  --primary: 38 58% 55%;               /* gold becomes primary in dark */
+  --primary-foreground: 224 30% 7%;
+  --secondary: 224 22% 16%;
+  --secondary-foreground: 30 20% 96%;
+  --muted: 224 22% 14%;
+  --muted-foreground: 220 14% 65%;
+  --accent: 38 58% 55%;
+  --accent-foreground: 224 30% 7%;
+  --destructive: 0 65% 55%;
+  --destructive-foreground: 30 20% 96%;
+  --input: 224 22% 18%;
+  --ring: 38 58% 55%;
+  --chart-1: 38 58% 55%;
+  --chart-2: 200 50% 60%;
+  --chart-3: 175 55% 50%;
+  --chart-4: 264 45% 65%;
+  --chart-5: 12 60% 60%;
+  --sidebar: 224 32% 6%;
+  --sidebar-foreground: 30 20% 92%;
+  --sidebar-border: 224 22% 14%;
+  --sidebar-primary: 38 58% 55%;
+  --sidebar-primary-foreground: 224 30% 7%;
+  --sidebar-accent: 224 24% 12%;
+  --sidebar-accent-foreground: 38 58% 60%;
+  --sidebar-ring: 38 58% 55%;
+
+  --button-outline: rgba(255, 255, 255, .08);
+  --badge-outline: rgba(255, 255, 255, .04);
+  --elevate-1: rgba(255, 255, 255, .03);
+  --elevate-2: rgba(255, 255, 255, .06);
 }
 
 @layer base {
