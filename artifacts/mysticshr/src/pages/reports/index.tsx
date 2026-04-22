@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useGetEmployeeDirectoryReport,
   useGetAttendanceSummaryReport,
@@ -60,6 +60,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   FileText, Download, Plus, Trash2, Calendar, Settings, Filter,
   Users, Clock, Umbrella, DollarSign, TrendingDown, Target, UserPlus, BarChart3,
+  Eye,
 } from "lucide-react";
 
 type Tab = "catalog" | "custom" | "scheduler";
@@ -312,6 +313,52 @@ function ReportFilterPanel({
 function ReportCatalog() {
   const [selected, setSelected] = useState<ReportType | null>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
+  // PDF preview modal state. We hold the blob URL so we can revoke it on
+  // close — important to avoid leaking object URLs in long sessions where HR
+  // may preview many reports.
+  const [previewState, setPreviewState] = useState<{
+    open: boolean; reportLabel: string; url: string | null; loading: boolean; error: string | null;
+  }>({ open: false, reportLabel: "", url: null, loading: false, error: null });
+  // Tracks the currently-mounted blob URL so cleanup paths (re-open, close,
+  // unmount) can reliably revoke it without relying on setState ordering.
+  const previewUrlRef = useRef<string | null>(null);
+
+  function setPreviewUrl(nextUrl: string | null) {
+    if (previewUrlRef.current && previewUrlRef.current !== nextUrl) {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+    previewUrlRef.current = nextUrl;
+  }
+
+  // Final safety net: revoke any in-flight blob URL on component unmount so
+  // navigating away mid-preview doesn't leak the object URL.
+  useEffect(() => () => { setPreviewUrl(null); }, []);
+
+  async function openPreview(reportType: string, reportLabel: string, currentFilters: Record<string, string>) {
+    setPreviewUrl(null);
+    setPreviewState({ open: true, reportLabel, url: null, loading: true, error: null });
+    try {
+      const params = new URLSearchParams(
+        Object.entries(currentFilters).filter(([, v]) => v) as [string, string][]
+      );
+      const resp = await fetch(`/api/reports/${reportType}/preview?${params.toString()}`, { credentials: "include" });
+      if (!resp.ok) {
+        setPreviewState((s) => ({ ...s, loading: false, error: `Preview failed (${resp.status}). Try again or use Download.` }));
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      setPreviewState((s) => ({ ...s, loading: false, url }));
+    } catch {
+      setPreviewState((s) => ({ ...s, loading: false, error: "Preview failed. Try again or use Download." }));
+    }
+  }
+
+  function closePreview() {
+    setPreviewUrl(null);
+    setPreviewState({ open: false, reportLabel: "", url: null, loading: false, error: null });
+  }
 
   const today = new Date().toISOString().split("T")[0];
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
@@ -454,6 +501,14 @@ function ReportCatalog() {
                     <Button size="sm" variant="outline" onClick={() => exportReport(selected, "xlsx", filters)}>
                       <Download className="w-3 h-3 mr-1" /> Excel
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openPreview(selected, REPORT_TYPES.find((r) => r.id === selected)?.label ?? selected, filters)}
+                      title="Preview the first page before downloading"
+                    >
+                      <Eye className="w-3 h-3 mr-1" /> Preview
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => exportReport(selected, "pdf", filters)}>
                       <Download className="w-3 h-3 mr-1" /> PDF
                     </Button>
@@ -509,6 +564,38 @@ function ReportCatalog() {
           </CardContent>
         </Card>
       )}
+
+      {/* PDF Preview Modal — first page rendered inline so HR can confirm
+          scope before triggering the full download. */}
+      <Dialog open={previewState.open} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Preview — {previewState.reportLabel}</DialogTitle>
+          </DialogHeader>
+          <div className="h-[70vh] bg-gray-50 rounded border flex items-center justify-center overflow-hidden">
+            {previewState.loading ? (
+              <div className="text-gray-500 text-sm">Generating preview…</div>
+            ) : previewState.error ? (
+              <div className="text-red-600 text-sm px-4 text-center">{previewState.error}</div>
+            ) : previewState.url ? (
+              <iframe
+                src={`${previewState.url}#page=1&toolbar=0&navpanes=0`}
+                title="PDF preview"
+                className="w-full h-full"
+              />
+            ) : null}
+          </div>
+          <DialogFooter>
+            <p className="text-xs text-gray-500 mr-auto">First page only · use Download for the full report</p>
+            <Button variant="outline" onClick={closePreview}>Close</Button>
+            {selected && (
+              <Button onClick={() => { exportReport(selected, "pdf", filters); }}>
+                <Download className="w-3 h-3 mr-1" /> Download Full PDF
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

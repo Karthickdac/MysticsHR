@@ -804,17 +804,132 @@ function escHtml(v: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
+// Filter keys that the underlying GET /reports/:type/* endpoints understand.
+// Shared by /preview and /export so both paths forward exactly the same
+// filters — guarantees the preview always matches what gets downloaded.
+const REPORT_FORWARDABLE_FILTER_KEYS = [
+  "fromDate", "toDate", "departmentId", "designationId", "employmentType",
+  "location", "status", "employeeStatus", "leaveStatus", "leaveType",
+  "month", "year", "exitType", "cycleId", "employeeId",
+] as const;
+
+// ─── PDF PREVIEW (first page only, short-lived cache) ────────────────────────
+// Returns a single-page PDF derived from the same generator the full export
+// uses, so HR can confirm they're grabbing the right report (right month,
+// right scope) before triggering a multi-MB download. Cached for a few minutes
+// keyed on (reportType + sorted filter querystring + user role) so reopening
+// the modal is instant. Cache is per-process — fine for the small footprint
+// here, no Redis needed.
+const PREVIEW_CACHE_TTL_MS = 3 * 60 * 1000;
+const PREVIEW_CACHE_MAX_ENTRIES = 64;
+type PreviewCacheEntry = { buffer: Buffer; expiresAt: number };
+const previewCache = new Map<string, PreviewCacheEntry>();
+
+function makePreviewCacheKey(type: string, query: Record<string, string>, userId: number, role: string): string {
+  // Cache scope is per-user (not just per-role): even though current report
+  // endpoints are role-gated and don't filter by user identity, future
+  // per-user data scoping (e.g. HoD seeing only their department) must not
+  // serve another user's cached PDF bytes. Sort filters so two requests with
+  // the same filters in different querystring order share a cache entry.
+  const sortedFilters = Object.entries(query)
+    .filter(([k, v]) => REPORT_FORWARDABLE_FILTER_KEYS.includes(k as typeof REPORT_FORWARDABLE_FILTER_KEYS[number])
+      && v !== undefined && v !== "" && v !== null)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&");
+  return `u${userId}|${role}|${type}|${sortedFilters}`;
+}
+
+function pruneExpiredPreviews(now: number) {
+  for (const [k, v] of previewCache) {
+    if (v.expiresAt <= now) previewCache.delete(k);
+  }
+  // Hard cap on entries: drop oldest insertions (Map iteration is insertion-order).
+  while (previewCache.size > PREVIEW_CACHE_MAX_ENTRIES) {
+    const oldestKey = previewCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    previewCache.delete(oldestKey);
+  }
+}
+
+router.get("/reports/:type/preview", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
+  try {
+    const type = String(req.params.type);
+    const u = req.hrmsUser!;
+    const queryRecord = req.query as Record<string, string>;
+
+    const cacheKey = makePreviewCacheKey(type, queryRecord, u.id, u.role);
+    const now = Date.now();
+    pruneExpiredPreviews(now);
+    const cached = previewCache.get(cacheKey);
+    if (cached) {
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${type}-preview.pdf"`);
+      res.setHeader("Cache-Control", "private, max-age=60");
+      res.setHeader("X-Preview-Cache", "HIT");
+      res.send(cached.buffer);
+      return;
+    }
+
+    // Reuse the existing data endpoint internally (same approach as /export)
+    // so the preview is guaranteed to match what the download would contain.
+    const params = new URLSearchParams();
+    for (const k of REPORT_FORWARDABLE_FILTER_KEYS) {
+      const v = queryRecord[k];
+      if (v) params.set(k, v);
+    }
+    const reportRes = await fetch(`http://localhost:${process.env.PORT ?? 8080}/api/reports/${type}?${params.toString()}`, {
+      headers: { authorization: req.headers.authorization ?? "", cookie: req.headers.cookie ?? "" },
+    });
+    if (!reportRes.ok) { res.status(reportRes.status).json({ error: "Failed to fetch report data" }); return; }
+    const body = await reportRes.json() as { data?: Record<string, unknown>[]; rows?: Record<string, unknown>[] };
+    const rows: Record<string, unknown>[] = body.data ?? body.rows ?? [];
+
+    const headers = rows.length > 0 ? Object.keys(rows[0]).filter(k => k !== "id") : [];
+    const title = type.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) + " Report";
+    const subtitle = `Preview · Generated on ${new Date().toLocaleDateString("en-IN")} · ${rows.length} record(s)`;
+    const tableRows = rows.map(r => headers.map(h => r[h] as string | number | null | undefined));
+    const { generateTablePdf } = await import("../lib/pdf");
+    const fullPdfBuffer = await generateTablePdf({ title, subtitle, headers, rows: tableRows });
+
+    // Strip to the first page so the download stays small (a 500-row table
+    // can be 30+ pages). The user is here to confirm scope, not to read the
+    // whole report inline.
+    const { PDFDocument } = await import("pdf-lib");
+    const fullDoc = await PDFDocument.load(fullPdfBuffer);
+    const firstPageDoc = await PDFDocument.create();
+    if (fullDoc.getPageCount() > 0) {
+      const [copied] = await firstPageDoc.copyPages(fullDoc, [0]);
+      firstPageDoc.addPage(copied);
+    }
+    const previewBytes = await firstPageDoc.save();
+    const previewBuffer = Buffer.from(previewBytes);
+
+    previewCache.set(cacheKey, { buffer: previewBuffer, expiresAt: now + PREVIEW_CACHE_TTL_MS });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${type}-preview.pdf"`);
+    res.setHeader("Cache-Control", "private, max-age=60");
+    res.setHeader("X-Preview-Cache", "MISS");
+    res.send(previewBuffer);
+  } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
 // GET /reports/:type/export?format=xlsx|pdf  — streams a formatted Excel or print-ready HTML report
 router.get("/reports/:type/export", requireHrmsUser, requireRole(...MANAGER_ROLES), async (req, res) => {
   try {
     const type = String(req.params.type);
-    const { format = "xlsx", fromDate, toDate, departmentId, month, year } = req.query as Record<string, string>;
+    const queryRecord = req.query as Record<string, string>;
+    const format = queryRecord.format ?? "xlsx";
 
-    // Reuse the existing report data by calling our own GET endpoint internally
-    const reportRes = await fetch(`http://localhost:${process.env.PORT ?? 8080}/api/reports/${type}?` + new URLSearchParams({
-      ...(fromDate && { fromDate }), ...(toDate && { toDate }),
-      ...(departmentId && { departmentId }), ...(month && { month }), ...(year && { year }),
-    }).toString(), {
+    // Forward the same allowlisted filters as /preview so the downloaded
+    // file always matches what HR saw in the preview modal.
+    const exportParams = new URLSearchParams();
+    for (const k of REPORT_FORWARDABLE_FILTER_KEYS) {
+      const v = queryRecord[k];
+      if (v) exportParams.set(k, v);
+    }
+    const reportRes = await fetch(`http://localhost:${process.env.PORT ?? 8080}/api/reports/${type}?${exportParams.toString()}`, {
       headers: { authorization: req.headers.authorization ?? "", cookie: req.headers.cookie ?? "" },
     });
     if (!reportRes.ok) { res.status(reportRes.status).json({ error: "Failed to fetch report data" }); return; }
