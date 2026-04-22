@@ -5,6 +5,7 @@ import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { cleanupOrphanedAttachments } from "../lib/orphan-attachment-cleanup";
 import { loadAttendanceSuspicionConfig, saveAttendanceSuspicionConfig } from "../lib/attendance-suspicion";
+import { isValidIanaTimezone } from "../lib/timezones";
 
 const router = Router();
 
@@ -66,6 +67,13 @@ router.put("/system-settings/:category", requireHrmsUser, requireRole(...SUPER_A
   try {
     const category = req.params.category as string;
     const data = req.body as Record<string, unknown>;
+
+    if (category === "org_profile" && data.timezone !== undefined && data.timezone !== null && data.timezone !== "") {
+      if (!isValidIanaTimezone(data.timezone)) {
+        res.status(400).json({ error: "Invalid IANA timezone identifier" });
+        return;
+      }
+    }
 
     for (const [key, value] of Object.entries(data)) {
       const jsonValue = value as (Record<string, unknown> | string | number | boolean | null);

@@ -313,6 +313,47 @@ export const CreateEmployeeBody = zod.object({
 });
 
 /**
+ * @summary Update the authenticated employee's preferred IANA timezone
+ */
+export const UpdateMyTimezoneBody = zod.object({
+  timezone: zod
+    .string()
+    .describe('IANA timezone identifier (e.g. \"Asia\/Kolkata\").'),
+});
+
+export const UpdateMyTimezoneResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.string(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  dateOfBirth: zod.coerce.date().nullish(),
+  gender: zod.string().nullish(),
+  departmentId: zod.number().nullish(),
+  departmentName: zod.string().nullish(),
+  designationId: zod.number().nullish(),
+  designationTitle: zod.string().nullish(),
+  employmentType: zod.string(),
+  status: zod.string(),
+  dateOfJoining: zod.coerce.date().nullish(),
+  ctc: zod.number().nullish(),
+  managerId: zod.number().nullish(),
+  managerName: zod.string().nullish(),
+  location: zod.string().nullish(),
+  timezone: zod
+    .string()
+    .optional()
+    .describe(
+      'IANA timezone identifier for this employee (e.g. \"Asia\/Kolkata\").',
+    ),
+  avatarUrl: zod.string().nullish(),
+  isDeleted: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary List active employees with the minimal fields needed for an org chart
  */
 export const ListOrgChartResponse = zod.object({

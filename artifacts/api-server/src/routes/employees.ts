@@ -48,6 +48,44 @@ const employeeSelect = {
   updatedAt: employeesTable.updatedAt,
 };
 
+// Self-service: any authenticated employee may update their own preferred timezone.
+router.patch("/employees/me/timezone", requireHrmsUser, async (req, res) => {
+  try {
+    const empId = req.hrmsUser?.employeeId;
+    if (!empId) {
+      res.status(403).json({ error: "Authenticated user is not linked to an employee record" });
+      return;
+    }
+    const { timezone } = req.body ?? {};
+    if (!isValidIanaTimezone(timezone)) {
+      res.status(400).json({ error: "Invalid IANA timezone identifier" });
+      return;
+    }
+    const [existing] = await db
+      .select({ tz: employeesTable.timezone })
+      .from(employeesTable)
+      .where(and(eq(employeesTable.id, empId), isNull(employeesTable.deletedAt)))
+      .limit(1);
+    if (!existing) {
+      res.status(404).json({ error: "Employee not found" });
+      return;
+    }
+    const [emp] = await db
+      .update(employeesTable)
+      .set({ timezone, updatedAt: new Date() })
+      .where(and(eq(employeesTable.id, empId), isNull(employeesTable.deletedAt)))
+      .returning();
+    if (existing.tz !== timezone) {
+      await recordHistory(empId, "Employee", "timezone", existing.tz, timezone, req.hrmsUser?.id ?? null);
+    }
+    await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "Employees", recordId: empId, ipAddress: req.ip });
+    res.json(emp);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/employees", requireHrmsUser, async (req, res) => {
   try {
     const { status, departmentId, search, limit = "50", offset = "0" } = req.query as Record<string, string>;

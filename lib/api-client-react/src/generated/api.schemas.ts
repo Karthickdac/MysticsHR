@@ -3575,6 +3575,11 @@ export type ListEmployeesParams = {
   offset?: number;
 };
 
+export type UpdateMyTimezoneBody = {
+  /** IANA timezone identifier (e.g. "Asia/Kolkata"). */
+  timezone: string;
+};
+
 export type ListOrgChart200 = {
   data?: OrgChartEmployee[];
 };

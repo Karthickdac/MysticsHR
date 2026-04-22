@@ -5,6 +5,7 @@ import {
   useGetEmployeesIdProfile,
   usePutEmployeesIdProfile,
   useUpdateEmployee,
+  useUpdateMyTimezone,
   getGetEmployeeQueryKey,
   useGetEmployeesIdEducation,
   usePostEmployeesIdEducation,
@@ -99,7 +100,7 @@ const TASK_CATEGORY_COLORS: Record<string, string> = {
   Employee: "bg-green-100 text-green-700",
 };
 
-function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col sm:flex-row sm:gap-4 py-3 border-b border-border last:border-0">
       <dt className="text-sm font-medium text-muted-foreground w-44 flex-shrink-0">{label}</dt>
@@ -447,8 +448,10 @@ function OnboardingTab({ employeeId, canEdit }: { employeeId: number; canEdit: b
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const search = useSearch();
-  const { role } = useCurrentHrmsUser();
+  const { role, hrmsUser } = useCurrentHrmsUser();
   const canEdit = hasRole(role, ["super_admin", "hr_manager", "hr_executive"]);
+  const isSelf = hrmsUser?.employeeId === parseInt(id, 10);
+  const canEditOwnTimezone = isSelf;
   const canViewPerformanceHistory = hasRole(role, ["super_admin", "hr_manager", "hr_executive", "hod"]);
   const empId = parseInt(id, 10);
 
@@ -463,6 +466,7 @@ export default function EmployeeDetailPage() {
   const { data: profile } = useGetEmployeesIdProfile(empId);
   const upsertProfile = usePutEmployeesIdProfile();
   const updateEmp = useUpdateEmployee();
+  const updateMyTz = useUpdateMyTimezone();
   const qc = useQueryClient();
 
   const [editingProfile, setEditingProfile] = useState(false);
@@ -672,7 +676,28 @@ export default function EmployeeDetailPage() {
                 <InfoRow label="Probation End Date" value={profile?.probationEndDate} />
                 <InfoRow label="Confirmation Date" value={profile?.confirmationDate} />
                 <InfoRow label="Notice Period" value={profile?.noticePeriodDays ? `${profile.noticePeriodDays} days` : null} />
-                <InfoRow label="Timezone" value={emp.timezone} />
+                <InfoRow
+                  label="Timezone"
+                  value={
+                    canEditOwnTimezone && !canEdit ? (
+                      <div className="flex items-center gap-2 max-w-xs">
+                        <TimezoneCombo
+                          value={emp.timezone ?? "Asia/Kolkata"}
+                          onChange={(v) => {
+                            updateMyTz.mutate(
+                              { data: { timezone: v } },
+                              {
+                                onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeeQueryKey(empId) }),
+                              },
+                            );
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      emp.timezone
+                    )
+                  }
+                />
               </dl>
             </CardContent>
           </Card>

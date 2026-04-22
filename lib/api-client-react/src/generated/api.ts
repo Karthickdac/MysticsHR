@@ -319,6 +319,7 @@ import type {
   UpdateLoanBody,
   UpdateMyNotificationPreferences200,
   UpdateMyNotificationPreferencesBody,
+  UpdateMyTimezoneBody,
   UpdateNotificationDefaults200,
   UpdateNotificationTemplateBody,
   UpdateOfferBody,
@@ -1801,6 +1802,92 @@ export const useCreateEmployee = <
   TContext
 > => {
   return useMutation(getCreateEmployeeMutationOptions(options));
+};
+
+/**
+ * @summary Update the authenticated employee's preferred IANA timezone
+ */
+export const getUpdateMyTimezoneUrl = () => {
+  return `/api/employees/me/timezone`;
+};
+
+export const updateMyTimezone = async (
+  updateMyTimezoneBody: UpdateMyTimezoneBody,
+  options?: RequestInit,
+): Promise<Employee> => {
+  return customFetch<Employee>(getUpdateMyTimezoneUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateMyTimezoneBody),
+  });
+};
+
+export const getUpdateMyTimezoneMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyTimezone>>,
+    TError,
+    { data: BodyType<UpdateMyTimezoneBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMyTimezone>>,
+  TError,
+  { data: BodyType<UpdateMyTimezoneBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMyTimezone"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMyTimezone>>,
+    { data: BodyType<UpdateMyTimezoneBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateMyTimezone(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMyTimezoneMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMyTimezone>>
+>;
+export type UpdateMyTimezoneMutationBody = BodyType<UpdateMyTimezoneBody>;
+export type UpdateMyTimezoneMutationError = ErrorType<void>;
+
+/**
+ * @summary Update the authenticated employee's preferred IANA timezone
+ */
+export const useUpdateMyTimezone = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMyTimezone>>,
+    TError,
+    { data: BodyType<UpdateMyTimezoneBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMyTimezone>>,
+  TError,
+  { data: BodyType<UpdateMyTimezoneBody> },
+  TContext
+> => {
+  return useMutation(getUpdateMyTimezoneMutationOptions(options));
 };
 
 /**

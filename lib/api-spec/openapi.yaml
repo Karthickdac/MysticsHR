@@ -374,6 +374,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Employee"
 
+  /employees/me/timezone:
+    patch:
+      operationId: updateMyTimezone
+      tags: [employees]
+      summary: Update the authenticated employee's preferred IANA timezone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timezone:
+                  type: string
+                  description: IANA timezone identifier (e.g. "Asia/Kolkata").
+              required:
+                - timezone
+      responses:
+        "200":
+          description: Updated employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+        "400":
+          description: Invalid timezone identifier
+        "403":
+          description: User not linked to an employee record
+
   /employees/org-chart:
     get:
       operationId: listOrgChart
