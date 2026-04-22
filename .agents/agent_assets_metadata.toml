@@ -6,3 +6,9 @@ id = "i9YN6SGyULchjwnuIdBp6"
 uri = "file://docs/DEMO.md"
 type = "text"
 title = "MysticsHR Demo Documentation"
+
+[[outputs]]
+id = "zIGGQ2x2zf7oe6IIqNikD"
+uri = "file://docs/DEMO.pdf"
+type = "pdf"
+title = "MysticsHR — Demo Documentation (PDF)"
