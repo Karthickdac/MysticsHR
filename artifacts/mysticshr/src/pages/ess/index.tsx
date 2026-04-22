@@ -411,6 +411,11 @@ function RecentlySilencedPanel() {
     );
   }
 
+  function scrollToMaster() {
+    const el = document.getElementById("notification-master-preferences");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <Card data-testid="card-recently-silenced">
       <CardHeader>
@@ -425,7 +430,16 @@ function RecentlySilencedPanel() {
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {!isLoading && items.length === 0 && (
           <p className="text-sm text-muted-foreground" data-testid="text-silenced-empty">
-            You haven't silenced any notifications recently. Use the master preferences below to fine-tune what you receive.
+            You haven't silenced any notifications recently.{" "}
+            <button
+              type="button"
+              onClick={scrollToMaster}
+              className="underline text-primary hover:opacity-80"
+              data-testid="link-jump-to-master-prefs"
+            >
+              Open master preferences
+            </button>{" "}
+            to fine-tune what you receive.
           </p>
         )}
         {!isLoading && items.length > 0 && (
@@ -518,7 +532,7 @@ function NotificationPreferencesPanel() {
   if (isLoading) return <Card><CardContent className="p-6 text-sm text-muted-foreground">Loading your notification preferences…</CardContent></Card>;
 
   return (
-    <Card>
+    <Card id="notification-master-preferences">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="w-5 h-5 text-primary" /> Notification Preferences
