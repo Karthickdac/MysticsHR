@@ -4,6 +4,8 @@ import {
   useGetEmployee,
   useGetEmployeesIdProfile,
   usePutEmployeesIdProfile,
+  useUpdateEmployee,
+  getGetEmployeeQueryKey,
   useGetEmployeesIdEducation,
   usePostEmployeesIdEducation,
   usePatchEmployeeEducationId,
@@ -460,6 +462,7 @@ export default function EmployeeDetailPage() {
   const { data: emp, isLoading, error } = useGetEmployee(empId);
   const { data: profile } = useGetEmployeesIdProfile(empId);
   const upsertProfile = usePutEmployeesIdProfile();
+  const updateEmp = useUpdateEmployee();
   const qc = useQueryClient();
 
   const [editingProfile, setEditingProfile] = useState(false);
@@ -496,15 +499,25 @@ export default function EmployeeDetailPage() {
     setEditingProfile(true);
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     const data: Record<string, string | number | null> = {};
+    const tz = profileForm.timezone;
     for (const [k, v] of Object.entries(profileForm)) {
+      if (k === "timezone") continue; // lives on employees, not employee_profiles
       if (k === "noticePeriodDays") data[k] = v ? parseInt(v, 10) : null;
       else data[k] = v || null;
     }
-    upsertProfile.mutate({ id: empId, data }, {
-      onSuccess: () => { setEditingProfile(false); qc.invalidateQueries({ queryKey: getGetEmployeesIdProfileQueryKey(empId) }); }
-    });
+    try {
+      await upsertProfile.mutateAsync({ id: empId, data });
+      if (tz && tz !== emp?.timezone) {
+        await updateEmp.mutateAsync({ id: empId, data: { timezone: tz } });
+      }
+      setEditingProfile(false);
+      qc.invalidateQueries({ queryKey: getGetEmployeesIdProfileQueryKey(empId) });
+      qc.invalidateQueries({ queryKey: getGetEmployeeQueryKey(empId) });
+    } catch (e) {
+      console.error("Save profile failed", e);
+    }
   }
 
   if (isLoading) {

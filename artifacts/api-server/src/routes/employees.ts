@@ -229,7 +229,7 @@ router.patch(
         dateOfJoining, ctc, managerId, location, avatarUrl, isActive, timezone,
       } = req.body;
 
-      if (timezone !== undefined && timezone !== null && !isValidIanaTimezone(timezone)) {
+      if (timezone !== undefined && !isValidIanaTimezone(timezone)) {
         res.status(400).json({ error: "Invalid IANA timezone identifier" });
         return;
       }
