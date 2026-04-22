@@ -1212,6 +1212,65 @@ router.get("/payroll/payslips/:id", requireHrmsUser, requireRole(...ALL_ROLES), 
         .leftJoin(hrmsUsersTable, eq(hrmsUsersTable.employeeId, employeesTable.id)).where(eq(hrmsUsersTable.id, u.id));
       if (!emp || emp.id !== payslip.employeeId) { res.status(403).json({ error: "Forbidden" }); return; }
     }
+
+    // Lazy-generate htmlContent when the payslip was inserted without it
+    // (e.g. seeded demo data, or rows created before approval-driven HTML
+    // generation existed). Persists so subsequent fetches are cheap.
+    if (!payslip.htmlContent) {
+      try {
+        const [record] = await db.select().from(payrollRecordsTable).where(eq(payrollRecordsTable.id, payslip.payrollRecordId));
+        const [emp] = await db.select().from(employeesTable).where(eq(employeesTable.id, payslip.employeeId));
+        const [dept] = emp?.departmentId
+          ? await db.select({ name: departmentsTable.name }).from(departmentsTable).where(eq(departmentsTable.id, emp.departmentId))
+          : [null as { name: string } | null];
+        const [desig] = await db.select({ name: designationsTable.title }).from(designationsTable).where(eq(designationsTable.id, emp?.designationId ?? 0));
+
+        const num = (v: unknown) => Number(v ?? 0);
+        const payslipData = {
+          employee: {
+            name: `${emp?.firstName ?? ""} ${emp?.lastName ?? ""}`.trim(),
+            code: emp?.employeeId,
+            department: dept?.name ?? "",
+            designation: desig?.name ?? "",
+          },
+          period: { year: payslip.periodYear, month: payslip.periodMonth },
+          earnings: {
+            basic: num(record?.basic), hra: num(record?.hra), specialAllowance: num(record?.specialAllowance),
+            travelAllowance: num(record?.travelAllowance), medicalAllowance: num(record?.medicalAllowance),
+            performanceBonus: num(record?.performanceBonus), shiftAllowance: num(record?.shiftAllowance),
+            nightDifferential: num(record?.nightDifferential), otherEarnings: num(record?.otherEarnings),
+            grossEarnings: num(record?.grossEarnings),
+          },
+          deductions: {
+            pfEmployee: num(record?.pfEmployee), esiEmployee: num(record?.esiEmployee),
+            professionalTax: num(record?.professionalTax), tds: num(record?.tds),
+            lopDeduction: num(record?.lopDeduction), loanDeduction: num(record?.loanDeduction),
+            otherDeductions: num(record?.otherDeductions), totalDeductions: num(record?.totalDeductions),
+          },
+          attendance: {
+            workingDays: num(record?.workingDays), presentDays: num(record?.presentDays),
+            lopDays: num(record?.lopDays), overtimeHours: num(record?.overtimeHours),
+          },
+          netPay: num(record?.netPay),
+          taxRegime: record?.taxRegime ?? "New",
+        };
+
+        const monthName = new Date(payslip.periodYear, payslip.periodMonth - 1).toLocaleString("en-IN", { month: "long" });
+        const html = generatePayslipHtml(payslipData as any, monthName, payslip.periodYear);
+
+        await db.update(payslipsTable)
+          .set({ payslipData, htmlContent: html, generatedAt: new Date() })
+          .where(eq(payslipsTable.id, payslip.id));
+
+        payslip.htmlContent = html;
+        (payslip as any).payslipData = payslipData;
+        payslip.generatedAt = new Date();
+      } catch (e) {
+        console.error("Lazy payslip HTML generation failed", e);
+        // Fall through with the row as-is so the client still gets a response.
+      }
+    }
+
     res.json(payslip);
   } catch (err) { console.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
