@@ -9,6 +9,7 @@ import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
 import EmployeesPage from "@/pages/employees/index";
 import EmployeeDetailPage from "@/pages/employees/detail";
+import NewEmployeePage from "@/pages/employees/new";
 import OrgChartPage from "@/pages/org-chart/index";
 import DepartmentsPage from "@/pages/departments";
 import DesignationsPage from "@/pages/designations";
@@ -60,12 +61,7 @@ import SystemConfigPage from "@/pages/system-config/index";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
-const NewEmployee = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold">New Employee</h1>
-    <p className="text-muted-foreground mt-2">Employee creation form coming soon.</p>
-  </div>
-);
+const NewEmployee = NewEmployeePage;
 
 function Forbidden() {
   return (
