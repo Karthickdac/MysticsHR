@@ -84,7 +84,7 @@ export function Sidebar({ isOpen, setOpen, collapsed, setCollapsed }: SidebarPro
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1" data-testid="sidebar-nav">
+        <nav className="flex-1 overflow-y-auto sidebar-scroll py-3 px-2 space-y-1" data-testid="sidebar-nav">
           {groups.map((group) => {
             const open = effectiveOpen[group.id] ?? group.defaultOpen ?? false;
             return (
