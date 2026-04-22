@@ -3,6 +3,7 @@ import { requireHrmsUser, requireRole } from "../lib/auth";
 import { dispatchNotification } from "../lib/notification-service";
 import { getUsersByRoles } from "./system-config";
 import { db } from "../lib/db";
+import { buildSlaReport, buildSlaReportCsv, type SlaTicket } from "../lib/sla-report";
 import {
   helpdeskTicketsTable,
   ticketCommentsTable,
@@ -738,151 +739,30 @@ router.post("/helpdesk/sla-check", requireHrmsUser, requireRole(...MANAGER_ROLES
 });
 
 // ─── SLA REPORT ───────────────────────────────────────────────────────────────
-// Compute SLA report data, optionally filtered by createdAt date range [from, to].
-async function computeSlaReport(from?: Date, to?: Date) {
+// Loads tickets + assignee names from the DB and delegates the KPI/CSV math to
+// the pure builders in `lib/sla-report.ts` (which are unit-tested in isolation).
+async function loadSlaReportInputs(): Promise<{ tickets: SlaTicket[]; assigneeNameById: Map<number, string | null> }> {
   const all = await db.select().from(helpdeskTicketsTable).orderBy(desc(helpdeskTicketsTable.createdAt));
-
-  // Filter by createdAt range (inclusive)
-  const inRange = all.filter(t => {
-    if (!t.createdAt) return false;
-    const c = new Date(t.createdAt).getTime();
-    if (from && c < from.getTime()) return false;
-    if (to && c > to.getTime()) return false;
-    return true;
-  });
-
-  const now = new Date();
-  const totalTickets = inRange.length;
-  const openTickets = inRange.filter(t => !["Resolved", "Closed"].includes(t.status)).length;
-  const resolvedTickets = inRange.filter(t => ["Resolved", "Closed"].includes(t.status)).length;
-
-  const isBreached = (t: typeof helpdeskTicketsTable.$inferSelect) => {
-    if (!t.slaDeadline) return false;
-    if (["Resolved", "Closed"].includes(t.status)) {
-      // Historical breach: completion (resolved or closed) happened after the SLA deadline
-      const completedAt = t.resolvedAt ?? t.closedAt;
-      return !!completedAt && new Date(completedAt) > new Date(t.slaDeadline);
-    }
-    return new Date(t.slaDeadline) < now;
-  };
-  const slaBreachedCount = inRange.filter(isBreached).length;
-
-  // Treat "completion" as resolvedAt OR closedAt (whichever exists), so closed-without-resolved
-  // tickets still contribute to resolution-time metrics.
-  const completionTime = (t: typeof helpdeskTicketsTable.$inferSelect): Date | null => {
-    const c = t.resolvedAt ?? t.closedAt;
-    return c ? new Date(c) : null;
-  };
-  const resolvedWithTime = inRange.filter(t => completionTime(t) && t.createdAt);
-  const avgResolutionHours = resolvedWithTime.length > 0
-    ? resolvedWithTime.reduce((sum, t) => {
-        const diff = completionTime(t)!.getTime() - new Date(t.createdAt).getTime();
-        return sum + diff / (1000 * 60 * 60);
-      }, 0) / resolvedWithTime.length
-    : null;
-
-  const priorityMap: Record<string, { count: number; breached: number; resolvedSumHrs: number; resolvedCount: number }> = {};
-  const categoryMap: Record<string, { count: number; breached: number; resolvedSumHrs: number; resolvedCount: number }> = {};
-
-  for (const t of inRange) {
-    const completedAt = completionTime(t);
-    const resolvedHrs = (completedAt && t.createdAt)
-      ? (completedAt.getTime() - new Date(t.createdAt).getTime()) / 3_600_000
-      : null;
-
-    if (!priorityMap[t.priority]) priorityMap[t.priority] = { count: 0, breached: 0, resolvedSumHrs: 0, resolvedCount: 0 };
-    priorityMap[t.priority].count++;
-    if (isBreached(t)) priorityMap[t.priority].breached++;
-    if (resolvedHrs !== null) {
-      priorityMap[t.priority].resolvedSumHrs += resolvedHrs;
-      priorityMap[t.priority].resolvedCount++;
-    }
-
-    if (!categoryMap[t.category]) categoryMap[t.category] = { count: 0, breached: 0, resolvedSumHrs: 0, resolvedCount: 0 };
-    categoryMap[t.category].count++;
-    if (isBreached(t)) categoryMap[t.category].breached++;
-    if (resolvedHrs !== null) {
-      categoryMap[t.category].resolvedSumHrs += resolvedHrs;
-      categoryMap[t.category].resolvedCount++;
-    }
-  }
-
-  const round1 = (n: number | null) => n === null ? null : Math.round(n * 10) / 10;
-  const round2 = (n: number) => Math.round(n * 100) / 100;
-
-  // Daily trend: average resolution hours bucketed by the day a ticket was
-  // resolved. Days with no resolutions are omitted, so the chart renders a
-  // continuous line across active days only. Bucket day is also clamped to the
-  // requested [from, to] window so a ticket created in-range but resolved well
-  // after the window doesn't produce a trend point outside the report range.
-  const trendBuckets = new Map<string, { sum: number; n: number }>();
-  for (const t of inRange) {
-    const completedAt = completionTime(t);
-    if (!completedAt || !t.createdAt) continue;
-    if (from && completedAt < from) continue;
-    if (to && completedAt > to) continue;
-    const hrs = (completedAt.getTime() - new Date(t.createdAt).getTime()) / 3_600_000;
-    const day = completedAt.toISOString().slice(0, 10);
-    const b = trendBuckets.get(day) ?? { sum: 0, n: 0 };
-    b.sum += hrs;
-    b.n += 1;
-    trendBuckets.set(day, b);
-  }
-  const trend = [...trendBuckets.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, b]) => ({
-      date,
-      avgHours: round2(b.sum / b.n),
-      resolved: b.n,
-    }));
-
-  // Per-assignee aggregation. Resolves user IDs to display names in one batch
-  // so the chart can render names directly. Tickets without an assignee are
-  // grouped under "Unassigned" so they're visible (but typically excluded
-  // from the chart on the client).
-  const assigneeMap = new Map<number | null, { total: number; breached: number }>();
-  for (const t of inRange) {
-    const key: number | null = t.assignedToUserId ?? null;
-    const m = assigneeMap.get(key) ?? { total: 0, breached: 0 };
-    m.total += 1;
-    if (isBreached(t)) m.breached += 1;
-    assigneeMap.set(key, m);
-  }
-  const assigneeIds = [...assigneeMap.keys()].filter((k): k is number => k !== null);
+  const tickets: SlaTicket[] = all.map(t => ({
+    id: t.id,
+    subject: t.subject,
+    category: t.category,
+    priority: t.priority,
+    status: t.status,
+    assignedToUserId: t.assignedToUserId,
+    raisedByEmployeeId: t.raisedByEmployeeId,
+    slaDeadline: t.slaDeadline,
+    resolvedAt: t.resolvedAt,
+    closedAt: t.closedAt,
+    createdAt: t.createdAt,
+  }));
+  const assigneeIds = [...new Set(tickets.map(t => t.assignedToUserId).filter((v): v is number => v !== null))];
   const userRows = assigneeIds.length > 0
     ? await db.select({ id: hrmsUsersTable.id, name: hrmsUsersTable.name })
         .from(hrmsUsersTable)
         .where(inArray(hrmsUsersTable.id, assigneeIds))
     : [];
-  const idToName = new Map(userRows.map(u => [u.id, u.name]));
-  const byAssignee = [...assigneeMap.entries()].map(([id, v]) => ({
-    assigneeUserId: id,
-    assigneeName: id === null ? "Unassigned" : (idToName.get(id) ?? `User #${id}`),
-    total: v.total,
-    breached: v.breached,
-    withinPct: v.total > 0 ? Math.round(((v.total - v.breached) / v.total) * 100) : 0,
-  }));
-
-  return {
-    totalTickets,
-    openTickets,
-    resolvedTickets,
-    slaBreachedCount,
-    avgResolutionHours: round1(avgResolutionHours),
-    byPriority: Object.entries(priorityMap).map(([priority, v]) => ({
-      priority, count: v.count, breached: v.breached,
-      avgResolutionHours: v.resolvedCount > 0 ? round1(v.resolvedSumHrs / v.resolvedCount) : null,
-    })),
-    byCategory: Object.entries(categoryMap).map(([category, v]) => ({
-      category, count: v.count, breached: v.breached,
-      avgResolutionHours: v.resolvedCount > 0 ? round1(v.resolvedSumHrs / v.resolvedCount) : null,
-    })),
-    trend,
-    byAssignee,
-    rangeFrom: from?.toISOString() ?? null,
-    rangeTo: to?.toISOString() ?? null,
-    tickets: inRange, // used by CSV exporter; not serialised by JSON endpoint
-  };
+  return { tickets, assigneeNameById: new Map(userRows.map(u => [u.id, u.name])) };
 }
 
 class BadDateParamError extends Error {
@@ -900,8 +780,8 @@ router.get("/helpdesk/sla-report", requireHrmsUser, requireRole(...MANAGER_ROLES
   try {
     const from = parseDateParam(req.query.from, "from");
     const to = parseDateParam(req.query.to, "to");
-    const report = await computeSlaReport(from, to);
-    const { tickets: _omit, ...payload } = report; // strip ticket list from JSON response
+    const { tickets, assigneeNameById } = await loadSlaReportInputs();
+    const payload = buildSlaReport({ tickets, assigneeNameById, now: new Date(), from, to });
     res.json(payload);
   } catch (err) {
     if (err instanceof BadDateParamError) { res.status(400).json({ error: err.message }); return; }
@@ -914,55 +794,12 @@ router.get("/helpdesk/sla-report.csv", requireHrmsUser, requireRole(...MANAGER_R
   try {
     const from = parseDateParam(req.query.from, "from");
     const to = parseDateParam(req.query.to, "to");
-    const report = await computeSlaReport(from, to);
-
-    const escape = (v: unknown) => {
-      if (v === null || v === undefined) return "";
-      let s = String(v);
-      // Neutralise spreadsheet formula injection: prefix dangerous leading chars with a single quote
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-
-    const header = [
-      "Ticket ID", "Subject", "Category", "Priority", "Status",
-      "Raised By Employee ID", "Assigned To User ID",
-      "Created At", "SLA Deadline", "Resolved At", "Closed At",
-      "SLA Breached", "Resolution Hours",
-    ];
-    const lines = [header.join(",")];
-
-    const now = new Date();
-    const isBreached = (t: typeof helpdeskTicketsTable.$inferSelect) => {
-      if (!t.slaDeadline) return false;
-      if (["Resolved", "Closed"].includes(t.status)) {
-        const completedAt = t.resolvedAt ?? t.closedAt;
-        return !!completedAt && new Date(completedAt) > new Date(t.slaDeadline);
-      }
-      return new Date(t.slaDeadline) < now;
-    };
-    for (const t of report.tickets) {
-      const breached = isBreached(t);
-      const completedAt = t.resolvedAt ?? t.closedAt;
-      const resolutionHours = completedAt && t.createdAt
-        ? Math.round(((new Date(completedAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000) * 10) / 10
-        : "";
-      lines.push([
-        t.id, t.subject, t.category, t.priority, t.status,
-        t.raisedByEmployeeId ?? "", t.assignedToUserId ?? "",
-        t.createdAt ? new Date(t.createdAt).toISOString() : "",
-        t.slaDeadline ? new Date(t.slaDeadline).toISOString() : "",
-        t.resolvedAt ? new Date(t.resolvedAt).toISOString() : "",
-        t.closedAt ? new Date(t.closedAt).toISOString() : "",
-        breached ? "Yes" : "No",
-        resolutionHours,
-      ].map(escape).join(","));
-    }
-
+    const { tickets } = await loadSlaReportInputs();
+    const csv = buildSlaReportCsv(tickets, { now: new Date(), from, to });
     const fileLabel = `helpdesk-sla-report-${new Date().toISOString().slice(0, 10)}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${fileLabel}"`);
-    res.send(lines.join("\r\n"));
+    res.send(csv);
   } catch (err) {
     if (err instanceof BadDateParamError) { res.status(400).json({ error: err.message }); return; }
     console.error(err); res.status(500).json({ error: "Internal server error" });
