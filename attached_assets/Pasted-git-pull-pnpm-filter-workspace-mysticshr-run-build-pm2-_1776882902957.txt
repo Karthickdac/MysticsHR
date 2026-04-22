@@ -1,0 +1,26 @@
+git pull
+pnpm --filter @workspace/mysticshr run build
+pm2 restart mysticshr
+Already up to date.
+
+> @workspace/mysticshr@0.0.0 build /root/artifacts/mysticshr
+> vite build --config vite.config.ts
+
+failed to load config from /root/artifacts/mysticshr/vite.config.ts
+error during build:
+Error: PORT environment variable is required but was not provided.
+    at file:///root/artifacts/mysticshr/node_modules/.vite-temp/vite.config.ts.timestamp-1776882887810-7c1d827d0904e.mjs:10:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async loadConfigFromBundledFile (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35920:12)
+    at async bundleAndLoadConfigFile (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35808:17)
+    at async loadConfigFromFile (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35775:42)
+    at async resolveConfig (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35424:22)
+    at async createBuilder (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:33879:19)
+    at async CAC.<anonymous> (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/cli.js:629:10)
+/root/artifacts/mysticshr:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/mysticshr@0.0.0 build: `vite build --config vite.config.ts`
+Exit status 1
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace mysticshr not found
+root@srv1609330:~/htdocs/mysticshr.automystics.tech# 
