@@ -110,6 +110,8 @@ export interface DbMockState {
   inserted: Array<{ table: unknown; rows: Row[] }>;
   /** Every `db.update(table).set(...)` invocation, in call order. */
   updated: Array<{ table: unknown; values: Row }>;
+  /** Every `db.delete(table).where(...)` invocation, in call order. */
+  deleted: Array<{ table: unknown }>;
   /** Auto-incrementing id used by `insert(...).returning()` rows. */
   nextId: number;
   /**
@@ -132,6 +134,7 @@ export function createDbMockState(opts: DbMockStateOptions = {}): DbMockState {
     updateReturnQueues: new Map(),
     inserted: [],
     updated: [],
+    deleted: [],
     nextId: 100,
     defaultUpdateReturn: opts.defaultUpdateReturn ?? ((values: Row) => [{ ...values, id: 1 }]),
   };
@@ -142,6 +145,7 @@ export function resetDbMockState(state: DbMockState): void {
   state.updateReturnQueues.clear();
   state.inserted = [];
   state.updated = [];
+  state.deleted = [];
   state.nextId = 100;
 }
 
@@ -218,7 +222,12 @@ function buildDbMockSurface(state: DbMockState) {
     selectDistinctOn: (_cols: unknown, _proj?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
     insert: (t: unknown) => ({ values: (v: Row | Row[]) => makeInsertChain(t, v) }),
     update: (t: unknown) => makeUpdateChain(t),
-    delete: (_t: unknown) => ({ where: async () => undefined }),
+    delete: (t: unknown) => ({
+      where: async () => {
+        state.deleted.push({ table: t });
+        return undefined;
+      },
+    }),
     // db.transaction((tx) => fn(tx)) — re-use the same surface so tests don't
     // need to know whether a route runs inside a transaction or not.
     transaction: <T>(fn: (tx: any) => Promise<T>): Promise<T> => fn(surface),
