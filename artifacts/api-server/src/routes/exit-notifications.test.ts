@@ -545,6 +545,164 @@ describe("POST /exit/requests/:id/fnf/approve — dual-lane approval", () => {
   });
 });
 
+describe("POST /exit/requests — submission stage", () => {
+  it("does NOT dispatch any notification on a fresh resignation submission (current product behavior)", async () => {
+    // The "request raised" stage is intentionally silent in the current design
+    // — notifications start at the Clearance Pending transition. This test
+    // pins that contract so any future addition of a submit-stage notification
+    // is an explicit, reviewed change.
+    const employee: TestUser = { id: 30, role: "employee", name: "Asha Raiser" };
+
+    // getEmployeeForUser does TWO selects: first hrmsUsersTable for employeeId,
+    // then employeesTable for the employee record.
+    queueSelect(hrmsUsersTable, [{ employeeId: 11 }]);
+    queueSelect(employeesTable, [{
+      id: 11, dateOfJoining: "2020-01-01", employmentType: "Permanent", departmentId: 3,
+    }]);
+    // Then the route re-selects the employee row by id (line ~252)
+    queueSelect(employeesTable, [{
+      id: 11, dateOfJoining: "2020-01-01", employmentType: "Permanent", departmentId: 3,
+    }]);
+    // employeeProfilesTable for contractual notice period override (set to 0
+    // so the notice-period gate does not reject the request)
+    queueSelect(employeeProfilesTable, [{ noticePeriodDays: 0 }]);
+    // enrichExitRequest after insert
+    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
+    queueSelect(departmentsTable, [{ name: "Engineering" }]);
+
+    // requestedLwd far in the future so the notice-period gate passes
+    const futureLwd = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const res = await fetch(`${baseUrl}/exit/requests`, {
+      method: "POST", headers: userHeader(employee),
+      body: JSON.stringify({ exitType: "Resignation", reason: "Personal", requestedLwd: futureLwd }),
+    });
+    expect(res.status).toBe(201);
+    await flushAsyncDeep();
+
+    expect(dispatchCalls).toHaveLength(0);
+  });
+});
+
+describe("POST /exit/requests/:id/fnf/approve — relieving documents (happy path)", () => {
+  it("issues docs and emails one relieving_doc_link per generated document", async () => {
+    const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
+    const payroll: TestUser = { id: 8, role: "payroll_admin", name: "Finance User" };
+
+    // ── HR approves first (no dispatches expected) ──
+    queueSelect(fnfComputationsTable, [{
+      id: 50, exitRequestId: 5, hrApprovedAt: null, financeApprovedAt: null,
+      totalPayable: "60000",
+    }]);
+    const res1 = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+      method: "POST", headers: userHeader(hr), body: JSON.stringify({}),
+    });
+    expect(res1.status).toBe(200);
+    await flushAsync();
+    dispatchCalls.length = 0;
+
+    // ── Finance approves second — full approval; docs WILL be issued ──
+    queueSelect(fnfComputationsTable, [{
+      id: 50, exitRequestId: 5, hrApprovedAt: new Date(), financeApprovedAt: null,
+      totalPayable: "60000",
+    }]);
+    queueUpdateReturn(fnfComputationsTable, [{
+      id: 50, exitRequestId: 5,
+      hrApprovedAt: new Date(), financeApprovedAt: new Date(),
+      totalPayable: "60000",
+    }]);
+    queueSelect(exitRequestsTable, [{
+      id: 5, employeeId: 11, status: "FnF Pending",
+      requestedLwd: "2025-12-31", actualLwd: "2025-12-31",
+    }]);
+    queueSelect(employeesTable, [{
+      id: 11, firstName: "Asha", lastName: "Raiser", employeeCode: "E11", dateOfJoining: "2022-01-01",
+    }]);
+    // Active templates for both document types — this is the key difference
+    // from the "no docs" test: the loop body actually runs, generates a PDF,
+    // mints a download token, and queues a relieving_doc_link email.
+    queueSelect(documentTemplatesTable, [{
+      id: 401, documentType: "Relieving Letter", isActive: true,
+      bodyTemplate: "Dear {{employeeName}}", companyName: "Automystics", companyAddress: "",
+      headerText: "", footerText: "",
+    }]);
+    queueSelect(documentTemplatesTable, [{
+      id: 402, documentType: "Experience Certificate", isActive: true,
+      bodyTemplate: "Dear {{employeeName}}", companyName: "Automystics", companyAddress: "",
+      headerText: "", footerText: "",
+    }]);
+    // fnf_approved IIFE: re-select exit + employee user
+    queueSelect(exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
+    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+
+    const res2 = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+      method: "POST", headers: userHeader(payroll), body: JSON.stringify({}),
+    });
+    expect(res2.status).toBe(200);
+    await flushAsyncDeep();
+
+    // One closure email + one relieving_doc_link per document.
+    const closure = dispatchCalls.filter((c) => c.eventType === "fnf_approved");
+    expect(closure).toHaveLength(1);
+    expect(closure[0].variables?.documentsIssued).toBe("true");
+
+    const docLinks = dispatchCalls.filter((c) => c.eventType === "relieving_doc_link");
+    expect(docLinks).toHaveLength(2);
+    const docTypes = docLinks.map((c) => c.variables?.documentType).sort();
+    expect(docTypes).toEqual(["Experience Certificate", "Relieving Letter"]);
+    for (const c of docLinks) {
+      expect(c.recipientEmail).toBe("asha@co.test");
+      expect(c.variables?.downloadUrl).toBe("https://example.test/doc/abc");
+      expect(c.variables?.expiresAt).toMatch(/\d/); // a formatted date string
+      expect(c.entityType).toBe("exit_request");
+      expect(c.entityId).toBe(5);
+    }
+  });
+
+  it("skips relieving_doc_link emails when APP_URL is not configured (avoids broken links)", async () => {
+    const { getAppBaseUrl } = await import("../lib/document-tokens");
+    const spy = vi.mocked(getAppBaseUrl).mockReturnValueOnce("");
+    const payroll: TestUser = { id: 8, role: "payroll_admin", name: "Finance User" };
+
+    queueSelect(fnfComputationsTable, [{
+      id: 50, exitRequestId: 5, hrApprovedAt: new Date(), financeApprovedAt: null,
+      totalPayable: "60000",
+    }]);
+    queueUpdateReturn(fnfComputationsTable, [{
+      id: 50, exitRequestId: 5,
+      hrApprovedAt: new Date(), financeApprovedAt: new Date(),
+      totalPayable: "60000",
+    }]);
+    queueSelect(exitRequestsTable, [{
+      id: 5, employeeId: 11, status: "FnF Pending",
+      requestedLwd: "2025-12-31", actualLwd: "2025-12-31",
+    }]);
+    queueSelect(employeesTable, [{
+      id: 11, firstName: "Asha", lastName: "Raiser", employeeCode: "E11", dateOfJoining: "2022-01-01",
+    }]);
+    queueSelect(documentTemplatesTable, [{
+      id: 401, documentType: "Relieving Letter", isActive: true,
+      bodyTemplate: "x", companyName: "A", companyAddress: "", headerText: "", footerText: "",
+    }]);
+    queueSelect(documentTemplatesTable, [{
+      id: 402, documentType: "Experience Certificate", isActive: true,
+      bodyTemplate: "x", companyName: "A", companyAddress: "", headerText: "", footerText: "",
+    }]);
+    queueSelect(exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
+    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+
+    const res = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+      method: "POST", headers: userHeader(payroll), body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(200);
+    await flushAsyncDeep();
+
+    expect(dispatchCalls.filter((c) => c.eventType === "fnf_approved")).toHaveLength(1);
+    expect(dispatchCalls.filter((c) => c.eventType === "relieving_doc_link")).toHaveLength(0);
+    spy.mockRestore();
+  });
+});
+
 // ─── SCHEDULER: overdue exit clearance task WhatsApp nudge ──────────────────
 describe("scheduler.remindOverdueExitClearanceTasks", () => {
   it("nudges only assignees of overdue tasks not already nudged today, on the WhatsApp channel", async () => {
