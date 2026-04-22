@@ -1,10 +1,12 @@
 /**
  * End-to-end tests for the exit workflow notification chain.
  *
- * Strategy mirrors `helpdesk-notifications.test.ts`: mock `db`, `auth`,
- * `notification-service`, `system-config`, `audit`, `pdf`, and
- * `document-tokens`; mount the real exit router on Express; drive the
- * routes via HTTP; assert on captured `dispatchNotification` calls.
+ * Strategy mirrors `helpdesk-notifications.test.ts`: re-uses the shared
+ * notification test harness for db / auth / notification-service / Express
+ * plumbing, and layers exit-specific mocks (`system-config`, `audit`, `pdf`,
+ * `document-tokens`) on top. Routes are mounted on a real Express app and
+ * driven via HTTP; assertions run against the captured `dispatchNotification`
+ * calls.
  *
  * Coverage:
  *  - Submit → Approve (Clearance Pending) — fires per-task assignment +
@@ -23,134 +25,24 @@
  *    `exit_clearance_task_overdue` per overdue task, suppresses tasks
  *    already nudged today, and pins channels to ["whatsapp"].
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import express, { type Request, type Response, type NextFunction } from "express";
-import http from "node:http";
-import type { AddressInfo } from "node:net";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  type TestUser, type TestServerHandle,
+  createDbMockState, buildDbMockModule, queueSelect, queueUpdateReturn, resetDbMockState,
+  createDispatchCapture, buildNotificationServiceMockModule, resetDispatchCapture,
+  buildAuthMockModule,
+  startTestServer, userHeader, flushAsync, flushAsyncDeep,
+} from "../test-utils/notification-test-harness";
 
-// ─── DB MOCK (per-table FIFO queues, same shape as helpdesk test) ────────────
-type Row = Record<string, unknown>;
+// Per-file fixture state. The `vi.mock` factories below close over these so
+// every test in this file shares one db / dispatch buffer; the `beforeEach`
+// hook resets them between cases.
+const dbState = createDbMockState();
+const dispatchCalls = createDispatchCapture();
 
-type SelectChain<T> = Promise<T[]> & {
-  where: (...args: unknown[]) => SelectChain<T>;
-  orderBy: (...args: unknown[]) => SelectChain<T>;
-  limit: (...args: unknown[]) => SelectChain<T>;
-  leftJoin: (...args: unknown[]) => SelectChain<T>;
-  innerJoin: (...args: unknown[]) => SelectChain<T>;
-};
-type InsertChain<T> = Promise<void> & { returning: (...args: unknown[]) => Promise<T[]> };
-type UpdateWhereChain<T> = Promise<void> & { returning: () => Promise<T[]> };
-type UpdateChain = { set: (values: Row) => { where: (...args: unknown[]) => UpdateWhereChain<Row> } };
-
-const dbState: {
-  selectQueues: Map<unknown, Array<Row[]>>;
-  updateReturnQueues: Map<unknown, Array<Row[]>>;
-  inserted: Array<{ table: unknown; rows: Row[] }>;
-  updated: Array<{ table: unknown; values: Row }>;
-  nextId: number;
-} = { selectQueues: new Map(), updateReturnQueues: new Map(), inserted: [], updated: [], nextId: 100 };
-
-function queueSelect(table: unknown, rows: Row[]) {
-  const q = dbState.selectQueues.get(table) ?? [];
-  q.push(rows);
-  dbState.selectQueues.set(table, q);
-}
-function dequeueSelect(table: unknown): Row[] {
-  const q = dbState.selectQueues.get(table);
-  return q && q.length ? q.shift()! : [];
-}
-function makeSelectChain(table: unknown): SelectChain<Row> {
-  const base = Promise.resolve().then(() => dequeueSelect(table));
-  const chain = base as SelectChain<Row>;
-  chain.where = () => chain;
-  chain.orderBy = () => chain;
-  chain.limit = () => chain;
-  chain.leftJoin = () => chain;
-  chain.innerJoin = () => chain;
-  return chain;
-}
-function makeInsertChain(table: unknown, values: Row | Row[]): InsertChain<Row> {
-  const rows = Array.isArray(values) ? values : [values];
-  dbState.inserted.push({ table, rows });
-  const generated: Row[] = rows.map((r) => ({ ...r, id: dbState.nextId++, createdAt: new Date() }));
-  const base = Promise.resolve();
-  const chain = base as InsertChain<Row>;
-  chain.returning = () => Promise.resolve(generated);
-  return chain;
-}
-function makeUpdateChain(table: unknown): UpdateChain {
-  return {
-    set: (values: Row) => {
-      dbState.updated.push({ table, values });
-      const base = Promise.resolve();
-      const whereChain = base as UpdateWhereChain<Row>;
-      whereChain.returning = () => {
-        // If a per-call update return is queued, prefer it (so tests can
-        // simulate the real DB merging unset columns). Fall back to echoing
-        // the SET values plus an id so simple paths stay terse.
-        const q = dbState.updateReturnQueues.get(table);
-        if (q && q.length) {
-          const next = q.shift()!;
-          return Promise.resolve(next);
-        }
-        return Promise.resolve([{ ...values, id: 1 }]);
-      };
-      return { where: () => whereChain };
-    },
-  };
-}
-function queueUpdateReturn(table: unknown, rows: Row[]) {
-  const q = dbState.updateReturnQueues.get(table) ?? [];
-  q.push(rows);
-  dbState.updateReturnQueues.set(table, q);
-}
-
-vi.mock("../lib/db", () => ({
-  db: {
-    select: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
-    insert: (t: unknown) => ({ values: (v: Row | Row[]) => makeInsertChain(t, v) }),
-    update: (t: unknown) => makeUpdateChain(t),
-    delete: (_t: unknown) => ({ where: async () => undefined }),
-  },
-}));
-
-// ─── AUTH MOCK ──────────────────────────────────────────────────────────────
-type TestUser = { id: number; role: string; name?: string; email?: string; employeeId?: number | null };
-type ReqWithUser = Request & { hrmsUser?: TestUser };
-
-vi.mock("../lib/auth", () => ({
-  requireHrmsUser: (req: ReqWithUser, res: Response, next: NextFunction) => {
-    const raw = req.headers["x-test-user"];
-    if (typeof raw !== "string") { res.status(401).json({ error: "no test user" }); return; }
-    req.hrmsUser = JSON.parse(raw) as TestUser;
-    next();
-  },
-  requireRole: (...roles: string[]) =>
-    (req: ReqWithUser, res: Response, next: NextFunction) => {
-      const role = req.hrmsUser?.role;
-      if (!role || !roles.includes(role)) { res.status(403).json({ error: "forbidden" }); return; }
-      next();
-    },
-}));
-
-// ─── NOTIFICATION SERVICE MOCK ──────────────────────────────────────────────
-type DispatchCall = {
-  eventType: string;
-  module: string;
-  recipientEmail?: string;
-  recipientPhone?: string;
-  recipientName?: string;
-  variables?: Record<string, string>;
-  entityType?: string;
-  entityId?: number;
-  channels?: Array<"email" | "whatsapp">;
-};
-const dispatchCalls: DispatchCall[] = [];
-vi.mock("../lib/notification-service", () => ({
-  dispatchNotification: vi.fn(async (params: DispatchCall) => {
-    dispatchCalls.push(params);
-  }),
-}));
+vi.mock("../lib/db", () => buildDbMockModule(dbState));
+vi.mock("../lib/auth", () => buildAuthMockModule());
+vi.mock("../lib/notification-service", () => buildNotificationServiceMockModule(dispatchCalls));
 
 // ─── SYSTEM CONFIG / AUDIT / PDF / DOCUMENT-TOKENS MOCKS ────────────────────
 type HrUserRow = { id: number; email: string; name: string; employeeId: number | null };
@@ -181,44 +73,15 @@ const {
   documentTemplatesTable,
 } = await import("@workspace/db/schema");
 
-// ─── HTTP SERVER ────────────────────────────────────────────────────────────
-let server: http.Server;
-let baseUrl: string;
+let server: TestServerHandle;
 
 beforeEach(async () => {
-  dbState.selectQueues.clear();
-  dbState.inserted = [];
-  dbState.updated = [];
-  dbState.nextId = 100;
-  dispatchCalls.length = 0;
+  resetDbMockState(dbState);
+  resetDispatchCapture(dispatchCalls);
   systemConfigState.hrUsers = [];
-
-  if (server) await new Promise<void>((r) => server.close(() => r()));
-  const app = express();
-  app.use(express.json());
-  app.use(router);
-  await new Promise<void>((resolve) => { server = app.listen(0, () => resolve()); });
-  const port = (server.address() as AddressInfo).port;
-  baseUrl = `http://127.0.0.1:${port}`;
+  server = await startTestServer(router);
 });
-
-function userHeader(u: TestUser): Record<string, string> {
-  return { "x-test-user": JSON.stringify(u), "content-type": "application/json" };
-}
-
-// Many exit-route notifications are fire-and-forget (`.catch()` or wrapped in
-// `void (async () => {…})()`), so the HTTP response can return before all
-// dispatches have settled. Yield the event loop a few times so queued
-// microtasks/promise chains finish before assertions run.
-async function flushAsync(times = 3) {
-  for (let i = 0; i < times; i++) await new Promise((r) => setImmediate(r));
-}
-// Use this when the route fires deeply-nested `void (async () => {…})()`
-// dispatches that include their own `await` chains (FnF approval, e.g.).
-async function flushAsyncDeep() {
-  await new Promise((r) => setTimeout(r, 100));
-  await flushAsync(5);
-}
+afterEach(async () => { await server.close(); });
 
 // Convenience: queue the four assignee-resolution role lookups + dept/HOD/emp
 // rows that `autoGenerateClearanceTasks` issues, plus the per-unique-assignee
@@ -229,15 +92,15 @@ function queueAutoGenerateLookups(opts: {
   employeeName: { firstName: string; lastName: string; employeeCode: string };
   assigneeRows: Array<{ id: number; email: string; name: string; employeeId: number | null }>;
 }) {
-  queueSelect(hrmsUsersTable, [{ id: opts.hrUserId }]);
-  queueSelect(hrmsUsersTable, [{ id: opts.financeUserId }]);
-  queueSelect(hrmsUsersTable, [{ id: opts.adminUserId }]);
-  queueSelect(employeesTable, [{ departmentId: opts.departmentId }]);
-  queueSelect(hrmsUsersTable, [{ id: opts.hodUserId }]);
-  queueSelect(employeesTable, [opts.employeeName]);
+  queueSelect(dbState, hrmsUsersTable, [{ id: opts.hrUserId }]);
+  queueSelect(dbState, hrmsUsersTable, [{ id: opts.financeUserId }]);
+  queueSelect(dbState, hrmsUsersTable, [{ id: opts.adminUserId }]);
+  queueSelect(dbState, employeesTable, [{ departmentId: opts.departmentId }]);
+  queueSelect(dbState, hrmsUsersTable, [{ id: opts.hodUserId }]);
+  queueSelect(dbState, employeesTable, [opts.employeeName]);
   // resolveAssignee is cached by user id — order is encounter order in the
   // task list (IT[admin], Finance[finance], HR[hr], Manager[hod]).
-  for (const a of opts.assigneeRows) queueSelect(hrmsUsersTable, [a]);
+  for (const a of opts.assigneeRows) queueSelect(dbState, hrmsUsersTable, [a]);
 }
 
 // ─── TESTS ──────────────────────────────────────────────────────────────────
@@ -247,12 +110,12 @@ describe("PUT /exit/requests/:id — Clearance Pending transition", () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
     // existing exit request
-    queueSelect(exitRequestsTable, [{
+    queueSelect(dbState, exitRequestsTable, [{
       id: 5, employeeId: 11, status: "Submitted", requestedLwd: "2025-12-31",
       actualLwd: null, hrRemarks: null, createdAt: new Date(),
     }]);
     // existingTasks check (idempotency) — empty, so autogen runs
-    queueSelect(exitClearanceTasksTable, []);
+    queueSelect(dbState, exitClearanceTasksTable, []);
     // autoGenerateClearanceTasks lookups
     queueAutoGenerateLookups({
       hrUserId: 7, financeUserId: 8, adminUserId: 9, hodUserId: 10, departmentId: 3,
@@ -266,12 +129,12 @@ describe("PUT /exit/requests/:id — Clearance Pending transition", () => {
       ],
     });
     // enrichExitRequest after the .returning()
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
-    queueSelect(departmentsTable, [{ name: "Engineering" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
+    queueSelect(dbState, departmentsTable, [{ name: "Engineering" }]);
     // employee user lookup for exit_initiated
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
 
-    const res = await fetch(`${baseUrl}/exit/requests/5`, {
+    const res = await fetch(`${server.baseUrl}/exit/requests/5`, {
       method: "PUT",
       headers: userHeader(hr),
       body: JSON.stringify({ status: "Clearance Pending" }),
@@ -301,19 +164,19 @@ describe("PUT /exit/requests/:id — Clearance Pending transition", () => {
   it("does NOT regenerate tasks or re-notify assignees on a repeat Clearance Pending PUT", async () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
-    queueSelect(exitRequestsTable, [{
+    queueSelect(dbState, exitRequestsTable, [{
       id: 5, employeeId: 11, status: "Clearance Pending", requestedLwd: "2025-12-31",
       actualLwd: "2025-12-31", hrRemarks: null, createdAt: new Date(),
     }]);
     // existingTasks check — already populated, so autogen is skipped
-    queueSelect(exitClearanceTasksTable, [{ id: 100 }]);
+    queueSelect(dbState, exitClearanceTasksTable, [{ id: 100 }]);
     // enrichExitRequest
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
-    queueSelect(departmentsTable, [{ name: "Engineering" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
+    queueSelect(dbState, departmentsTable, [{ name: "Engineering" }]);
     // exit_initiated employee lookup still fires (status block runs unconditionally)
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
 
-    const res = await fetch(`${baseUrl}/exit/requests/5`, {
+    const res = await fetch(`${server.baseUrl}/exit/requests/5`, {
       method: "PUT",
       headers: userHeader(hr),
       body: JSON.stringify({ status: "Clearance Pending" }),
@@ -333,15 +196,15 @@ describe("PUT /exit/requests/:id — rejection", () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
     // First reject — was Submitted
-    queueSelect(exitRequestsTable, [{
+    queueSelect(dbState, exitRequestsTable, [{
       id: 5, employeeId: 11, status: "Submitted", hrRemarks: null,
       createdAt: new Date("2025-01-15"),
     }]);
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
-    queueSelect(departmentsTable, [{ name: "Engineering" }]);
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
+    queueSelect(dbState, departmentsTable, [{ name: "Engineering" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
 
-    const res1 = await fetch(`${baseUrl}/exit/requests/5`, {
+    const res1 = await fetch(`${server.baseUrl}/exit/requests/5`, {
       method: "PUT", headers: userHeader(hr),
       body: JSON.stringify({ status: "Rejected", hrRemarks: "Withdrawn after discussion" }),
     });
@@ -355,14 +218,14 @@ describe("PUT /exit/requests/:id — rejection", () => {
 
     // Second reject — already Rejected, must NOT resend
     dispatchCalls.length = 0;
-    queueSelect(exitRequestsTable, [{
+    queueSelect(dbState, exitRequestsTable, [{
       id: 5, employeeId: 11, status: "Rejected", hrRemarks: "Withdrawn after discussion",
       createdAt: new Date("2025-01-15"),
     }]);
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
-    queueSelect(departmentsTable, [{ name: "Engineering" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
+    queueSelect(dbState, departmentsTable, [{ name: "Engineering" }]);
 
-    const res2 = await fetch(`${baseUrl}/exit/requests/5`, {
+    const res2 = await fetch(`${server.baseUrl}/exit/requests/5`, {
       method: "PUT", headers: userHeader(hr),
       body: JSON.stringify({ status: "Rejected", hrRemarks: "Updated note" }),
     });
@@ -377,20 +240,20 @@ describe("PUT /exit/clearance-tasks/:taskId — final task completion", () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
     // Load the task being updated
-    queueSelect(exitClearanceTasksTable, [{
+    queueSelect(dbState, exitClearanceTasksTable, [{
       id: 200, exitRequestId: 5, status: "Pending", assignedToUserId: 7,
     }]);
     // After update, allTasks check — only one task, completion makes allDone = true
-    queueSelect(exitClearanceTasksTable, [{ id: 200, status: "Pending" }]);
+    queueSelect(dbState, exitClearanceTasksTable, [{ id: 200, status: "Pending" }]);
     // employee lookup for exit_clearance_done
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
 
     systemConfigState.hrUsers = [
       { id: 7, email: "hr@co.test", name: "HR Lead", employeeId: 70 },
       { id: 8, email: "finance@co.test", name: "Finance User", employeeId: 80 },
     ];
 
-    const res = await fetch(`${baseUrl}/exit/clearance-tasks/200`, {
+    const res = await fetch(`${server.baseUrl}/exit/clearance-tasks/200`, {
       method: "PUT", headers: userHeader(hr),
       body: JSON.stringify({ status: "Completed", remarks: "All set" }),
     });
@@ -411,16 +274,16 @@ describe("PUT /exit/clearance-tasks/:taskId — final task completion", () => {
   it("does NOT broadcast when only some tasks are complete", async () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
-    queueSelect(exitClearanceTasksTable, [{
+    queueSelect(dbState, exitClearanceTasksTable, [{
       id: 200, exitRequestId: 5, status: "Pending", assignedToUserId: 7,
     }]);
     // allTasks: this one + a still-pending sibling → allDone = false
-    queueSelect(exitClearanceTasksTable, [
+    queueSelect(dbState, exitClearanceTasksTable, [
       { id: 200, status: "Pending" },
       { id: 201, status: "Pending" },
     ]);
 
-    const res = await fetch(`${baseUrl}/exit/clearance-tasks/200`, {
+    const res = await fetch(`${server.baseUrl}/exit/clearance-tasks/200`, {
       method: "PUT", headers: userHeader(hr),
       body: JSON.stringify({ status: "Completed" }),
     });
@@ -434,16 +297,16 @@ describe("POST /exit/requests/:id/fnf — compute", () => {
   it("notifies all approvers when an FnF computation is created", async () => {
     const payroll: TestUser = { id: 8, role: "payroll_admin", name: "Finance User" };
 
-    queueSelect(exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Pending" }]);
+    queueSelect(dbState, exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Pending" }]);
     // Clearance gating — all complete
-    queueSelect(exitClearanceTasksTable, [
+    queueSelect(dbState, exitClearanceTasksTable, [
       { id: 200, status: "Completed" },
       { id: 201, status: "Waived" },
     ]);
     // Existing FnF — none, so insert
-    queueSelect(fnfComputationsTable, []);
+    queueSelect(dbState, fnfComputationsTable, []);
     // Notification: employee lookup for name
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11" }]);
 
     systemConfigState.hrUsers = [
       { id: 7, email: "hr@co.test", name: "HR Lead", employeeId: 70 },
@@ -451,7 +314,7 @@ describe("POST /exit/requests/:id/fnf — compute", () => {
       { id: 9, email: "admin@co.test", name: "Admin", employeeId: 90 },
     ];
 
-    const res = await fetch(`${baseUrl}/exit/requests/5/fnf`, {
+    const res = await fetch(`${server.baseUrl}/exit/requests/5/fnf`, {
       method: "POST", headers: userHeader(payroll),
       body: JSON.stringify({
         pendingSalary: 50000, leaveEncashment: 10000, gratuity: 0,
@@ -477,12 +340,12 @@ describe("POST /exit/requests/:id/fnf/approve — dual-lane approval", () => {
     const payroll: TestUser = { id: 8, role: "payroll_admin", name: "Finance User" };
 
     // ── HR approves first ──
-    queueSelect(fnfComputationsTable, [{
+    queueSelect(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5, hrApprovedAt: null, financeApprovedAt: null,
       totalPayable: "60000",
     }]);
 
-    const res1 = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+    const res1 = await fetch(`${server.baseUrl}/exit/requests/5/fnf/approve`, {
       method: "POST", headers: userHeader(hr), body: JSON.stringify({ remarks: "OK" }),
     });
     expect(res1.status).toBe(200);
@@ -491,7 +354,7 @@ describe("POST /exit/requests/:id/fnf/approve — dual-lane approval", () => {
 
     // ── Finance approves second — fully approved transition ──
     dispatchCalls.length = 0;
-    queueSelect(fnfComputationsTable, [{
+    queueSelect(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5, hrApprovedAt: new Date(), financeApprovedAt: null,
       totalPayable: "60000",
     }]);
@@ -499,27 +362,27 @@ describe("POST /exit/requests/:id/fnf/approve — dual-lane approval", () => {
     // preserves the existing hrApprovedAt. Simulate that so the route's
     // `fullyApproved = !!(updated.hrApprovedAt && updated.financeApprovedAt)`
     // check flips true and the closure email is dispatched.
-    queueUpdateReturn(fnfComputationsTable, [{
+    queueUpdateReturn(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5,
       hrApprovedAt: new Date(), financeApprovedAt: new Date(),
       totalPayable: "60000",
     }]);
     // After update: re-select exitRequest for doc generation block
-    queueSelect(exitRequestsTable, [{
+    queueSelect(dbState, exitRequestsTable, [{
       id: 5, employeeId: 11, status: "FnF Pending", requestedLwd: "2025-12-31", actualLwd: "2025-12-31",
     }]);
     // Employee lookup for doc autogen
-    queueSelect(employeesTable, [{
+    queueSelect(dbState, employeesTable, [{
       id: 11, firstName: "Asha", lastName: "Raiser", employeeCode: "E11", dateOfJoining: "2022-01-01",
     }]);
     // Document templates — none, so doc generation is skipped (no relieving_doc_link emails)
-    queueSelect(documentTemplatesTable, []);
-    queueSelect(documentTemplatesTable, []);
+    queueSelect(dbState, documentTemplatesTable, []);
+    queueSelect(dbState, documentTemplatesTable, []);
     // fnf_approved notification block: re-select exit + employee user
-    queueSelect(exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
 
-    const res2 = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+    const res2 = await fetch(`${server.baseUrl}/exit/requests/5/fnf/approve`, {
       method: "POST", headers: userHeader(payroll), body: JSON.stringify({}),
     });
     expect(res2.status).toBe(200);
@@ -532,11 +395,11 @@ describe("POST /exit/requests/:id/fnf/approve — dual-lane approval", () => {
 
     // ── Repeat full-approve: no email re-sent ──
     dispatchCalls.length = 0;
-    queueSelect(fnfComputationsTable, [{
+    queueSelect(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5, hrApprovedAt: new Date(), financeApprovedAt: new Date(),
       totalPayable: "60000",
     }]);
-    const res3 = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+    const res3 = await fetch(`${server.baseUrl}/exit/requests/5/fnf/approve`, {
       method: "POST", headers: userHeader(hr), body: JSON.stringify({}),
     });
     expect(res3.status).toBe(200);
@@ -560,26 +423,26 @@ describe("POST /exit/requests — submission stage", () => {
 
     // getEmployeeForUser does TWO selects: first hrmsUsersTable for employeeId,
     // then employeesTable for the employee record.
-    queueSelect(hrmsUsersTable, [{ employeeId: 11 }]);
-    queueSelect(employeesTable, [{
+    queueSelect(dbState, hrmsUsersTable, [{ employeeId: 11 }]);
+    queueSelect(dbState, employeesTable, [{
       id: 11, dateOfJoining: "2020-01-01", employmentType: "Permanent", departmentId: 3,
     }]);
     // Then the route re-selects the employee row by id
-    queueSelect(employeesTable, [{
+    queueSelect(dbState, employeesTable, [{
       id: 11, firstName: "Asha", lastName: "Raiser", employeeId: "E11",
       dateOfJoining: "2020-01-01", employmentType: "Permanent", departmentId: 3,
     }]);
     // employeeProfilesTable for contractual notice period override (set to 0
     // so the notice-period gate does not reject the request)
-    queueSelect(employeeProfilesTable, [{ noticePeriodDays: 0 }]);
+    queueSelect(dbState, employeeProfilesTable, [{ noticePeriodDays: 0 }]);
     // enrichExitRequest after insert
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
-    queueSelect(departmentsTable, [{ name: "Engineering" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser", employeeCode: "E11", departmentId: 3 }]);
+    queueSelect(dbState, departmentsTable, [{ name: "Engineering" }]);
 
     // requestedLwd far in the future so the notice-period gate passes
     const futureLwd = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const res = await fetch(`${baseUrl}/exit/requests`, {
+    const res = await fetch(`${server.baseUrl}/exit/requests`, {
       method: "POST", headers: userHeader(employee),
       body: JSON.stringify({ exitType: "Resignation", reason: "Personal", requestedLwd: futureLwd }),
     });
@@ -598,11 +461,11 @@ describe("POST /exit/requests — submission stage", () => {
     for (const call of submitted) {
       expect(call.module).toBe("exit");
       expect(call.entityType).toBe("exit_request");
-      expect(call.variables.employeeName).toBe("Asha Raiser");
-      expect(call.variables.employeeId).toBe("E11");
-      expect(call.variables.exitType).toBe("Resignation");
-      expect(call.variables.requestedLwd).toBe(futureLwd);
-      expect(call.variables.reason).toBe("Personal");
+      expect(call.variables!.employeeName).toBe("Asha Raiser");
+      expect(call.variables!.employeeId).toBe("E11");
+      expect(call.variables!.exitType).toBe("Resignation");
+      expect(call.variables!.requestedLwd).toBe(futureLwd);
+      expect(call.variables!.reason).toBe("Personal");
     }
   });
 });
@@ -613,11 +476,11 @@ describe("POST /exit/requests/:id/fnf/approve — relieving documents (happy pat
     const payroll: TestUser = { id: 8, role: "payroll_admin", name: "Finance User" };
 
     // ── HR approves first (no dispatches expected) ──
-    queueSelect(fnfComputationsTable, [{
+    queueSelect(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5, hrApprovedAt: null, financeApprovedAt: null,
       totalPayable: "60000",
     }]);
-    const res1 = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+    const res1 = await fetch(`${server.baseUrl}/exit/requests/5/fnf/approve`, {
       method: "POST", headers: userHeader(hr), body: JSON.stringify({}),
     });
     expect(res1.status).toBe(200);
@@ -625,40 +488,40 @@ describe("POST /exit/requests/:id/fnf/approve — relieving documents (happy pat
     dispatchCalls.length = 0;
 
     // ── Finance approves second — full approval; docs WILL be issued ──
-    queueSelect(fnfComputationsTable, [{
+    queueSelect(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5, hrApprovedAt: new Date(), financeApprovedAt: null,
       totalPayable: "60000",
     }]);
-    queueUpdateReturn(fnfComputationsTable, [{
+    queueUpdateReturn(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5,
       hrApprovedAt: new Date(), financeApprovedAt: new Date(),
       totalPayable: "60000",
     }]);
-    queueSelect(exitRequestsTable, [{
+    queueSelect(dbState, exitRequestsTable, [{
       id: 5, employeeId: 11, status: "FnF Pending",
       requestedLwd: "2025-12-31", actualLwd: "2025-12-31",
     }]);
-    queueSelect(employeesTable, [{
+    queueSelect(dbState, employeesTable, [{
       id: 11, firstName: "Asha", lastName: "Raiser", employeeCode: "E11", dateOfJoining: "2022-01-01",
     }]);
     // Active templates for both document types — this is the key difference
     // from the "no docs" test: the loop body actually runs, generates a PDF,
     // mints a download token, and queues a relieving_doc_link email.
-    queueSelect(documentTemplatesTable, [{
+    queueSelect(dbState, documentTemplatesTable, [{
       id: 401, documentType: "Relieving Letter", isActive: true,
       bodyTemplate: "Dear {{employeeName}}", companyName: "Automystics", companyAddress: "",
       headerText: "", footerText: "",
     }]);
-    queueSelect(documentTemplatesTable, [{
+    queueSelect(dbState, documentTemplatesTable, [{
       id: 402, documentType: "Experience Certificate", isActive: true,
       bodyTemplate: "Dear {{employeeName}}", companyName: "Automystics", companyAddress: "",
       headerText: "", footerText: "",
     }]);
     // fnf_approved IIFE: re-select exit + employee user
-    queueSelect(exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
 
-    const res2 = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+    const res2 = await fetch(`${server.baseUrl}/exit/requests/5/fnf/approve`, {
       method: "POST", headers: userHeader(payroll), body: JSON.stringify({}),
     });
     expect(res2.status).toBe(200);
@@ -687,34 +550,34 @@ describe("POST /exit/requests/:id/fnf/approve — relieving documents (happy pat
     const spy = vi.mocked(getAppBaseUrl).mockReturnValueOnce("");
     const payroll: TestUser = { id: 8, role: "payroll_admin", name: "Finance User" };
 
-    queueSelect(fnfComputationsTable, [{
+    queueSelect(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5, hrApprovedAt: new Date(), financeApprovedAt: null,
       totalPayable: "60000",
     }]);
-    queueUpdateReturn(fnfComputationsTable, [{
+    queueUpdateReturn(dbState, fnfComputationsTable, [{
       id: 50, exitRequestId: 5,
       hrApprovedAt: new Date(), financeApprovedAt: new Date(),
       totalPayable: "60000",
     }]);
-    queueSelect(exitRequestsTable, [{
+    queueSelect(dbState, exitRequestsTable, [{
       id: 5, employeeId: 11, status: "FnF Pending",
       requestedLwd: "2025-12-31", actualLwd: "2025-12-31",
     }]);
-    queueSelect(employeesTable, [{
+    queueSelect(dbState, employeesTable, [{
       id: 11, firstName: "Asha", lastName: "Raiser", employeeCode: "E11", dateOfJoining: "2022-01-01",
     }]);
-    queueSelect(documentTemplatesTable, [{
+    queueSelect(dbState, documentTemplatesTable, [{
       id: 401, documentType: "Relieving Letter", isActive: true,
       bodyTemplate: "x", companyName: "A", companyAddress: "", headerText: "", footerText: "",
     }]);
-    queueSelect(documentTemplatesTable, [{
+    queueSelect(dbState, documentTemplatesTable, [{
       id: 402, documentType: "Experience Certificate", isActive: true,
       bodyTemplate: "x", companyName: "A", companyAddress: "", headerText: "", footerText: "",
     }]);
-    queueSelect(exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, exitRequestsTable, [{ id: 5, employeeId: 11, status: "FnF Approved" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
 
-    const res = await fetch(`${baseUrl}/exit/requests/5/fnf/approve`, {
+    const res = await fetch(`${server.baseUrl}/exit/requests/5/fnf/approve`, {
       method: "POST", headers: userHeader(payroll), body: JSON.stringify({}),
     });
     expect(res.status).toBe(200);
@@ -736,7 +599,7 @@ describe("scheduler.remindOverdueExitClearanceTasks", () => {
 
     // The function does a single big joined select on exitClearanceTasksTable.
     // We queue both the overdue rows and an empty notification-log lookup.
-    queueSelect(ect, [
+    queueSelect(dbState, ect, [
       {
         id: 200, exitRequestId: 5, taskName: "Asset Return", department: "IT",
         dueDate: "2025-01-01", assignedToUserId: 9,
@@ -751,12 +614,12 @@ describe("scheduler.remindOverdueExitClearanceTasks", () => {
       },
     ]);
     // Today's notification logs — task 200 was already nudged → suppress
-    queueSelect(notificationLogsTable, [
+    queueSelect(dbState, notificationLogsTable, [
       { entityId: 200, recipientPhone: null, recipientEmail: "admin@co.test" },
     ]);
     // Two resolveAssigneePhone lookups (employees table); return null phones
-    queueSelect(employeesTable, [{ phone: null }]);
-    queueSelect(employeesTable, [{ phone: null }]);
+    queueSelect(dbState, employeesTable, [{ phone: null }]);
+    queueSelect(dbState, employeesTable, [{ phone: null }]);
 
     await remindOverdueExitClearanceTasks();
     await flushAsync();
@@ -776,7 +639,7 @@ describe("scheduler.remindOverdueExitClearanceTasks", () => {
   it("returns silently when there are no overdue tasks", async () => {
     const { remindOverdueExitClearanceTasks } = await import("../lib/scheduler");
     const { exitClearanceTasksTable: ect } = await import("@workspace/db/schema");
-    queueSelect(ect, []);
+    queueSelect(dbState, ect, []);
     await remindOverdueExitClearanceTasks();
     await flushAsync();
     expect(dispatchCalls).toHaveLength(0);
