@@ -118,7 +118,8 @@ function HrAttendanceView() {
         notes: form.notes || null,
       };
       await createAtt.mutateAsync({ data: payload });
-      await qc.invalidateQueries({ queryKey: getGetAttendanceQueryKey({ date: filterDate }) });
+      // Match every cached /attendance variant (with or without suspiciousOnly, etc.)
+      await qc.invalidateQueries({ queryKey: getGetAttendanceQueryKey().slice(0, 1) });
       setShowForm(false);
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -139,7 +140,7 @@ function HrAttendanceView() {
         notes: overrideForm.notes || null,
       };
       await overrideAtt.mutateAsync({ id: editingRecord.id, data: payload });
-      await qc.invalidateQueries({ queryKey: getGetAttendanceQueryKey({ date: filterDate }) });
+      await qc.invalidateQueries({ queryKey: getGetAttendanceQueryKey().slice(0, 1) });
       setShowOverride(false);
       setEditingRecord(null);
     } catch (e: unknown) {
