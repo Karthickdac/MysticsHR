@@ -2,11 +2,23 @@ import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
-import { employeesTable, departmentsTable, designationsTable } from "@workspace/db/schema";
+import { employeesTable, departmentsTable, designationsTable, systemSettingsTable } from "@workspace/db/schema";
 import { eq, isNull, and, sql, desc } from "drizzle-orm";
 import { autoCreateOnboardingChecklist } from "../lib/onboarding-utils";
 import { recordHistory } from "../lib/history-utils";
 import { seedNotificationPreferencesForEmployee } from "../lib/notification-service";
+import { DEFAULT_TIMEZONE, isValidIanaTimezone } from "../lib/timezones";
+
+async function getCompanyDefaultTimezone(): Promise<string> {
+  const [row] = await db
+    .select({ value: systemSettingsTable.value })
+    .from(systemSettingsTable)
+    .where(and(eq(systemSettingsTable.category, "org_profile"), eq(systemSettingsTable.key, "timezone")))
+    .limit(1);
+  const v = row?.value;
+  if (typeof v === "string" && isValidIanaTimezone(v)) return v;
+  return DEFAULT_TIMEZONE;
+}
 
 const router = Router();
 
@@ -29,6 +41,7 @@ const employeeSelect = {
   ctc: employeesTable.ctc,
   managerId: employeesTable.managerId,
   location: employeesTable.location,
+  timezone: employeesTable.timezone,
   avatarUrl: employeesTable.avatarUrl,
   isActive: employeesTable.isActive,
   createdAt: employeesTable.createdAt,
@@ -91,12 +104,22 @@ router.post(
       const {
         employeeId, firstName, lastName, email, phone, dateOfBirth,
         gender, departmentId, designationId, employmentType, status,
-        dateOfJoining, ctc, managerId, location, avatarUrl,
+        dateOfJoining, ctc, managerId, location, avatarUrl, timezone,
       } = req.body;
 
       if (!employeeId || !firstName || !lastName || !email) {
         res.status(400).json({ error: "employeeId, firstName, lastName, and email are required" });
         return;
+      }
+
+      let resolvedTimezone: string;
+      if (timezone === undefined || timezone === null || timezone === "") {
+        resolvedTimezone = await getCompanyDefaultTimezone();
+      } else if (!isValidIanaTimezone(timezone)) {
+        res.status(400).json({ error: "Invalid IANA timezone identifier" });
+        return;
+      } else {
+        resolvedTimezone = timezone;
       }
 
       const [emp] = await db
@@ -105,6 +128,7 @@ router.post(
           employeeId, firstName, lastName, email, phone, dateOfBirth,
           gender, departmentId, designationId, employmentType, status,
           dateOfJoining, ctc, managerId, location, avatarUrl,
+          timezone: resolvedTimezone,
         })
         .returning();
 
@@ -202,8 +226,13 @@ router.patch(
       const {
         firstName, lastName, email, phone, dateOfBirth, gender,
         departmentId, designationId, employmentType, status,
-        dateOfJoining, ctc, managerId, location, avatarUrl, isActive,
+        dateOfJoining, ctc, managerId, location, avatarUrl, isActive, timezone,
       } = req.body;
+
+      if (timezone !== undefined && timezone !== null && !isValidIanaTimezone(timezone)) {
+        res.status(400).json({ error: "Invalid IANA timezone identifier" });
+        return;
+      }
 
       const [existing] = await db
         .select()
@@ -222,6 +251,7 @@ router.patch(
           firstName, lastName, email, phone, dateOfBirth, gender,
           departmentId, designationId, employmentType, status,
           dateOfJoining, ctc, managerId, location, avatarUrl, isActive,
+          ...(timezone !== undefined ? { timezone } : {}),
           updatedAt: new Date(),
         })
         .where(and(eq(employeesTable.id, id), isNull(employeesTable.deletedAt)))
@@ -248,6 +278,7 @@ router.patch(
         { key: "ctc", val: ctc },
         { key: "managerId", val: managerId },
         { key: "location", val: location },
+        { key: "timezone", val: timezone },
         { key: "isActive", val: isActive },
       ];
       for (const { key, val } of coreFields) {

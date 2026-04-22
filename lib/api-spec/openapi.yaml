@@ -6787,6 +6787,9 @@ components:
           type: ["string", "null"]
         location:
           type: ["string", "null"]
+        timezone:
+          type: string
+          description: IANA timezone identifier for this employee (e.g. "Asia/Kolkata").
         avatarUrl:
           type: ["string", "null"]
         isDeleted:
@@ -6885,6 +6888,9 @@ components:
           type: ["integer", "null"]
         location:
           type: ["string", "null"]
+        timezone:
+          type: ["string", "null"]
+          description: IANA timezone identifier. Falls back to the company default when omitted.
       required:
         - firstName
         - lastName
@@ -6920,6 +6926,9 @@ components:
           type: ["integer", "null"]
         location:
           type: ["string", "null"]
+        timezone:
+          type: ["string", "null"]
+          description: IANA timezone identifier. Server validates against `Intl.supportedValuesOf("timeZone")`.
         avatarUrl:
           type: ["string", "null"]
 

@@ -270,6 +270,12 @@ export const ListEmployeesResponse = zod.object({
       managerId: zod.number().nullish(),
       managerName: zod.string().nullish(),
       location: zod.string().nullish(),
+      timezone: zod
+        .string()
+        .optional()
+        .describe(
+          'IANA timezone identifier for this employee (e.g. \"Asia\/Kolkata\").',
+        ),
       avatarUrl: zod.string().nullish(),
       isDeleted: zod.boolean(),
       createdAt: zod.coerce.date(),
@@ -298,6 +304,12 @@ export const CreateEmployeeBody = zod.object({
   ctc: zod.number().nullish(),
   managerId: zod.number().nullish(),
   location: zod.string().nullish(),
+  timezone: zod
+    .string()
+    .nullish()
+    .describe(
+      "IANA timezone identifier. Falls back to the company default when omitted.",
+    ),
 });
 
 /**
@@ -349,6 +361,12 @@ export const GetEmployeeResponse = zod.object({
   managerId: zod.number().nullish(),
   managerName: zod.string().nullish(),
   location: zod.string().nullish(),
+  timezone: zod
+    .string()
+    .optional()
+    .describe(
+      'IANA timezone identifier for this employee (e.g. \"Asia\/Kolkata\").',
+    ),
   avatarUrl: zod.string().nullish(),
   isDeleted: zod.boolean(),
   createdAt: zod.coerce.date(),
@@ -376,6 +394,12 @@ export const UpdateEmployeeBody = zod.object({
   ctc: zod.number().nullish(),
   managerId: zod.number().nullish(),
   location: zod.string().nullish(),
+  timezone: zod
+    .string()
+    .nullish()
+    .describe(
+      'IANA timezone identifier. Server validates against `Intl.supportedValuesOf(\"timeZone\")`.',
+    ),
   avatarUrl: zod.string().nullish(),
 });
 
@@ -399,6 +423,12 @@ export const UpdateEmployeeResponse = zod.object({
   managerId: zod.number().nullish(),
   managerName: zod.string().nullish(),
   location: zod.string().nullish(),
+  timezone: zod
+    .string()
+    .optional()
+    .describe(
+      'IANA timezone identifier for this employee (e.g. \"Asia\/Kolkata\").',
+    ),
   avatarUrl: zod.string().nullish(),
   isDeleted: zod.boolean(),
   createdAt: zod.coerce.date(),
@@ -1191,6 +1221,12 @@ export const UpdateEmployeeStatusResponse = zod.object({
   managerId: zod.number().nullish(),
   managerName: zod.string().nullish(),
   location: zod.string().nullish(),
+  timezone: zod
+    .string()
+    .optional()
+    .describe(
+      'IANA timezone identifier for this employee (e.g. \"Asia\/Kolkata\").',
+    ),
   avatarUrl: zod.string().nullish(),
   isDeleted: zod.boolean(),
   createdAt: zod.coerce.date(),

@@ -50,6 +50,35 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
+import { listTimezones } from "@/lib/timezones";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+function TimezoneCombo({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const zones = listTimezones();
+  const [query, setQuery] = useState("");
+  const filtered = query.trim()
+    ? zones.filter((z) => z.toLowerCase().includes(query.toLowerCase())).slice(0, 200)
+    : zones.slice(0, 200);
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger><SelectValue placeholder="Select timezone" /></SelectTrigger>
+      <SelectContent>
+        <div className="p-1 sticky top-0 bg-popover z-10">
+          <Input
+            placeholder="Search…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8"
+          />
+        </div>
+        {filtered.map((z) => (
+          <SelectItem key={z} value={z}>{z}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 import PerformanceHistoryView from "@/components/PerformanceHistoryView";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -462,6 +491,7 @@ export default function EmployeeDetailPage() {
       confirmationDate: profile?.confirmationDate ?? "",
       noticePeriodDays: String(profile?.noticePeriodDays ?? ""),
       workLocation: profile?.workLocation ?? "",
+      timezone: emp?.timezone ?? "Asia/Kolkata",
     });
     setEditingProfile(true);
   }
@@ -629,6 +659,7 @@ export default function EmployeeDetailPage() {
                 <InfoRow label="Probation End Date" value={profile?.probationEndDate} />
                 <InfoRow label="Confirmation Date" value={profile?.confirmationDate} />
                 <InfoRow label="Notice Period" value={profile?.noticePeriodDays ? `${profile.noticePeriodDays} days` : null} />
+                <InfoRow label="Timezone" value={emp.timezone} />
               </dl>
             </CardContent>
           </Card>
@@ -731,6 +762,13 @@ export default function EmployeeDetailPage() {
                 {[["Work Location", "workLocation"], ["Notice Period (days)", "noticePeriodDays"], ["Probation End Date", "probationEndDate"], ["Confirmation Date", "confirmationDate"]].map(([label, key]) => (
                   <div key={key} className="space-y-1.5"><Label>{label}</Label><Input value={profileForm[key] ?? ""} onChange={pf(key)} type={key.includes("Date") ? "date" : key.includes("days") ? "number" : "text"} /></div>
                 ))}
+                <div className="space-y-1.5 col-span-2">
+                  <Label>Timezone</Label>
+                  <TimezoneCombo
+                    value={profileForm.timezone ?? "Asia/Kolkata"}
+                    onChange={(v) => setProfileForm((prev) => ({ ...prev, timezone: v }))}
+                  />
+                </div>
               </div>
             </div>
           </div>

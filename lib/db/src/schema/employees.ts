@@ -40,6 +40,7 @@ export const employeesTable = pgTable("employees", {
   ctc: numeric("ctc", { precision: 14, scale: 2 }),
   managerId: integer("manager_id"),
   location: text("location"),
+  timezone: text("timezone").notNull().default("Asia/Kolkata"),
   avatarUrl: text("avatar_url"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),

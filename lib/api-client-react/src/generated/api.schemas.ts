@@ -601,6 +601,8 @@ export interface Employee {
   managerName?: string | null;
   /** @nullable */
   location?: string | null;
+  /** IANA timezone identifier for this employee (e.g. "Asia/Kolkata"). */
+  timezone?: string;
   /** @nullable */
   avatarUrl?: string | null;
   isDeleted: boolean;
@@ -658,6 +660,11 @@ export interface CreateEmployeeBody {
   managerId?: number | null;
   /** @nullable */
   location?: string | null;
+  /**
+   * IANA timezone identifier. Falls back to the company default when omitted.
+   * @nullable
+   */
+  timezone?: string | null;
 }
 
 export interface UpdateEmployeeBody {
@@ -687,6 +694,11 @@ export interface UpdateEmployeeBody {
   managerId?: number | null;
   /** @nullable */
   location?: string | null;
+  /**
+   * IANA timezone identifier. Server validates against `Intl.supportedValuesOf("timeZone")`.
+   * @nullable
+   */
+  timezone?: string | null;
   /** @nullable */
   avatarUrl?: string | null;
 }

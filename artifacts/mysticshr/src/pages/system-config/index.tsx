@@ -38,8 +38,36 @@ import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@clerk/react";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { listTimezones } from "@/lib/timezones";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+function TimezoneSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const zones = listTimezones();
+  const [query, setQuery] = useState("");
+  const filtered = query.trim()
+    ? zones.filter((z) => z.toLowerCase().includes(query.toLowerCase())).slice(0, 200)
+    : zones.slice(0, 200);
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger><SelectValue placeholder="Select timezone" /></SelectTrigger>
+      <SelectContent>
+        <div className="p-1 sticky top-0 bg-popover z-10">
+          <Input
+            placeholder="Search…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8"
+          />
+        </div>
+        {filtered.map((z) => (
+          <SelectItem key={z} value={z}>{z}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 // ─── Settings form helper ─────────────────────────────────────────────────────
 
@@ -125,6 +153,11 @@ function OrgProfileTab() {
         <div>
           <Label>Website</Label>
           <Input value={merged.website ?? ""} onChange={(e) => set("website", e.target.value)} placeholder="https://automystics.com" />
+        </div>
+        <div>
+          <Label>Default Timezone</Label>
+          <TimezoneSelect value={merged.timezone ?? "Asia/Kolkata"} onChange={(v) => set("timezone", v)} />
+          <p className="text-xs text-muted-foreground mt-1">New employees default to this IANA timezone.</p>
         </div>
         <Button onClick={save} disabled={isSaving}>Save Organization Profile</Button>
       </CardContent>
