@@ -8,166 +8,31 @@
  * helpdesk action. Suppression of opted-out recipients lives inside
  * `dispatchNotification` itself and is covered by
  * `lib/notification-service-preferences.test.ts`.
+ *
+ * The shared db / auth / notification-service / Express plumbing lives in
+ * `../test-utils/notification-test-harness.ts` so other notification-flow
+ * suites can re-use it without re-pasting the same fixture code.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import express, { type Request, type Response, type NextFunction } from "express";
-import http from "node:http";
-import type { AddressInfo } from "node:net";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  type Row, type TestUser, type TestServerHandle,
+  createDbMockState, buildDbMockModule, queueSelect, resetDbMockState,
+  createDispatchCapture, buildNotificationServiceMockModule, resetDispatchCapture,
+  buildAuthMockModule,
+  startTestServer, userHeader,
+} from "../test-utils/notification-test-harness";
 
-// ─── DB MOCK ────────────────────────────────────────────────────────────────
-// Per-table FIFO queue of select results. Each test seeds the queue in the
-// order the route is expected to issue queries against the table. The mock
-// is intentionally thin — it just satisfies the chained drizzle API surface
-// the helpdesk router uses (select/from/where/orderBy/limit/leftJoin and
-// insert/update/delete with .returning()).
+// Per-file fixture state. The `vi.mock` factories below close over these so
+// every test in this file shares one db / dispatch buffer; the `beforeEach`
+// hook resets them between cases.
+const dbState = createDbMockState();
+const dispatchCalls = createDispatchCapture();
 
-type Row = Record<string, unknown>;
+vi.mock("../lib/db", () => buildDbMockModule(dbState));
+vi.mock("../lib/auth", () => buildAuthMockModule());
+vi.mock("../lib/notification-service", () => buildNotificationServiceMockModule(dispatchCalls));
 
-type SelectChain<T> = Promise<T[]> & {
-  where: (...args: unknown[]) => SelectChain<T>;
-  orderBy: (...args: unknown[]) => SelectChain<T>;
-  limit: (...args: unknown[]) => SelectChain<T>;
-  leftJoin: (...args: unknown[]) => SelectChain<T>;
-  innerJoin: (...args: unknown[]) => SelectChain<T>;
-};
-
-type InsertChain<T> = Promise<void> & {
-  returning: () => Promise<T[]>;
-};
-
-type UpdateWhereChain<T> = Promise<void> & {
-  returning: () => Promise<T[]>;
-};
-
-type UpdateChain<T> = {
-  set: (values: Row) => { where: (...args: unknown[]) => UpdateWhereChain<T> };
-};
-
-type DeleteChain = { where: (...args: unknown[]) => Promise<void> };
-
-const dbState: {
-  selectQueues: Map<unknown, Array<Row[]>>;
-  inserted: Array<{ table: unknown; rows: Row[] }>;
-  updated: Array<{ table: unknown; values: Row }>;
-  nextId: number;
-} = {
-  selectQueues: new Map(),
-  inserted: [],
-  updated: [],
-  nextId: 100,
-};
-
-function queueSelect(table: unknown, rows: Row[]) {
-  const q = dbState.selectQueues.get(table) ?? [];
-  q.push(rows);
-  dbState.selectQueues.set(table, q);
-}
-
-function dequeueSelect(table: unknown): Row[] {
-  const q = dbState.selectQueues.get(table);
-  return q && q.length ? q.shift()! : [];
-}
-
-function makeSelectChain(table: unknown): SelectChain<Row> {
-  const base = Promise.resolve().then(() => dequeueSelect(table));
-  const chain = base as SelectChain<Row>;
-  chain.where = () => chain;
-  chain.orderBy = () => chain;
-  chain.limit = () => chain;
-  chain.leftJoin = () => chain;
-  chain.innerJoin = () => chain;
-  return chain;
-}
-
-function makeInsertChain(table: unknown, values: Row | Row[]): InsertChain<Row> {
-  const rows = Array.isArray(values) ? values : [values];
-  dbState.inserted.push({ table, rows });
-  const generated: Row[] = rows.map((r) => ({
-    ...r,
-    id: dbState.nextId++,
-    createdAt: new Date(),
-  }));
-  const base = Promise.resolve();
-  const chain = base as InsertChain<Row>;
-  chain.returning = () => Promise.resolve(generated);
-  return chain;
-}
-
-function makeUpdateChain(table: unknown): UpdateChain<Row> {
-  return {
-    set: (values: Row) => {
-      dbState.updated.push({ table, values });
-      const base = Promise.resolve();
-      const whereChain = base as UpdateWhereChain<Row>;
-      whereChain.returning = () => Promise.resolve([{ ...values, id: 1 }]);
-      return { where: () => whereChain };
-    },
-  };
-}
-
-function makeDeleteChain(_table: unknown): DeleteChain {
-  return { where: async () => undefined };
-}
-
-vi.mock("../lib/db", () => ({
-  db: {
-    select: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
-    insert: (t: unknown) => ({ values: (v: Row | Row[]) => makeInsertChain(t, v) }),
-    update: (t: unknown) => makeUpdateChain(t),
-    delete: (t: unknown) => makeDeleteChain(t),
-  },
-}));
-
-// ─── AUTH MOCK ──────────────────────────────────────────────────────────────
-// Lifts a JSON-encoded user from the `x-test-user` header onto req.hrmsUser.
-type TestUser = {
-  id: number;
-  role: string;
-  name?: string;
-  email?: string;
-  employeeId?: number | null;
-};
-type ReqWithUser = Request & { hrmsUser?: TestUser };
-
-vi.mock("../lib/auth", () => ({
-  requireHrmsUser: (req: ReqWithUser, res: Response, next: NextFunction) => {
-    const raw = req.headers["x-test-user"];
-    if (typeof raw !== "string") {
-      res.status(401).json({ error: "no test user" });
-      return;
-    }
-    req.hrmsUser = JSON.parse(raw) as TestUser;
-    next();
-  },
-  requireRole: (...roles: string[]) =>
-    (req: ReqWithUser, res: Response, next: NextFunction) => {
-      const role = req.hrmsUser?.role;
-      if (!role || !roles.includes(role)) {
-        res.status(403).json({ error: "forbidden" });
-        return;
-      }
-      next();
-    },
-}));
-
-// ─── NOTIFICATION SERVICE MOCK ──────────────────────────────────────────────
-type DispatchCall = {
-  eventType: string;
-  module: string;
-  recipientEmail?: string;
-  recipientName?: string;
-  variables?: Record<string, string>;
-  entityType?: string;
-  entityId?: number;
-};
-const dispatchCalls: DispatchCall[] = [];
-vi.mock("../lib/notification-service", () => ({
-  dispatchNotification: vi.fn(async (params: DispatchCall) => {
-    dispatchCalls.push(params);
-  }),
-}));
-
-// ─── SYSTEM CONFIG MOCK ─────────────────────────────────────────────────────
+// system-config is helpdesk-specific (HR fan-out for new tickets).
 type HrUserRow = { id: number; email: string; name: string; employeeId: number | null };
 const systemConfigState: { hrUsers: HrUserRow[] } = { hrUsers: [] };
 vi.mock("./system-config", () => ({
@@ -179,32 +44,15 @@ process.env.DATABASE_URL = "postgres://test/test";
 const { default: router } = await import("./helpdesk");
 const { helpdeskTicketsTable, hrmsUsersTable, employeesTable } = await import("@workspace/db/schema");
 
-// ─── HTTP SERVER ────────────────────────────────────────────────────────────
-let server: http.Server;
-let baseUrl: string;
+let server: TestServerHandle;
 
 beforeEach(async () => {
-  dbState.selectQueues.clear();
-  dbState.inserted = [];
-  dbState.updated = [];
-  dbState.nextId = 100;
-  dispatchCalls.length = 0;
+  resetDbMockState(dbState);
+  resetDispatchCapture(dispatchCalls);
   systemConfigState.hrUsers = [];
-
-  if (server) await new Promise<void>((r) => server.close(() => r()));
-  const app = express();
-  app.use(express.json());
-  app.use(router);
-  await new Promise<void>((resolve) => {
-    server = app.listen(0, () => resolve());
-  });
-  const port = (server.address() as AddressInfo).port;
-  baseUrl = `http://127.0.0.1:${port}`;
+  server = await startTestServer(router);
 });
-
-function userHeader(u: TestUser): Record<string, string> {
-  return { "x-test-user": JSON.stringify(u), "content-type": "application/json" };
-}
+afterEach(async () => { await server.close(); });
 
 // ─── TESTS ──────────────────────────────────────────────────────────────────
 
@@ -213,16 +61,16 @@ describe("POST /helpdesk/tickets — ticket created", () => {
     const employee: TestUser = { id: 11, role: "employee", name: "Asha Raiser", email: "asha@co.test", employeeId: 11 };
 
     // getEmployeeForUser
-    queueSelect(hrmsUsersTable, [{ employeeId: 11 }]);
-    queueSelect(employeesTable, [{ id: 11 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ employeeId: 11 }]);
+    queueSelect(dbState, employeesTable, [{ id: 11 }]);
     // autoAssignForCategory("IT"): tries super_admin first → hit
-    queueSelect(hrmsUsersTable, [{ id: 7 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ id: 7 }]);
     // assignee lookup for notification
-    queueSelect(hrmsUsersTable, [{ email: "agent@co.test", name: "Agent Smith", employeeId: 70 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "agent@co.test", name: "Agent Smith", employeeId: 70 }]);
     // enrichTicket — raisedBy lookup
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser" }]);
     // enrichTicket — assignedTo lookup
-    queueSelect(hrmsUsersTable, [{ name: "Agent Smith" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ name: "Agent Smith" }]);
 
     // HR broadcast: include the assignee (id:7 — should be skipped) and a separate HR user
     systemConfigState.hrUsers = [
@@ -230,7 +78,7 @@ describe("POST /helpdesk/tickets — ticket created", () => {
       { id: 8, email: "hr-lead@co.test", name: "HR Lead", employeeId: 80 },
     ];
 
-    const res = await fetch(`${baseUrl}/helpdesk/tickets`, {
+    const res = await fetch(`${server.baseUrl}/helpdesk/tickets`, {
       method: "POST",
       headers: userHeader(employee),
       body: JSON.stringify({
@@ -274,7 +122,7 @@ describe("PUT /helpdesk/tickets/:id — status & assignment changes", () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
     // checkTicketAccess: select ticket
-    queueSelect(helpdeskTicketsTable, [{
+    queueSelect(dbState, helpdeskTicketsTable, [{
       id: 5,
       subject: "Need access",
       status: "Open",
@@ -289,12 +137,12 @@ describe("PUT /helpdesk/tickets/:id — status & assignment changes", () => {
       priority: "High",
     }]);
     // raiser lookup
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser", employeeId: 22 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser", employeeId: 22 }]);
     // enrichTicket — raisedBy + assignedTo
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser" }]);
-    queueSelect(hrmsUsersTable, [{ name: "HR Lead" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ name: "HR Lead" }]);
 
-    const res = await fetch(`${baseUrl}/helpdesk/tickets/5`, {
+    const res = await fetch(`${server.baseUrl}/helpdesk/tickets/5`, {
       method: "PUT",
       headers: userHeader(hr),
       body: JSON.stringify({ status: "Resolved" }),
@@ -312,7 +160,7 @@ describe("PUT /helpdesk/tickets/:id — status & assignment changes", () => {
   it("notifies the new assignee when assignment changes", async () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
-    queueSelect(helpdeskTicketsTable, [{
+    queueSelect(dbState, helpdeskTicketsTable, [{
       id: 5,
       subject: "VPN broken",
       status: "Open",
@@ -327,12 +175,12 @@ describe("PUT /helpdesk/tickets/:id — status & assignment changes", () => {
       priority: "Medium",
     }]);
     // new assignee lookup
-    queueSelect(hrmsUsersTable, [{ email: "newagent@co.test", name: "New Agent", employeeId: 90 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "newagent@co.test", name: "New Agent", employeeId: 90 }]);
     // enrichTicket
-    queueSelect(employeesTable, [{ firstName: "Asha", lastName: "Raiser" }]);
-    queueSelect(hrmsUsersTable, [{ name: "New Agent" }]);
+    queueSelect(dbState, employeesTable, [{ firstName: "Asha", lastName: "Raiser" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ name: "New Agent" }]);
 
-    const res = await fetch(`${baseUrl}/helpdesk/tickets/5`, {
+    const res = await fetch(`${server.baseUrl}/helpdesk/tickets/5`, {
       method: "PUT",
       headers: userHeader(hr),
       body: JSON.stringify({ assignedToUserId: 12 }),
@@ -352,7 +200,7 @@ describe("POST /helpdesk/tickets/:id/comments — comment added", () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
     // checkTicketAccess
-    queueSelect(helpdeskTicketsTable, [{
+    queueSelect(dbState, helpdeskTicketsTable, [{
       id: 5,
       subject: "Need access",
       status: "Open",
@@ -367,13 +215,13 @@ describe("POST /helpdesk/tickets/:id/comments — comment added", () => {
       priority: "Medium",
     }]);
     // author name lookup
-    queueSelect(hrmsUsersTable, [{ name: "HR Lead" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ name: "HR Lead" }]);
     // raiser lookup (by employeeId)
-    queueSelect(hrmsUsersTable, [{ id: 22, email: "asha@co.test", name: "Asha Raiser", employeeId: 22 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ id: 22, email: "asha@co.test", name: "Asha Raiser", employeeId: 22 }]);
     // assignee lookup (by user id)
-    queueSelect(hrmsUsersTable, [{ email: "agent@co.test", name: "Agent Smith", employeeId: 90 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "agent@co.test", name: "Agent Smith", employeeId: 90 }]);
 
-    const res = await fetch(`${baseUrl}/helpdesk/tickets/5/comments`, {
+    const res = await fetch(`${server.baseUrl}/helpdesk/tickets/5/comments`, {
       method: "POST",
       headers: userHeader(hr),
       body: JSON.stringify({ message: "Investigating now.", isInternal: false }),
@@ -393,7 +241,7 @@ describe("POST /helpdesk/tickets/:id/comments — comment added", () => {
   it("does not notify anyone for an internal-only comment", async () => {
     const hr: TestUser = { id: 7, role: "hr_manager", name: "HR Lead" };
 
-    queueSelect(helpdeskTicketsTable, [{
+    queueSelect(dbState, helpdeskTicketsTable, [{
       id: 5,
       subject: "Internal note",
       status: "Open",
@@ -407,9 +255,9 @@ describe("POST /helpdesk/tickets/:id/comments — comment added", () => {
       category: "IT",
       priority: "Low",
     }]);
-    queueSelect(hrmsUsersTable, [{ name: "HR Lead" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ name: "HR Lead" }]);
 
-    const res = await fetch(`${baseUrl}/helpdesk/tickets/5/comments`, {
+    const res = await fetch(`${server.baseUrl}/helpdesk/tickets/5/comments`, {
       method: "POST",
       headers: userHeader(hr),
       body: JSON.stringify({ message: "FYI for the team only.", isInternal: true }),
@@ -439,18 +287,18 @@ describe("POST /helpdesk/sla-check — SLA breach escalation", () => {
     };
 
     // Initial overdue list
-    queueSelect(helpdeskTicketsTable, [overdue]);
+    queueSelect(dbState, helpdeskTicketsTable, [overdue]);
     // escalateSlaBreach: HR/SA/HOD users
-    queueSelect(hrmsUsersTable, [
+    queueSelect(dbState, hrmsUsersTable, [
       { id: 7, email: "hr@co.test", name: "HR Lead", employeeId: 70 },
       { id: 8, email: "sa@co.test", name: "Super Admin", employeeId: 80 },
     ]);
     // assignee lookup (user id 9, not already in HR list)
-    queueSelect(hrmsUsersTable, [
+    queueSelect(dbState, hrmsUsersTable, [
       { id: 9, email: "agent@co.test", name: "Agent Smith", employeeId: 90 },
     ]);
 
-    const res = await fetch(`${baseUrl}/helpdesk/sla-check`, {
+    const res = await fetch(`${server.baseUrl}/helpdesk/sla-check`, {
       method: "POST",
       headers: userHeader(hr),
       body: JSON.stringify({}),

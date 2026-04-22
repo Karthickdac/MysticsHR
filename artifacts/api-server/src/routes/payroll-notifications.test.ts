@@ -17,117 +17,31 @@
  *    linked hrmsUser email.
  *
  * Note: `form_16_available` is dispatched from `lib/scheduler.ts`, not from
- * `routes/payroll.ts`, so it's intentionally out of scope here.
+ * `routes/payroll.ts`, so it's bundled in with this file as an extension.
+ *
+ * Shared db / auth / notification / Express plumbing lives in
+ * `../test-utils/notification-test-harness.ts`.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import express, { type Request, type Response, type NextFunction } from "express";
-import http from "node:http";
-import type { AddressInfo } from "node:net";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  type TestUser, type TestServerHandle,
+  createDbMockState, buildDbMockModule, queueSelect, resetDbMockState,
+  createDispatchCapture, buildNotificationServiceMockModule, resetDispatchCapture,
+  buildAuthMockModule,
+  startTestServer, userHeader,
+  flushAsyncDeep,
+} from "../test-utils/notification-test-harness";
 
-// ─── DB MOCK (per-table FIFO queues) ────────────────────────────────────────
-type Row = Record<string, unknown>;
+const dbState = createDbMockState();
+const dispatchCalls = createDispatchCapture();
 
-type SelectChain<T> = Promise<T[]> & {
-  where: (...args: unknown[]) => SelectChain<T>;
-  orderBy: (...args: unknown[]) => SelectChain<T>;
-  limit: (...args: unknown[]) => SelectChain<T>;
-  leftJoin: (...args: unknown[]) => SelectChain<T>;
-  innerJoin: (...args: unknown[]) => SelectChain<T>;
-};
-type InsertChain<T> = Promise<void> & { returning: (...args: unknown[]) => Promise<T[]> };
-type UpdateWhereChain<T> = Promise<void> & { returning: () => Promise<T[]> };
-type UpdateChain = { set: (values: Row) => { where: (...args: unknown[]) => UpdateWhereChain<Row> } };
+vi.mock("../lib/db", () => buildDbMockModule(dbState));
+vi.mock("../lib/auth", () => buildAuthMockModule());
+vi.mock("../lib/notification-service", () => buildNotificationServiceMockModule(dispatchCalls));
 
-const dbState: {
-  selectQueues: Map<unknown, Array<Row[]>>;
-  inserted: Array<{ table: unknown; rows: Row[] }>;
-  updated: Array<{ table: unknown; values: Row }>;
-  nextId: number;
-} = { selectQueues: new Map(), inserted: [], updated: [], nextId: 100 };
-
-function queueSelect(table: unknown, rows: Row[]) {
-  const q = dbState.selectQueues.get(table) ?? [];
-  q.push(rows);
-  dbState.selectQueues.set(table, q);
-}
-function dequeueSelect(table: unknown): Row[] {
-  const q = dbState.selectQueues.get(table);
-  return q && q.length ? q.shift()! : [];
-}
-function makeSelectChain(table: unknown): SelectChain<Row> {
-  const base = Promise.resolve().then(() => dequeueSelect(table));
-  const chain = base as SelectChain<Row>;
-  chain.where = () => chain;
-  chain.orderBy = () => chain;
-  chain.limit = () => chain;
-  chain.leftJoin = () => chain;
-  chain.innerJoin = () => chain;
-  return chain;
-}
-function makeInsertChain(table: unknown, values: Row | Row[]): InsertChain<Row> {
-  const rows = Array.isArray(values) ? values : [values];
-  dbState.inserted.push({ table, rows });
-  const generated: Row[] = rows.map((r) => ({ ...r, id: dbState.nextId++, createdAt: new Date() }));
-  const base = Promise.resolve();
-  const chain = base as InsertChain<Row>;
-  chain.returning = () => Promise.resolve(generated);
-  return chain;
-}
-function makeUpdateChain(table: unknown): UpdateChain {
-  return {
-    set: (values: Row) => {
-      dbState.updated.push({ table, values });
-      const base = Promise.resolve();
-      const whereChain = base as UpdateWhereChain<Row>;
-      whereChain.returning = () => Promise.resolve([{ ...values, id: 1 }]);
-      return { where: () => whereChain };
-    },
-  };
-}
-
-vi.mock("../lib/db", () => ({
-  db: {
-    select: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
-    selectDistinct: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
-    selectDistinctOn: (_cols: unknown, _projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
-    insert: (t: unknown) => ({ values: (v: Row | Row[]) => makeInsertChain(t, v) }),
-    update: (t: unknown) => makeUpdateChain(t),
-    delete: (_t: unknown) => ({ where: async () => undefined }),
-  },
-}));
-
-// ─── AUTH MOCK ──────────────────────────────────────────────────────────────
-type TestUser = { id: number; role: string; name?: string; email?: string; employeeId?: number | null };
-type ReqWithUser = Request & { hrmsUser?: TestUser };
-
-vi.mock("../lib/auth", () => ({
-  requireHrmsUser: (req: ReqWithUser, res: Response, next: NextFunction) => {
-    const raw = req.headers["x-test-user"];
-    if (typeof raw !== "string") { res.status(401).json({ error: "no test user" }); return; }
-    req.hrmsUser = JSON.parse(raw) as TestUser;
-    next();
-  },
-  requireRole: (...roles: string[]) =>
-    (req: ReqWithUser, res: Response, next: NextFunction) => {
-      const role = req.hrmsUser?.role;
-      if (!role || !roles.includes(role)) { res.status(403).json({ error: "forbidden" }); return; }
-      next();
-    },
-}));
-
-// ─── NOTIFICATION SERVICE MOCK ──────────────────────────────────────────────
-type DispatchCall = {
-  eventType: string; module: string;
-  recipientEmail?: string; recipientName?: string;
-  variables?: Record<string, string>;
-  entityType?: string; entityId?: number;
-};
-const dispatchCalls: DispatchCall[] = [];
-vi.mock("../lib/notification-service", () => ({
-  dispatchNotification: vi.fn(async (params: DispatchCall) => { dispatchCalls.push(params); }),
-}));
-
-// ─── SYSTEM CONFIG / AUDIT MOCKS ────────────────────────────────────────────
+// system-config is payroll-specific (recipient role fan-out for `payroll_locked`).
+// We also capture the role lists the route asks for, so a future role rename
+// or scope expansion is caught by the test.
 type HrUserRow = { id: number; email: string; name: string; employeeId: number | null };
 const systemConfigState: { recipients: HrUserRow[]; roleCalls: string[][] } = { recipients: [], roleCalls: [] };
 vi.mock("./system-config", () => ({
@@ -145,42 +59,16 @@ const {
   hrmsUsersTable, employeesTable,
 } = await import("@workspace/db/schema");
 
-// ─── HTTP SERVER ────────────────────────────────────────────────────────────
-let server: http.Server;
-let baseUrl: string;
+let server: TestServerHandle;
 
 beforeEach(async () => {
-  dbState.selectQueues.clear();
-  dbState.inserted = [];
-  dbState.updated = [];
-  dbState.nextId = 100;
-  dispatchCalls.length = 0;
+  resetDbMockState(dbState);
+  resetDispatchCapture(dispatchCalls);
   systemConfigState.recipients = [];
   systemConfigState.roleCalls = [];
-
-  if (server) await new Promise<void>((r) => server.close(() => r()));
-  const app = express();
-  app.use(express.json());
-  app.use(router);
-  await new Promise<void>((resolve) => { server = app.listen(0, () => resolve()); });
-  const port = (server.address() as AddressInfo).port;
-  baseUrl = `http://127.0.0.1:${port}`;
+  server = await startTestServer(router);
 });
-
-function userHeader(u: TestUser): Record<string, string> {
-  return { "x-test-user": JSON.stringify(u), "content-type": "application/json" };
-}
-
-// Several payroll dispatches happen inside `void import(...).then(...)`
-// chains. Yield the event loop a few times so the dynamic-import promise
-// settles and the queued dispatches run before assertions.
-async function flushAsync(times = 5) {
-  for (let i = 0; i < times; i++) await new Promise((r) => setImmediate(r));
-}
-async function flushAsyncDeep() {
-  await new Promise((r) => setTimeout(r, 100));
-  await flushAsync(5);
-}
+afterEach(async () => { await server.close(); });
 
 // ─── TESTS ──────────────────────────────────────────────────────────────────
 
@@ -189,7 +77,7 @@ describe("POST /payroll/locks/:year/:month/lock — payroll_locked", () => {
     const admin: TestUser = { id: 7, role: "payroll_admin", name: "Payroll Admin" };
 
     // existing lock check — none, so insert path
-    queueSelect(payrollLocksTable, []);
+    queueSelect(dbState, payrollLocksTable, []);
 
     systemConfigState.recipients = [
       { id: 1, email: "sa@co.test", name: "Super Admin", employeeId: null },
@@ -197,7 +85,7 @@ describe("POST /payroll/locks/:year/:month/lock — payroll_locked", () => {
       { id: 3, email: "pa@co.test", name: "Payroll Admin", employeeId: 80 },
     ];
 
-    const res = await fetch(`${baseUrl}/payroll/locks/2025/3/lock`, {
+    const res = await fetch(`${server.baseUrl}/payroll/locks/2025/3/lock`, {
       method: "POST", headers: userHeader(admin), body: JSON.stringify({}),
     });
     expect(res.status).toBe(200);
@@ -225,11 +113,11 @@ describe("POST /payroll/runs/:id/approve — payslip_published", () => {
     const admin: TestUser = { id: 7, role: "payroll_admin", name: "Payroll Admin" };
 
     // Run lookup
-    queueSelect(payrollRunsTable, [{
+    queueSelect(dbState, payrollRunsTable, [{
       id: 50, status: "Computed", periodYear: 2025, periodMonth: 3,
     }]);
     // After the two updates, records-in-run lookup
-    queueSelect(payrollRecordsTable, [
+    queueSelect(dbState, payrollRecordsTable, [
       // record for emp 11 — has user + email
       {
         id: 100, employeeId: 11, basic: "30000", hra: "10000", specialAllowance: "0",
@@ -256,30 +144,30 @@ describe("POST /payroll/runs/:id/approve — payslip_published", () => {
 
     // Per-record loop: employees + dept + designation + payslip insert/check
     // Record 100 (emp 11)
-    queueSelect(employeesTable, [{ id: 11, firstName: "Asha", lastName: "Raiser", employeeId: "E11", departmentId: 3, designationId: 5 }]);
+    queueSelect(dbState, employeesTable, [{ id: 11, firstName: "Asha", lastName: "Raiser", employeeId: "E11", departmentId: 3, designationId: 5 }]);
     // dept lookup (departmentId is set, so the conditional ternary fires)
     // The route does: emp?.departmentId ? db.select(...).from(departmentsTable)... : [null]
     // — that's a real select, so we queue it.
-    queueSelect(await (async () => (await import("@workspace/db/schema")).departmentsTable)(), [{ name: "Engineering" }]);
-    queueSelect(await (async () => (await import("@workspace/db/schema")).designationsTable)(), [{ name: "Engineer" }]);
+    queueSelect(dbState, await (async () => (await import("@workspace/db/schema")).departmentsTable)(), [{ name: "Engineering" }]);
+    queueSelect(dbState, await (async () => (await import("@workspace/db/schema")).designationsTable)(), [{ name: "Engineer" }]);
     // existingSlip check
-    queueSelect(payslipsTable, []);
+    queueSelect(dbState, payslipsTable, []);
 
     // Record 101 (emp 12)
-    queueSelect(employeesTable, [{ id: 12, firstName: "Bob", lastName: "Singh", employeeId: "E12", departmentId: 3, designationId: 5 }]);
-    queueSelect(await (async () => (await import("@workspace/db/schema")).departmentsTable)(), [{ name: "Engineering" }]);
-    queueSelect(await (async () => (await import("@workspace/db/schema")).designationsTable)(), [{ name: "Engineer" }]);
-    queueSelect(payslipsTable, []);
+    queueSelect(dbState, employeesTable, [{ id: 12, firstName: "Bob", lastName: "Singh", employeeId: "E12", departmentId: 3, designationId: 5 }]);
+    queueSelect(dbState, await (async () => (await import("@workspace/db/schema")).departmentsTable)(), [{ name: "Engineering" }]);
+    queueSelect(dbState, await (async () => (await import("@workspace/db/schema")).designationsTable)(), [{ name: "Engineer" }]);
+    queueSelect(dbState, payslipsTable, []);
 
     // Notification block (per-record async loop): hrmsUser + payslip lookups
     // Emp 11 — has email
-    queueSelect(hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
-    queueSelect(payslipsTable, [{ id: 900 }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: "asha@co.test", name: "Asha Raiser" }]);
+    queueSelect(dbState, payslipsTable, [{ id: 900 }]);
     // Emp 12 — no email → second query returns nothing → dispatch skipped
-    queueSelect(hrmsUsersTable, [{ email: null, name: "Bob Singh" }]);
+    queueSelect(dbState, hrmsUsersTable, [{ email: null, name: "Bob Singh" }]);
     // (no payslip lookup for emp 12 since route returns early)
 
-    const res = await fetch(`${baseUrl}/payroll/runs/50/approve`, {
+    const res = await fetch(`${server.baseUrl}/payroll/runs/50/approve`, {
       method: "POST", headers: userHeader(admin), body: JSON.stringify({}),
     });
     expect(res.status).toBe(200);
@@ -300,22 +188,22 @@ describe("POST /payroll/runs/:id/compute — payroll_run_pending_approval", () =
     const admin: TestUser = { id: 7, role: "payroll_admin", name: "Payroll Admin" };
 
     // Run lookup — must be Draft or Computed for the compute path to run
-    queueSelect(payrollRunsTable, [{
+    queueSelect(dbState, payrollRunsTable, [{
       id: 60, status: "Draft", periodYear: 2025, periodMonth: 1,
     }]);
     // No employees → records=[], totals stay at 0; this lets us isolate the
     // notification block without simulating the entire compute pipeline.
-    queueSelect(employeesTable, []);
+    queueSelect(dbState, employeesTable, []);
 
     // Notification block: approver lookup
-    queueSelect(hrmsUsersTable, [
+    queueSelect(dbState, hrmsUsersTable, [
       { email: "sa@co.test", name: "Super Admin", id: 1 },
       { email: "pa@co.test", name: "Payroll Admin", id: 7 },
       // user without email — must be skipped by the route's `if (!a.email) return;`
       { email: null, name: "No Email", id: 99 },
     ]);
 
-    const res = await fetch(`${baseUrl}/payroll/runs/60/compute`, {
+    const res = await fetch(`${server.baseUrl}/payroll/runs/60/compute`, {
       method: "POST", headers: userHeader(admin), body: JSON.stringify({}),
     });
     expect(res.status).toBe(200);
@@ -343,7 +231,7 @@ describe("scheduler.dispatchForm16ForFy — form_16_available", () => {
     const { notificationLogsTable } = await import("@workspace/db/schema");
 
     // Step 1 — recipients (single big joined select on employeesTable).
-    queueSelect(employeesTable, [
+    queueSelect(dbState, employeesTable, [
       { id: 11, firstName: "Asha", lastName: "Raiser", email: "asha@co.test" },
       // Already sent for FY 2024 — must be skipped via dedup
       { id: 12, firstName: "Bob",  lastName: "Singh",  email: "bob@co.test" },
@@ -351,7 +239,7 @@ describe("scheduler.dispatchForm16ForFy — form_16_available", () => {
       { id: 13, firstName: "Cara", lastName: "Khan",   email: null },
     ]);
     // Step 2 — already-sent log lookup; record for emp 12 only.
-    queueSelect(notificationLogsTable, [{ entityId: 12 }]);
+    queueSelect(dbState, notificationLogsTable, [{ entityId: 12 }]);
 
     const result = await dispatchForm16ForFy(2024);
     await flushAsyncDeep();
@@ -373,7 +261,7 @@ describe("scheduler.dispatchForm16ForFy — form_16_available", () => {
 
   it("returns zeros and dispatches nothing when no eligible employees exist", async () => {
     const { dispatchForm16ForFy } = await import("../lib/scheduler");
-    queueSelect(employeesTable, []);
+    queueSelect(dbState, employeesTable, []);
     const result = await dispatchForm16ForFy(2024);
     await flushAsyncDeep();
     expect(result).toEqual({ eligible: 0, sent: 0, skipped: 0 });
