@@ -22,6 +22,8 @@ import {
   BarChart3,
   Bell,
   Network,
+  LifeBuoy,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
