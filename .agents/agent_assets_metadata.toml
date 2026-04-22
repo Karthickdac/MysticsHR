@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "i9YN6SGyULchjwnuIdBp6"
+uri = "file://docs/DEMO.md"
+type = "text"
+title = "MysticsHR Demo Documentation"

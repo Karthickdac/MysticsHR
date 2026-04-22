@@ -47,9 +47,12 @@ function KPICard({ title, value, icon: Icon, sub, loading }: { title: string; va
 
 export default function DashboardPage() {
   const { data: kpis, isLoading: kpisLoading } = useGetDashboardKpis();
-  const { data: activity } = useGetDashboardRecentActivity({ limit: 8 });
-  const { data: headcount } = useGetDashboardHeadcountByDepartment();
-  const { data: statusBreakdown } = useGetDashboardEmployeeStatusBreakdown();
+  const { data: activityRaw } = useGetDashboardRecentActivity({ limit: 8 });
+  const activity = Array.isArray(activityRaw) ? activityRaw : [];
+  const { data: headcountRaw } = useGetDashboardHeadcountByDepartment();
+  const headcount = Array.isArray(headcountRaw) ? headcountRaw : [];
+  const { data: statusBreakdownRaw } = useGetDashboardEmployeeStatusBreakdown();
+  const statusBreakdown = Array.isArray(statusBreakdownRaw) ? statusBreakdownRaw : [];
   const { hrmsUser } = useCurrentHrmsUser();
   const showClockWidget = !!hrmsUser?.employeeId;
 

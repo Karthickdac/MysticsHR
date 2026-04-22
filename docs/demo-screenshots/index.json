@@ -1,0 +1,275 @@
+[
+  {
+    "role": "super_admin",
+    "path": "/dashboard",
+    "file": "01-dashboard.png",
+    "caption": "HR Manager dashboard with KPIs and recent activity",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/employees",
+    "file": "02-employees-list.png",
+    "caption": "Employee directory",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/employees/new",
+    "file": "03-employees-new.png",
+    "caption": "New employee creation form",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/departments",
+    "file": "04-departments.png",
+    "caption": "Departments management",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/designations",
+    "file": "05-designations.png",
+    "caption": "Designations management",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/org-chart",
+    "file": "06-org-chart.png",
+    "caption": "Organisation chart",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/onboarding",
+    "file": "07-onboarding-list.png",
+    "caption": "Onboarding pipeline",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/pre-onboarding",
+    "file": "08-pre-onboarding.png",
+    "caption": "Pre-onboarding queue",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/recruitment",
+    "file": "09-recruitment.png",
+    "caption": "Recruitment requisitions and candidates",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/my-attendance",
+    "file": "10-my-attendance.png",
+    "caption": "Employee self-service attendance with clock in/out",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/attendance/summary",
+    "file": "11-attendance-summary.png",
+    "caption": "Attendance summary across employees",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/attendance/regularization",
+    "file": "12-attendance-regularization.png",
+    "caption": "Attendance regularization requests",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/shifts",
+    "file": "13-shifts.png",
+    "caption": "Shift templates and assignments",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/shifts/calendar",
+    "file": "14-shifts-calendar.png",
+    "caption": "Shift calendar view",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/leave",
+    "file": "15-leave-employee.png",
+    "caption": "Employee leave balances and applications",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/leave/approvals",
+    "file": "16-leave-approvals.png",
+    "caption": "Leave approvals queue",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/leave/calendar",
+    "file": "17-leave-calendar.png",
+    "caption": "Team leave calendar",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/leave/types",
+    "file": "18-leave-types.png",
+    "caption": "Leave types configuration",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/leave/policies",
+    "file": "19-leave-policies.png",
+    "caption": "Leave policies",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/payroll",
+    "file": "20-payroll-runs.png",
+    "caption": "Payroll runs (locked + draft)",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/payroll/salary-structures",
+    "file": "21-payroll-salary-structures.png",
+    "caption": "Salary structures and components",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/payroll/payslips",
+    "file": "22-payroll-payslips.png",
+    "caption": "Generated payslips",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/payroll/reports",
+    "file": "23-payroll-reports.png",
+    "caption": "Payroll reports",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/payroll/tax-declaration",
+    "file": "24-payroll-tax-declaration.png",
+    "caption": "Employee tax declarations",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/performance",
+    "file": "25-performance.png",
+    "caption": "Active performance cycles",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/performance/goals",
+    "file": "26-performance-goals.png",
+    "caption": "Goals across the org",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/performance/appraisals",
+    "file": "27-performance-appraisals.png",
+    "caption": "Self-appraisal and manager evaluation status",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/performance/calibration",
+    "file": "28-performance-calibration.png",
+    "caption": "Rating calibration",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/helpdesk",
+    "file": "29-helpdesk-list.png",
+    "caption": "Helpdesk tickets across all statuses",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/helpdesk/sla-report",
+    "file": "30-helpdesk-sla.png",
+    "caption": "SLA compliance report",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/documents",
+    "file": "31-documents.png",
+    "caption": "Document templates and issued documents",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/communications",
+    "file": "32-communications.png",
+    "caption": "Communications and notifications hub",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/analytics",
+    "file": "33-analytics.png",
+    "caption": "Analytics dashboard",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/reports",
+    "file": "34-reports.png",
+    "caption": "Reports library",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/audit-logs",
+    "file": "35-audit-logs.png",
+    "caption": "Audit trail",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/users",
+    "file": "36-users.png",
+    "caption": "User & role management",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/permissions",
+    "file": "37-permissions.png",
+    "caption": "Role permissions matrix",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/settings",
+    "file": "38-settings.png",
+    "caption": "System configuration",
+    "ok": true
+  },
+  {
+    "role": "super_admin",
+    "path": "/ess",
+    "file": "39-ess.png",
+    "caption": "Employee self-service hub",
+    "ok": true
+  }
+]
