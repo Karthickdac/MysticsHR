@@ -461,6 +461,14 @@ router.put("/documents/requests/:id", requireHrmsUser, requireRole(...HR_ROLES),
     const { status, hrNote, issuedDocumentId } = req.body;
     if (!status) { res.status(400).json({ error: "status is required" }); return; }
 
+    // Capture pre-update status so we only fire terminal-status notifications
+    // on an actual transition (prevents duplicate emails/log rows when HR
+    // re-saves a request that's already Fulfilled/Cancelled).
+    const [existing] = await db.select({ status: documentRequestsTable.status })
+      .from(documentRequestsTable).where(eq(documentRequestsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Document request not found" }); return; }
+    const previousStatus = existing.status;
+
     const updates: Partial<typeof documentRequestsTable.$inferInsert> = {
       status,
       updatedAt: new Date(),
@@ -478,18 +486,39 @@ router.put("/documents/requests/:id", requireHrmsUser, requireRole(...HR_ROLES),
 
     await logAudit({ user: u, action: `document_request_${status.toLowerCase()}`, module: "documents", recordId: id });
 
-    // Notify employee
-    const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
-      .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, updated.employeeId)).limit(1);
-    if (empUser?.email) {
-      dispatchNotification({
-        eventType: status === "Fulfilled" ? "document_request_fulfilled" : "document_request_cancelled",
-        module: "documents",
-        recipientEmail: empUser.email, recipientName: empUser.name ?? undefined,
-        recipientEmployeeDbId: updated.employeeId,
-        variables: { documentType: updated.documentType, hrNote: hrNote ?? "", recipientName: empUser.name ?? "Team Member" },
-        entityType: "document_request", entityId: updated.id,
-      }).catch(() => {});
+    // Notify employee only on a real transition into a terminal status
+    // (Fulfilled / Cancelled). Skipping when status is unchanged prevents
+    // duplicate emails/log rows if HR re-saves the same request.
+    // Per-employee notification preferences are applied inside
+    // dispatchNotification, and a row is written to notification_logs.
+    const isTerminalTransition =
+      (status === "Fulfilled" || status === "Cancelled") && previousStatus !== status;
+    if (isTerminalTransition) {
+      const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, updated.employeeId)).limit(1);
+      if (empUser?.email) {
+        const appBase = process.env.APP_URL
+          ?? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "");
+        const deepLink = appBase ? `${appBase.replace(/\/$/, "")}/documents` : "";
+        const requestDate = updated.createdAt
+          ? new Date(updated.createdAt).toLocaleDateString("en-IN")
+          : "";
+        dispatchNotification({
+          eventType: status === "Fulfilled" ? "document_request_fulfilled" : "document_request_cancelled",
+          module: "documents",
+          recipientEmail: empUser.email, recipientName: empUser.name ?? undefined,
+          recipientEmployeeDbId: updated.employeeId,
+          variables: {
+            documentType: updated.documentType,
+            hrNote: hrNote ?? "",
+            requestDate,
+            deepLink,
+            recipientName: empUser.name ?? "Team Member",
+          },
+          entityType: "document_request", entityId: updated.id,
+          channels: ["email"],
+        }).catch(() => {});
+      }
     }
 
     res.json(updated);
