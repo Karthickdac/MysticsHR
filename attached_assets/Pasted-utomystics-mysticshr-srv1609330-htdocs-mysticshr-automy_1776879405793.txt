@@ -1,0 +1,32 @@
+utomystics-mysticshr@srv1609330:~/htdocs/mysticshr.automystics.tech$ cd ~/htdocs/mysticshr.automystics.tech
+git pull
+set -a; source .env; set +a
+pnpm --filter @workspace/api-server exec tsx scripts/seed-clerk-users.ts
+remote: Enumerating objects: 36, done.
+remote: Counting objects: 100% (36/36), done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 30 (delta 20), reused 30 (delta 20), pack-reused 0 (from 0)
+Unpacking objects: 100% (30/30), 103.96 KiB | 1.32 MiB/s, done.
+From https://github.com/Karthickdac/MysticsHR
+   083b1fc..f8b1947  main       -> origin/main
+Updating 083b1fc..f8b1947
+Fast-forward
+ artifacts/api-server/scripts/seed-clerk-users.ts                                                 |  19 +++++++++++++++
+ attached_assets/Pasted--Is-there-a-backup-ls-la-backups-2-dev-null-ls-la-head-_1776878568948.txt |  47 +++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted--Last-login-Wed-Apr-22-16-32-28-2026-from-169-254-0-1-r_1776878447487.txt |  78 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted-0-mysticsh-node-internal-modules-cjs-loader-1386-0-myst_1776879167623.txt |  85 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted-HTTP-1-1-404-Not-Found-X-Powered-By-Express-Vary-Origin_1776878297187.txt |  46 ++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted-automystics-mysticshr-srv1609330-htdocs-mysticshr-autom_1776878169317.txt |  74 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/image_1776876991977.png                                                          | Bin 0 -> 106439 bytes
+ 7 files changed, 349 insertions(+)
+ create mode 100644 attached_assets/Pasted--Is-there-a-backup-ls-la-backups-2-dev-null-ls-la-head-_1776878568948.txt
+ create mode 100644 attached_assets/Pasted--Last-login-Wed-Apr-22-16-32-28-2026-from-169-254-0-1-r_1776878447487.txt
+ create mode 100644 attached_assets/Pasted-0-mysticsh-node-internal-modules-cjs-loader-1386-0-myst_1776879167623.txt
+ create mode 100644 attached_assets/Pasted-HTTP-1-1-404-Not-Found-X-Powered-By-Express-Vary-Origin_1776878297187.txt
+ create mode 100644 attached_assets/Pasted-automystics-mysticshr-srv1609330-htdocs-mysticshr-autom_1776878169317.txt
+ create mode 100644 attached_assets/image_1776876991977.png
+/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "tsx" not found
+
+Did you mean "pnpm exec tsc"?
+automystics-mysticshr@srv1609330:~/htdocs/mysticshr.automystics.tech$ 
