@@ -88,6 +88,8 @@ function makeUpdateChain(table: unknown): UpdateChain {
 vi.mock("../lib/db", () => ({
   db: {
     select: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
+    selectDistinct: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
+    selectDistinctOn: (_cols: unknown, _projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
     insert: (t: unknown) => ({ values: (v: Row | Row[]) => makeInsertChain(t, v) }),
     update: (t: unknown) => makeUpdateChain(t),
     delete: (_t: unknown) => ({ where: async () => undefined }),
@@ -331,5 +333,50 @@ describe("POST /payroll/runs/:id/compute — payroll_run_pending_approval", () =
       expect(c.entityType).toBe("payroll_run");
       expect(c.entityId).toBe(60);
     }
+  });
+});
+
+// ─── SCHEDULER: annual Form 16 dispatch ─────────────────────────────────────
+describe("scheduler.dispatchForm16ForFy — form_16_available", () => {
+  it("emails every eligible employee, skips those already-sent and those without an email", async () => {
+    const { dispatchForm16ForFy } = await import("../lib/scheduler");
+    const { notificationLogsTable } = await import("@workspace/db/schema");
+
+    // Step 1 — recipients (single big joined select on employeesTable).
+    queueSelect(employeesTable, [
+      { id: 11, firstName: "Asha", lastName: "Raiser", email: "asha@co.test" },
+      // Already sent for FY 2024 — must be skipped via dedup
+      { id: 12, firstName: "Bob",  lastName: "Singh",  email: "bob@co.test" },
+      // No email — must be skipped
+      { id: 13, firstName: "Cara", lastName: "Khan",   email: null },
+    ]);
+    // Step 2 — already-sent log lookup; record for emp 12 only.
+    queueSelect(notificationLogsTable, [{ entityId: 12 }]);
+
+    const result = await dispatchForm16ForFy(2024);
+    await flushAsyncDeep();
+
+    expect(result.eligible).toBe(3);
+    expect(result.skipped).toBe(2);
+
+    const calls = dispatchCalls.filter((c) => c.eventType === "form_16_available");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].recipientEmail).toBe("asha@co.test");
+    expect(calls[0].module).toBe("payroll");
+    expect(calls[0].entityType).toBe("form_16_fy_2024");
+    expect(calls[0].entityId).toBe(11);
+    expect(calls[0].variables?.financialYear).toBe("2024-25");
+    expect(calls[0].variables?.recipientName).toBe("Asha Raiser");
+    expect(calls[0].variables?.form16Url).toContain("/payroll/reports/form-16/11/2024/pdf");
+    expect(calls[0].channels).toEqual(["email"]);
+  });
+
+  it("returns zeros and dispatches nothing when no eligible employees exist", async () => {
+    const { dispatchForm16ForFy } = await import("../lib/scheduler");
+    queueSelect(employeesTable, []);
+    const result = await dispatchForm16ForFy(2024);
+    await flushAsyncDeep();
+    expect(result).toEqual({ eligible: 0, sent: 0, skipped: 0 });
+    expect(dispatchCalls).toHaveLength(0);
   });
 });

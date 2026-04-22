@@ -81,6 +81,8 @@ function makeUpdateChain(table: unknown): UpdateChain {
 vi.mock("../lib/db", () => ({
   db: {
     select: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
+    selectDistinct: (_projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
+    selectDistinctOn: (_cols: unknown, _projection?: unknown) => ({ from: (t: unknown) => makeSelectChain(t) }),
     insert: (t: unknown) => ({ values: (v: Row | Row[]) => makeInsertChain(t, v) }),
     update: (t: unknown) => makeUpdateChain(t),
     delete: (_t: unknown) => ({ where: async () => undefined }),
@@ -197,6 +199,56 @@ describe("POST /employees/:id/onboarding-checklist/welcome-email — onboarding_
       method: "POST", headers: userHeader(hr), body: JSON.stringify({}),
     });
     expect(res.status).toBe(200);
+    await flushAsyncDeep();
+
+    expect(dispatchCalls).toHaveLength(0);
+  });
+});
+
+// ─── SCHEDULER: pre-onboarding pending document reminders ───────────────────
+describe("scheduler.remindPreOnboardingPending — onboarding_doc_pending", () => {
+  it("notifies only candidates whose pre-onboarding record has at least one pending document", async () => {
+    const { remindPreOnboardingPending } = await import("../lib/scheduler");
+    const { preOnboardingRecordsTable, preOnboardingDocumentsTable, candidatesTable } =
+      await import("@workspace/db/schema");
+
+    // Step 1 — two in-progress records with joining dates
+    queueSelect(preOnboardingRecordsTable, [
+      { id: 100, candidateId: 11, expectedJoiningDate: "2026-05-01" },
+      { id: 101, candidateId: 12, expectedJoiningDate: "2026-05-15" },
+    ]);
+    // Step 2 — only record 100 has pending docs; record 101 should be skipped.
+    queueSelect(preOnboardingDocumentsTable, [{ recordId: 100 }]);
+    // Step 3 — candidate lookup for the one record that survives the filter.
+    queueSelect(candidatesTable, [{
+      email: "asha@candidate.test", firstName: "Asha", lastName: "Raiser", phone: null,
+    }]);
+
+    await remindPreOnboardingPending();
+    await flushAsyncDeep();
+
+    const calls = dispatchCalls.filter((c) => c.eventType === "onboarding_doc_pending");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].recipientEmail).toBe("asha@candidate.test");
+    expect(calls[0].module).toBe("pre_onboarding");
+    expect(calls[0].entityType).toBe("pre_onboarding_record");
+    expect(calls[0].entityId).toBe(100);
+    expect(calls[0].variables?.joiningDate).toBe("2026-05-01");
+    expect(calls[0].variables?.recipientName).toBe("Asha Raiser");
+  });
+
+  it("does NOT dispatch when the matched candidate has no email on file", async () => {
+    const { remindPreOnboardingPending } = await import("../lib/scheduler");
+    const { preOnboardingRecordsTable, preOnboardingDocumentsTable, candidatesTable } =
+      await import("@workspace/db/schema");
+
+    queueSelect(preOnboardingRecordsTable, [
+      { id: 100, candidateId: 11, expectedJoiningDate: "2026-05-01" },
+    ]);
+    queueSelect(preOnboardingDocumentsTable, [{ recordId: 100 }]);
+    queueSelect(candidatesTable, [{ email: null, firstName: "No", lastName: "Mail", phone: null }]);
+
+    await remindPreOnboardingPending();
     await flushAsyncDeep();
 
     expect(dispatchCalls).toHaveLength(0);

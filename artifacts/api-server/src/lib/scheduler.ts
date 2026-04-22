@@ -929,7 +929,7 @@ async function alertConsecutiveAbsences() {
 }
 
 /** Pre-onboarding pending document reminders — notify candidates who have actual pending documents */
-async function remindPreOnboardingPending() {
+export async function remindPreOnboardingPending() {
   try {
     const { dispatchNotification } = await import("../lib/notification-service");
     const { candidatesTable } = await import("@workspace/db/schema");
