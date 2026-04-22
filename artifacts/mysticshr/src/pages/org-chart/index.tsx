@@ -300,25 +300,16 @@ export default function OrgChartPage() {
     if (!chartRef.current || exporting) return;
     setExporting(kind);
     try {
-      // Force-expand everything in the rendered DOM before snapshotting so
-      // the export reflects the full visible structure, not just the user's
-      // current click-state. We then restore the prior expansion below.
-      const previousExpanded = expandedIds;
-      setExpandedIds(collectIds([...roots, ...orphans, ...cycles]));
-      // Wait one paint so React commits the expansion before capture.
+      // Wait for the export footer (rendered conditionally on `exporting`)
+      // to commit to the DOM before we snapshot.
       await new Promise<void>((r) => requestAnimationFrame(() => r()));
       await new Promise<void>((r) => requestAnimationFrame(() => r()));
-      try {
-        if (kind === "png") {
-          await exportOrgChartPng(chartRef.current, exportScope);
-        } else {
-          await exportOrgChartPdf(chartRef.current, exportScope);
-        }
-        toast.success(kind === "png" ? "Org chart PNG downloaded" : "Org chart PDF downloaded");
-      } finally {
-        // Restore prior expansion regardless of success/failure.
-        setExpandedIds(previousExpanded);
+      if (kind === "png") {
+        await exportOrgChartPng(chartRef.current, exportScope);
+      } else {
+        await exportOrgChartPdf(chartRef.current, exportScope);
       }
+      toast.success(kind === "png" ? "Org chart PNG downloaded" : "Org chart PDF downloaded");
     } catch (err) {
       console.error("[org-chart export]", err);
       toast.error(`Failed to export org chart as ${kind.toUpperCase()}`);
@@ -326,6 +317,11 @@ export default function OrgChartPage() {
       setExporting(null);
     }
   };
+
+  const exportDateLabel = useMemo(
+    () => new Date().toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" }),
+    [exporting], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -459,6 +455,19 @@ export default function OrgChartPage() {
                   />
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Export-only footer: rendered into the snapshot region while an
+              export is in progress so the PNG and PDF outputs always carry
+              the company name and export date. */}
+          {exporting !== null && (
+            <div
+              data-testid="org-chart-export-footer"
+              className="mt-6 pt-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between"
+            >
+              <span>Automystics Technologies — Organization Chart</span>
+              <span>Exported on {exportDateLabel}</span>
             </div>
           )}
           </div>
