@@ -54,6 +54,68 @@ export const NOTIFICATION_EVENT_TYPES: ReadonlyArray<{
 /** Set of all known event types — fast O(1) lookup. */
 export const NOTIFICATION_EVENT_TYPE_SET: ReadonlySet<string> = new Set(NOTIFICATION_EVENT_TYPES.map((e) => e.eventType));
 
+/** Storage location for company-wide notification preference defaults that
+ * seed each new joiner's `notification_preferences` rows. Persisted as a
+ * single JSONB blob (one row in `system_settings`) keyed by event type. */
+export const NOTIFICATION_DEFAULTS_CATEGORY = "notification_defaults";
+export const NOTIFICATION_DEFAULTS_KEY = "all";
+
+export type NotificationDefaultsMap = Record<string, { emailEnabled: boolean; whatsappEnabled: boolean }>;
+
+/**
+ * Read the company-wide defaults map from `system_settings`. Returns an empty
+ * map when nothing has been configured yet — callers should fall back to the
+ * historical hard-coded "everything on" behavior in that case.
+ */
+export async function getNotificationDefaults(): Promise<NotificationDefaultsMap> {
+  const [row] = await db.select().from(systemSettingsTable)
+    .where(and(
+      eq(systemSettingsTable.category, NOTIFICATION_DEFAULTS_CATEGORY),
+      eq(systemSettingsTable.key, NOTIFICATION_DEFAULTS_KEY),
+    ))
+    .limit(1);
+  if (!row || !row.value || typeof row.value !== "object" || Array.isArray(row.value)) return {};
+  const out: NotificationDefaultsMap = {};
+  for (const [k, v] of Object.entries(row.value as Record<string, unknown>)) {
+    if (!NOTIFICATION_EVENT_TYPE_SET.has(k)) continue;
+    if (!v || typeof v !== "object") continue;
+    const obj = v as Record<string, unknown>;
+    out[k] = {
+      emailEnabled: obj["emailEnabled"] !== false,
+      whatsappEnabled: obj["whatsappEnabled"] !== false,
+    };
+  }
+  return out;
+}
+
+/**
+ * Seed the per-event `notification_preferences` rows for a freshly created
+ * employee. Uses the company-wide defaults if any have been configured;
+ * otherwise falls back to "everything on" (matching legacy behavior).
+ * Existing rows for the employee are left untouched (idempotent on re-run).
+ */
+export async function seedNotificationPreferencesForEmployee(employeeId: number): Promise<number> {
+  const defaults = await getNotificationDefaults();
+  const existing = await db.select({ eventType: notificationPreferencesTable.eventType })
+    .from(notificationPreferencesTable)
+    .where(eq(notificationPreferencesTable.employeeId, employeeId));
+  const have = new Set(existing.map((r) => r.eventType));
+  const rows: Array<{ employeeId: number; eventType: string; emailEnabled: boolean; whatsappEnabled: boolean }> = [];
+  for (const meta of NOTIFICATION_EVENT_TYPES) {
+    if (have.has(meta.eventType)) continue;
+    const d = defaults[meta.eventType];
+    rows.push({
+      employeeId,
+      eventType: meta.eventType,
+      emailEnabled: d ? d.emailEnabled : true,
+      whatsappEnabled: d ? d.whatsappEnabled : true,
+    });
+  }
+  if (!rows.length) return 0;
+  await db.insert(notificationPreferencesTable).values(rows);
+  return rows.length;
+}
+
 interface SendEmailOptions {
   to: string;
   toName?: string;

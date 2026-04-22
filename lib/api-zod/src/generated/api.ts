@@ -7340,6 +7340,40 @@ export const TestWhatsAppConfigResponse = zod.object({
 });
 
 /**
+ * @summary Get company-wide default notification preferences for new joiners
+ */
+export const GetNotificationDefaultsResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      eventType: zod.string(),
+      label: zod.string(),
+      description: zod.string(),
+      module: zod.string(),
+      emailEnabled: zod.boolean(),
+      whatsappEnabled: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Replace company-wide default notification preferences
+ */
+export const UpdateNotificationDefaultsBody = zod.object({
+  items: zod.array(
+    zod.object({
+      eventType: zod.string(),
+      emailEnabled: zod.boolean(),
+      whatsappEnabled: zod.boolean(),
+    }),
+  ),
+});
+
+export const UpdateNotificationDefaultsResponse = zod.object({
+  success: zod.boolean(),
+  count: zod.number(),
+});
+
+/**
  * @summary Get all settings for a category
  */
 export const GetSystemSettingsParams = zod.object({

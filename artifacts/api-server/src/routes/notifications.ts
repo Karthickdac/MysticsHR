@@ -1,9 +1,15 @@
 import { Router } from "express";
 import { db } from "../lib/db";
-import { notificationLogsTable, notificationTemplatesTable, notificationPreferencesTable } from "@workspace/db/schema";
+import { notificationLogsTable, notificationTemplatesTable, notificationPreferencesTable, systemSettingsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, ilike, or } from "drizzle-orm";
 import { requireHrmsUser, requireRole } from "../lib/auth";
-import { NOTIFICATION_EVENT_TYPES, NOTIFICATION_EVENT_TYPE_SET } from "../lib/notification-service";
+import {
+  NOTIFICATION_EVENT_TYPES,
+  NOTIFICATION_EVENT_TYPE_SET,
+  NOTIFICATION_DEFAULTS_CATEGORY,
+  NOTIFICATION_DEFAULTS_KEY,
+  getNotificationDefaults,
+} from "../lib/notification-service";
 import nodemailer from "nodemailer";
 
 const router = Router();
@@ -235,6 +241,82 @@ router.put("/my-preferences/notifications", requireHrmsUser, requireRole(...ALL_
   } catch (e) {
     console.error("[my-preferences/notifications PUT]", e);
     res.status(500).json({ error: "Failed to update notification preferences" });
+  }
+});
+
+// ─── Company-wide Default Notification Preferences (HR/Admin) ─────────────────
+
+/** GET /notification-defaults
+ * Returns the company-wide default toggles for new joiners, overlaid on the
+ * master event-type registry. Same item shape as `/my-preferences/notifications`
+ * so the admin UI can reuse the ESS list rendering. Missing entries default
+ * to "everything on" — matching the seeding fallback. */
+router.get("/notification-defaults", requireHrmsUser, requireRole(...HR_ROLES), async (_req, res) => {
+  try {
+    const defaults = await getNotificationDefaults();
+    const items = NOTIFICATION_EVENT_TYPES.map((meta) => {
+      const d = defaults[meta.eventType];
+      return {
+        eventType: meta.eventType,
+        label: meta.label,
+        description: meta.description,
+        module: meta.module,
+        emailEnabled: d ? d.emailEnabled : true,
+        whatsappEnabled: d ? d.whatsappEnabled : true,
+      };
+    });
+    res.json({ items });
+  } catch (e) {
+    console.error("[notification-defaults GET]", e);
+    res.status(500).json({ error: "Failed to load notification defaults" });
+  }
+});
+
+/** PUT /notification-defaults
+ * Body: { items: [{ eventType, emailEnabled, whatsappEnabled }, ...] }
+ * Replaces the entire defaults map. Only event types in the master registry
+ * are accepted. Existing employees are NOT affected — these defaults only
+ * seed future joiners. */
+router.put("/notification-defaults", requireHrmsUser, requireRole(...HR_ROLES), async (req, res): Promise<void> => {
+  try {
+    const body = req.body as { items?: Array<{ eventType?: string; emailEnabled?: boolean; whatsappEnabled?: boolean }> };
+    const rawItems = Array.isArray(body?.items) ? body.items : [];
+    if (rawItems.length === 0) { res.status(400).json({ error: "items[] is required" }); return; }
+
+    const map: Record<string, { emailEnabled: boolean; whatsappEnabled: boolean }> = {};
+    for (const it of rawItems) {
+      const eventType = String(it.eventType ?? "").trim();
+      if (!eventType || !NOTIFICATION_EVENT_TYPE_SET.has(eventType)) {
+        res.status(400).json({ error: `Unknown eventType: ${eventType || "(empty)"}` });
+        return;
+      }
+      map[eventType] = {
+        emailEnabled: it.emailEnabled !== false,
+        whatsappEnabled: it.whatsappEnabled !== false,
+      };
+    }
+
+    const [existing] = await db.select({ id: systemSettingsTable.id }).from(systemSettingsTable)
+      .where(and(
+        eq(systemSettingsTable.category, NOTIFICATION_DEFAULTS_CATEGORY),
+        eq(systemSettingsTable.key, NOTIFICATION_DEFAULTS_KEY),
+      ))
+      .limit(1);
+    if (existing) {
+      await db.update(systemSettingsTable)
+        .set({ value: map, updatedAt: new Date() })
+        .where(eq(systemSettingsTable.id, existing.id));
+    } else {
+      await db.insert(systemSettingsTable).values({
+        category: NOTIFICATION_DEFAULTS_CATEGORY,
+        key: NOTIFICATION_DEFAULTS_KEY,
+        value: map,
+      });
+    }
+    res.json({ success: true, count: Object.keys(map).length });
+  } catch (e) {
+    console.error("[notification-defaults PUT]", e);
+    res.status(500).json({ error: "Failed to update notification defaults" });
   }
 });
 

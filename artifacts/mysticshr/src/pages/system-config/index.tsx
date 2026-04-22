@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetSystemSettings,
   useUpdateSystemSettings,
+  useGetNotificationDefaults,
+  useUpdateNotificationDefaults,
   useListApprovalChains,
   useCreateApprovalChain,
   useUpdateApprovalChain,
@@ -1269,6 +1271,116 @@ function CredentialCategoryCard({
   );
 }
 
+// ─── Notification Defaults Tab ────────────────────────────────────────────────
+// Lets HR set company-wide ON/OFF defaults for each notification event type.
+// These seed every new joiner's `notification_preferences` rows; existing
+// employees are not affected. Mirrors the ESS preferences UI shape.
+
+type DefaultItem = {
+  eventType: string;
+  label: string;
+  description: string;
+  module: string;
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
+};
+
+function NotificationDefaultsTab() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useGetNotificationDefaults();
+  const updateMut = useUpdateNotificationDefaults();
+  const [items, setItems] = useState<DefaultItem[]>([]);
+
+  useEffect(() => {
+    const incoming = (data as { items?: DefaultItem[] } | undefined)?.items;
+    if (incoming) setItems(incoming);
+  }, [data]);
+
+  function setItem(eventType: string, patch: Partial<DefaultItem>) {
+    setItems((cur) => cur.map((it) => (it.eventType === eventType ? { ...it, ...patch } : it)));
+  }
+
+  async function save() {
+    await updateMut.mutateAsync({
+      data: {
+        items: items.map((it) => ({
+          eventType: it.eventType,
+          emailEnabled: it.emailEnabled,
+          whatsappEnabled: it.whatsappEnabled,
+        })),
+      },
+    });
+    toast({ title: "Default notification preferences saved" });
+    await queryClient.invalidateQueries({ queryKey: ["/api/notification-defaults"] });
+  }
+
+  // Group by module for a less-overwhelming layout — same grouping the ESS
+  // preferences page uses.
+  const grouped = items.reduce<Record<string, DefaultItem[]>>((acc, it) => {
+    (acc[it.module] ||= []).push(it);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Default notification preferences</CardTitle>
+          <CardDescription>
+            Toggle which channels are enabled by default for every newly created employee. Existing
+            employees are unaffected — they keep whatever they have already chosen.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {!isLoading && Object.entries(grouped).map(([module, list]) => (
+            <div key={module} className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{module}</h3>
+              <div className="border rounded-md divide-y">
+                {list.map((it) => (
+                  <div key={it.eventType} className="p-3 flex items-start gap-4" data-testid={`row-default-${it.eventType}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{it.label}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{it.description}</div>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={it.emailEnabled}
+                          onCheckedChange={(v) => setItem(it.eventType, { emailEnabled: v })}
+                          data-testid={`switch-default-email-${it.eventType}`}
+                        />
+                        <span>Email</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Switch
+                          checked={it.whatsappEnabled}
+                          onCheckedChange={(v) => setItem(it.eventType, { whatsappEnabled: v })}
+                          data-testid={`switch-default-whatsapp-${it.eventType}`}
+                        />
+                        <span>WhatsApp</span>
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div>
+            <Button
+              onClick={save}
+              disabled={updateMut.isPending || isLoading || items.length === 0}
+              data-testid="button-save-notification-defaults"
+            >
+              {updateMut.isPending ? "Saving…" : "Save defaults"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function NotificationCredentialsTab() {
   return (
     <div className="space-y-6">
@@ -1310,6 +1422,7 @@ export default function SystemConfigPage() {
             <TabsTrigger value="permissions">Role Permissions</TabsTrigger>
             <TabsTrigger value="custom-fields">Custom Fields</TabsTrigger>
             <TabsTrigger value="leave-blackouts">Leave Blackouts</TabsTrigger>
+            <TabsTrigger value="notification-defaults">Notification Defaults</TabsTrigger>
             {isSuperAdmin && <TabsTrigger value="credentials">Notification Credentials</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="storage-cleanup">Storage Cleanup</TabsTrigger>}
           </TabsList>
@@ -1323,6 +1436,7 @@ export default function SystemConfigPage() {
           <TabsContent value="permissions" className="mt-4"><RolePermissionsTab /></TabsContent>
           <TabsContent value="custom-fields" className="mt-4"><CustomEmployeeFieldsTab /></TabsContent>
           <TabsContent value="leave-blackouts" className="mt-4"><LeaveBlackoutsTab /></TabsContent>
+          <TabsContent value="notification-defaults" className="mt-4"><NotificationDefaultsTab /></TabsContent>
           {isSuperAdmin && (
             <TabsContent value="credentials" className="mt-4"><NotificationCredentialsTab /></TabsContent>
           )}

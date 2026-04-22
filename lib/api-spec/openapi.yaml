@@ -5888,6 +5888,45 @@ paths:
 
   # ─── System Settings ─────────────────────────────────────────────────────────
 
+  /notification-defaults:
+    get:
+      operationId: getNotificationDefaults
+      tags: [system-config]
+      summary: Get company-wide default notification preferences for new joiners
+      responses:
+        '200':
+          description: Default toggles for every event type
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/NotificationPreferenceItem" }
+                required: [items]
+    put:
+      operationId: updateNotificationDefaults
+      tags: [system-config]
+      summary: Replace company-wide default notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyNotificationPreferencesBody"
+      responses:
+        '200':
+          description: Update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  count: { type: integer }
+                required: [success, count]
+
   /system-settings/{category}:
     get:
       operationId: getSystemSettings

@@ -6,6 +6,7 @@ import { employeesTable, departmentsTable, designationsTable } from "@workspace/
 import { eq, isNull, and, sql, desc } from "drizzle-orm";
 import { autoCreateOnboardingChecklist } from "../lib/onboarding-utils";
 import { recordHistory } from "../lib/history-utils";
+import { seedNotificationPreferencesForEmployee } from "../lib/notification-service";
 
 const router = Router();
 
@@ -108,6 +109,16 @@ router.post(
         .returning();
 
       await logAudit({ user: req.hrmsUser, action: "CREATE", module: "Employees", recordId: emp.id, ipAddress: req.ip });
+
+      // Seed per-event notification preferences from the company-wide defaults
+      // (or "everything on" if no defaults are configured). Failure here is
+      // non-fatal — the ESS prefs page falls back to the same defaults at read
+      // time, so a missed seed only affects subsequent admin reporting.
+      try {
+        await seedNotificationPreferencesForEmployee(emp.id);
+      } catch (e) {
+        console.error("Notification preference seeding failed (non-fatal):", e);
+      }
 
       if (dateOfJoining) {
         try {

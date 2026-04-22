@@ -4434,6 +4434,15 @@ export type TestWhatsAppConfig200 = {
   message?: string;
 };
 
+export type GetNotificationDefaults200 = {
+  items: NotificationPreferenceItem[];
+};
+
+export type UpdateNotificationDefaults200 = {
+  success: boolean;
+  count: number;
+};
+
 export type GetSystemSettingsParams = {
   /**
    * When "true", returns an envelope with per-key source attribution (db vs server default).

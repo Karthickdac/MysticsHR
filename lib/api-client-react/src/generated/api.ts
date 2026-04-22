@@ -143,6 +143,7 @@ import type {
   GetLeaveUtilizationReportParams,
   GetMyActiveSalaryStructure200,
   GetMyAttendanceTodayParams,
+  GetNotificationDefaults200,
   GetOnboardingChecklistsParams,
   GetPayrollAnalytics200,
   GetPayrollAnalyticsParams,
@@ -314,6 +315,7 @@ import type {
   UpdateLoanBody,
   UpdateMyNotificationPreferences200,
   UpdateMyNotificationPreferencesBody,
+  UpdateNotificationDefaults200,
   UpdateNotificationTemplateBody,
   UpdateOfferBody,
   UpdatePreOnboardingDocumentBody,
@@ -26076,6 +26078,175 @@ export const useTestWhatsAppConfig = <
   TContext
 > => {
   return useMutation(getTestWhatsAppConfigMutationOptions(options));
+};
+
+/**
+ * @summary Get company-wide default notification preferences for new joiners
+ */
+export const getGetNotificationDefaultsUrl = () => {
+  return `/api/notification-defaults`;
+};
+
+export const getNotificationDefaults = async (
+  options?: RequestInit,
+): Promise<GetNotificationDefaults200> => {
+  return customFetch<GetNotificationDefaults200>(
+    getGetNotificationDefaultsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetNotificationDefaultsQueryKey = () => {
+  return [`/api/notification-defaults`] as const;
+};
+
+export const getGetNotificationDefaultsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getNotificationDefaults>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNotificationDefaults>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetNotificationDefaultsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getNotificationDefaults>>
+  > = ({ signal }) => getNotificationDefaults({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getNotificationDefaults>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetNotificationDefaultsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getNotificationDefaults>>
+>;
+export type GetNotificationDefaultsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get company-wide default notification preferences for new joiners
+ */
+
+export function useGetNotificationDefaults<
+  TData = Awaited<ReturnType<typeof getNotificationDefaults>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNotificationDefaults>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetNotificationDefaultsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Replace company-wide default notification preferences
+ */
+export const getUpdateNotificationDefaultsUrl = () => {
+  return `/api/notification-defaults`;
+};
+
+export const updateNotificationDefaults = async (
+  updateMyNotificationPreferencesBody: UpdateMyNotificationPreferencesBody,
+  options?: RequestInit,
+): Promise<UpdateNotificationDefaults200> => {
+  return customFetch<UpdateNotificationDefaults200>(
+    getUpdateNotificationDefaultsUrl(),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateMyNotificationPreferencesBody),
+    },
+  );
+};
+
+export const getUpdateNotificationDefaultsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNotificationDefaults>>,
+    TError,
+    { data: BodyType<UpdateMyNotificationPreferencesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateNotificationDefaults>>,
+  TError,
+  { data: BodyType<UpdateMyNotificationPreferencesBody> },
+  TContext
+> => {
+  const mutationKey = ["updateNotificationDefaults"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateNotificationDefaults>>,
+    { data: BodyType<UpdateMyNotificationPreferencesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateNotificationDefaults(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateNotificationDefaultsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateNotificationDefaults>>
+>;
+export type UpdateNotificationDefaultsMutationBody =
+  BodyType<UpdateMyNotificationPreferencesBody>;
+export type UpdateNotificationDefaultsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Replace company-wide default notification preferences
+ */
+export const useUpdateNotificationDefaults = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNotificationDefaults>>,
+    TError,
+    { data: BodyType<UpdateMyNotificationPreferencesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateNotificationDefaults>>,
+  TError,
+  { data: BodyType<UpdateMyNotificationPreferencesBody> },
+  TContext
+> => {
+  return useMutation(getUpdateNotificationDefaultsMutationOptions(options));
 };
 
 /**
