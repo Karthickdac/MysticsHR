@@ -1,0 +1,47 @@
+# Is there a backup?
+ls -la ~/backups 2>/dev/null
+ls -la ~ | head -20
+
+# Last writes anywhere?
+find ~ -maxdepth 3 -type f -mtime -30 2>/dev/null | head -20
+/home/automystics-kuralai/.nvm/package.json
+total 20
+drwxrwx---  3 automystics-kuralai automystics-kuralai 4096 Apr  1 14:15 .
+drwxrwx--- 10 automystics-kuralai automystics-kuralai 4096 Apr 22 17:20 ..
+drwxrwx---  2 automystics-kuralai automystics-kuralai 4096 Apr  1 14:15 databases
+-rwxrwx---  1 automystics-kuralai automystics-kuralai   11 Apr  1 14:15 .gitignore
+total 64
+drwxrwx--- 10 automystics-kuralai automystics-kuralai 4096 Apr 22 17:20 .
+drwxr-xr-x  8 root                root                4096 Apr 22 16:29 ..
+drwxrwx---  3 automystics-kuralai automystics-kuralai 4096 Apr  1 14:15 backups
+-rw-------  1 automystics-kuralai automystics-kuralai 1019 Apr 22 15:03 .bash_history
+-rwxrwx---  1 automystics-kuralai automystics-kuralai  182 Apr  1 14:15 .bashrc
+drwx------  2 automystics-kuralai automystics-kuralai 4096 Apr 22 14:59 .cache
+drwxrwx---  3 automystics-kuralai automystics-kuralai 4096 Apr 22 14:54 htdocs
+drwxrwx---  4 automystics-kuralai automystics-kuralai 4096 Apr  1 14:15 logs
+drwxrwx---  7 automystics-kuralai automystics-kuralai 4096 Apr 22 14:54 .nvm
+drwxrwx---  5 automystics-kuralai automystics-kuralai 4096 Apr 22 17:20 .pm2
+-rwxrwx---  1 automystics-kuralai automystics-kuralai  675 Apr  1 14:15 .profile
+drwx------  2 automystics-kuralai automystics-kuralai 4096 Apr  1 14:15 .ssh
+drwxrwx---  2 automystics-kuralai automystics-kuralai 4096 Apr  1 14:15 tmp
+/home/automystics-kuralai/tmp/.gitignore
+/home/automystics-kuralai/logs/nginx/access.log
+/home/automystics-kuralai/logs/nginx/error.log
+/home/automystics-kuralai/logs/php/error.log
+/home/automystics-kuralai/logs/.gitignore
+/home/automystics-kuralai/htdocs/.gitignore
+/home/automystics-kuralai/.pm2/touch
+/home/automystics-kuralai/.pm2/pm2.pid
+/home/automystics-kuralai/.pm2/module_conf.json
+/home/automystics-kuralai/.pm2/pm2.log
+/home/automystics-kuralai/.ssh/config
+/home/automystics-kuralai/.ssh/authorized_keys
+/home/automystics-kuralai/.profile
+/home/automystics-kuralai/.bashrc
+/home/automystics-kuralai/.nvm/nvm-exec
+/home/automystics-kuralai/.nvm/.github/ISSUE_TEMPLATE.md
+/home/automystics-kuralai/.nvm/.github/SECURITY.md
+/home/automystics-kuralai/.nvm/.github/FUNDING.yml
+/home/automystics-kuralai/.nvm/LICENSE.md
+/home/automystics-kuralai/.nvm/.gitattributes
+automystics-kuralai@srv1609330:~/htdocs/kuralai.automystics.tech$ 
