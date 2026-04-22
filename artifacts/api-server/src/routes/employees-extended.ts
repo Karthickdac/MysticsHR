@@ -16,6 +16,7 @@ import {
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { recordHistory } from "../lib/history-utils";
 import { autoCreateOnboardingChecklist } from "../lib/onboarding-utils";
+import { seedNotificationPreferencesForEmployee } from "../lib/notification-service";
 
 const router = Router();
 
@@ -56,11 +57,21 @@ router.post(
             dateOfJoining: r.dateOfJoining ?? null,
           }).returning({ id: employeesTable.id });
           imported++;
-          if (insertedEmp && r.dateOfJoining) {
+          if (insertedEmp) {
+            // Mirror POST /employees: seed notification preferences from the
+            // company-wide defaults so bulk-imported hires get the same
+            // starting toggles as singly-created ones.
             try {
-              await autoCreateOnboardingChecklist(insertedEmp.id, r.dateOfJoining);
+              await seedNotificationPreferencesForEmployee(insertedEmp.id);
             } catch (e) {
-              console.error(`Auto-checklist creation for bulk row ${i + 1} failed (non-fatal):`, e);
+              console.error(`Notification preference seeding for bulk row ${i + 1} failed (non-fatal):`, e);
+            }
+            if (r.dateOfJoining) {
+              try {
+                await autoCreateOnboardingChecklist(insertedEmp.id, r.dateOfJoining);
+              } catch (e) {
+                console.error(`Auto-checklist creation for bulk row ${i + 1} failed (non-fatal):`, e);
+              }
             }
           }
         } catch (err: unknown) {
