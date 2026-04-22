@@ -5555,6 +5555,35 @@ export const UpdateMyNotificationPreferencesResponse = zod.object({
 });
 
 /**
+ * @summary Recently silenced notifications digest (last 30 days)
+ */
+export const GetMySilencedNotificationsResponse = zod.object({
+  windowDays: zod.number(),
+  items: zod.array(
+    zod.object({
+      eventType: zod.string(),
+      label: zod.string(),
+      description: zod.string(),
+      module: zod.string(),
+      emailEnabled: zod.boolean(),
+      whatsappEnabled: zod.boolean(),
+      silencedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Re-enable a silenced notification (both channels on, clears digest entry)
+ */
+export const UnsilenceMyNotificationParams = zod.object({
+  eventType: zod.coerce.string(),
+});
+
+export const UnsilenceMyNotificationResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
  * @summary List helpdesk tickets (scoped by role)
  */
 export const ListHelpdeskTicketsQueryParams = zod.object({

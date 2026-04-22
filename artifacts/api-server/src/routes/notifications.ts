@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../lib/db";
 import { notificationLogsTable, notificationTemplatesTable, notificationPreferencesTable, systemSettingsTable } from "@workspace/db/schema";
-import { eq, and, desc, count, ilike, or } from "drizzle-orm";
+import { eq, and, desc, count, ilike, or, gte, isNotNull } from "drizzle-orm";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import {
   NOTIFICATION_EVENT_TYPES,
@@ -218,21 +218,38 @@ router.put("/my-preferences/notifications", requireHrmsUser, requireRole(...ALL_
     }
 
     // Apply all upserts in a single transaction so the write is all-or-nothing.
+    // Track silencedAt: an event is "silenced" when at least one channel is off.
+    // Stamp silencedAt when transitioning into the silenced state; clear it
+    // when both channels are re-enabled. Existing silencedAt is preserved
+    // while the event remains silenced.
     const items = Array.from(normalized.values());
+    const now = new Date();
     await db.transaction(async (tx) => {
       for (const it of items) {
-        const [existing] = await tx.select({ id: notificationPreferencesTable.id })
+        const isSilenced = !it.emailEnabled || !it.whatsappEnabled;
+        const [existing] = await tx.select({
+          id: notificationPreferencesTable.id,
+          emailEnabled: notificationPreferencesTable.emailEnabled,
+          whatsappEnabled: notificationPreferencesTable.whatsappEnabled,
+          silencedAt: notificationPreferencesTable.silencedAt,
+        })
           .from(notificationPreferencesTable)
           .where(and(eq(notificationPreferencesTable.employeeId, employeeId), eq(notificationPreferencesTable.eventType, it.eventType)))
           .limit(1);
         if (existing) {
+          const wasSilenced = !existing.emailEnabled || !existing.whatsappEnabled;
+          let silencedAt: Date | null;
+          if (!isSilenced) silencedAt = null;
+          else if (!wasSilenced) silencedAt = now;
+          else silencedAt = existing.silencedAt ?? now;
           await tx.update(notificationPreferencesTable)
-            .set({ emailEnabled: it.emailEnabled, whatsappEnabled: it.whatsappEnabled, updatedAt: new Date() })
+            .set({ emailEnabled: it.emailEnabled, whatsappEnabled: it.whatsappEnabled, silencedAt, updatedAt: now })
             .where(eq(notificationPreferencesTable.id, existing.id));
         } else {
           await tx.insert(notificationPreferencesTable).values({
             employeeId, eventType: it.eventType,
             emailEnabled: it.emailEnabled, whatsappEnabled: it.whatsappEnabled,
+            silencedAt: isSilenced ? now : null,
           });
         }
       }
@@ -241,6 +258,88 @@ router.put("/my-preferences/notifications", requireHrmsUser, requireRole(...ALL_
   } catch (e) {
     console.error("[my-preferences/notifications PUT]", e);
     res.status(500).json({ error: "Failed to update notification preferences" });
+  }
+});
+
+// ─── Recently Silenced Notifications (ESS digest) ─────────────────────────────
+
+const SILENCED_DIGEST_DAYS = 30;
+const NOTIFICATION_EVENT_META = new Map(NOTIFICATION_EVENT_TYPES.map((m) => [m.eventType, m]));
+
+/** GET /my-preferences/notifications/silenced
+ * Returns events the caller silenced (i.e. turned off at least one channel)
+ * within the last 30 days. Each item carries the timestamp the silence
+ * happened plus the same registry metadata the master prefs page uses, so
+ * the UI can render a friendly "Recently silenced" digest. */
+router.get("/my-preferences/notifications/silenced", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
+  try {
+    const u = req.hrmsUser!;
+    const employeeId = u.employeeId;
+    if (!employeeId) { res.json({ items: [], windowDays: SILENCED_DIGEST_DAYS }); return; }
+    const cutoff = new Date(Date.now() - SILENCED_DIGEST_DAYS * 24 * 60 * 60 * 1000);
+    const rows = await db.select().from(notificationPreferencesTable)
+      .where(and(
+        eq(notificationPreferencesTable.employeeId, employeeId),
+        isNotNull(notificationPreferencesTable.silencedAt),
+        gte(notificationPreferencesTable.silencedAt, cutoff),
+      ))
+      .orderBy(desc(notificationPreferencesTable.silencedAt));
+    const items = rows
+      .map((r) => {
+        const meta = NOTIFICATION_EVENT_META.get(r.eventType);
+        if (!meta) return null;
+        return {
+          eventType: r.eventType,
+          label: meta.label,
+          description: meta.description,
+          module: meta.module,
+          emailEnabled: r.emailEnabled,
+          whatsappEnabled: r.whatsappEnabled,
+          silencedAt: r.silencedAt!.toISOString(),
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+    res.json({ items, windowDays: SILENCED_DIGEST_DAYS });
+  } catch (e) {
+    console.error("[my-preferences/notifications/silenced GET]", e);
+    res.status(500).json({ error: "Failed to load silenced notifications digest" });
+  }
+});
+
+/** POST /my-preferences/notifications/:eventType/unsilence
+ * One-click re-enable for a single event from the digest. Sets both channels
+ * back on and clears silencedAt so the entry drops out of the digest. */
+router.post("/my-preferences/notifications/:eventType/unsilence", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res): Promise<void> => {
+  try {
+    const u = req.hrmsUser!;
+    const employeeId = u.employeeId;
+    if (!employeeId) {
+      res.status(400).json({ error: "Your account is not linked to an employee record. Contact HR." });
+      return;
+    }
+    const eventType = String(req.params.eventType ?? "").trim();
+    if (!eventType || !NOTIFICATION_EVENT_TYPE_SET.has(eventType)) {
+      res.status(400).json({ error: `Unknown eventType: ${eventType || "(empty)"}` });
+      return;
+    }
+    const now = new Date();
+    const [existing] = await db.select({ id: notificationPreferencesTable.id })
+      .from(notificationPreferencesTable)
+      .where(and(eq(notificationPreferencesTable.employeeId, employeeId), eq(notificationPreferencesTable.eventType, eventType)))
+      .limit(1);
+    if (existing) {
+      await db.update(notificationPreferencesTable)
+        .set({ emailEnabled: true, whatsappEnabled: true, silencedAt: null, updatedAt: now })
+        .where(eq(notificationPreferencesTable.id, existing.id));
+    } else {
+      await db.insert(notificationPreferencesTable).values({
+        employeeId, eventType, emailEnabled: true, whatsappEnabled: true, silencedAt: null,
+      });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    console.error("[my-preferences/notifications/:eventType/unsilence POST]", e);
+    res.status(500).json({ error: "Failed to re-enable notification" });
   }
 });
 

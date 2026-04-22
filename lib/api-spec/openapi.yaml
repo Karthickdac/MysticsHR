@@ -4500,6 +4500,56 @@ paths:
                   count: { type: integer }
                 required: [success, count]
 
+  /my-preferences/notifications/silenced:
+    get:
+      operationId: getMySilencedNotifications
+      tags: [ess]
+      summary: Recently silenced notifications digest (last 30 days)
+      responses:
+        "200":
+          description: Events the caller silenced within the digest window
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  windowDays: { type: integer }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        eventType: { type: string }
+                        label: { type: string }
+                        description: { type: string }
+                        module: { type: string }
+                        emailEnabled: { type: boolean }
+                        whatsappEnabled: { type: boolean }
+                        silencedAt: { type: string, format: date-time }
+                      required: [eventType, label, description, module, emailEnabled, whatsappEnabled, silencedAt]
+                required: [items, windowDays]
+
+  /my-preferences/notifications/{eventType}/unsilence:
+    post:
+      operationId: unsilenceMyNotification
+      tags: [ess]
+      summary: Re-enable a silenced notification (both channels on, clears digest entry)
+      parameters:
+        - in: path
+          name: eventType
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Re-enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                required: [success]
+
   # ──────────────────────────────────────────────
   # HELPDESK
   # ──────────────────────────────────────────────

@@ -143,6 +143,7 @@ import type {
   GetLeaveUtilizationReportParams,
   GetMyActiveSalaryStructure200,
   GetMyAttendanceTodayParams,
+  GetMySilencedNotifications200,
   GetNotificationDefaults200,
   GetOnboardingChecklistsParams,
   GetPayrollAnalytics200,
@@ -300,6 +301,7 @@ import type {
   TicketComment,
   TriggerStorageCleanupRun500,
   TriggerStorageCleanupRunBody,
+  UnsilenceMyNotification200,
   UpdateCandidateBody,
   UpdateClearanceTaskBody,
   UpdateDepartmentBody,
@@ -19989,6 +19991,172 @@ export const useUpdateMyNotificationPreferences = <
   return useMutation(
     getUpdateMyNotificationPreferencesMutationOptions(options),
   );
+};
+
+/**
+ * @summary Recently silenced notifications digest (last 30 days)
+ */
+export const getGetMySilencedNotificationsUrl = () => {
+  return `/api/my-preferences/notifications/silenced`;
+};
+
+export const getMySilencedNotifications = async (
+  options?: RequestInit,
+): Promise<GetMySilencedNotifications200> => {
+  return customFetch<GetMySilencedNotifications200>(
+    getGetMySilencedNotificationsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetMySilencedNotificationsQueryKey = () => {
+  return [`/api/my-preferences/notifications/silenced`] as const;
+};
+
+export const getGetMySilencedNotificationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMySilencedNotifications>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMySilencedNotifications>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMySilencedNotificationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMySilencedNotifications>>
+  > = ({ signal }) => getMySilencedNotifications({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMySilencedNotifications>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMySilencedNotificationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMySilencedNotifications>>
+>;
+export type GetMySilencedNotificationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Recently silenced notifications digest (last 30 days)
+ */
+
+export function useGetMySilencedNotifications<
+  TData = Awaited<ReturnType<typeof getMySilencedNotifications>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMySilencedNotifications>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMySilencedNotificationsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Re-enable a silenced notification (both channels on, clears digest entry)
+ */
+export const getUnsilenceMyNotificationUrl = (eventType: string) => {
+  return `/api/my-preferences/notifications/${eventType}/unsilence`;
+};
+
+export const unsilenceMyNotification = async (
+  eventType: string,
+  options?: RequestInit,
+): Promise<UnsilenceMyNotification200> => {
+  return customFetch<UnsilenceMyNotification200>(
+    getUnsilenceMyNotificationUrl(eventType),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getUnsilenceMyNotificationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unsilenceMyNotification>>,
+    TError,
+    { eventType: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unsilenceMyNotification>>,
+  TError,
+  { eventType: string },
+  TContext
+> => {
+  const mutationKey = ["unsilenceMyNotification"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unsilenceMyNotification>>,
+    { eventType: string }
+  > = (props) => {
+    const { eventType } = props ?? {};
+
+    return unsilenceMyNotification(eventType, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnsilenceMyNotificationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unsilenceMyNotification>>
+>;
+
+export type UnsilenceMyNotificationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Re-enable a silenced notification (both channels on, clears digest entry)
+ */
+export const useUnsilenceMyNotification = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unsilenceMyNotification>>,
+    TError,
+    { eventType: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof unsilenceMyNotification>>,
+  TError,
+  { eventType: string },
+  TContext
+> => {
+  return useMutation(getUnsilenceMyNotificationMutationOptions(options));
 };
 
 /**

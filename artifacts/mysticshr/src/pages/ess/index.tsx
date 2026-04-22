@@ -41,6 +41,9 @@ import {
   useGetMyNotificationPreferences,
   useUpdateMyNotificationPreferences,
   getGetMyNotificationPreferencesQueryKey,
+  useGetMySilencedNotifications,
+  getGetMySilencedNotificationsQueryKey,
+  useUnsilenceMyNotification,
   type NotificationPreferenceItem,
 } from "@workspace/api-client-react";
 
@@ -377,6 +380,90 @@ const ESS_MODULES = [
     color: "bg-teal-100 text-teal-600",
   },
 ];
+
+function RecentlySilencedPanel() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { data, isLoading } = useGetMySilencedNotifications();
+  const unsilence = useUnsilenceMyNotification();
+  const items = (data?.items ?? []) as Array<{
+    eventType: string; label: string; description: string; module: string;
+    emailEnabled: boolean; whatsappEnabled: boolean; silencedAt: string;
+  }>;
+  const windowDays = data?.windowDays ?? 30;
+
+  function handleReenable(eventType: string, label: string) {
+    unsilence.mutate(
+      { eventType },
+      {
+        onSuccess: async () => {
+          toast({ title: "Re-enabled", description: `"${label}" notifications turned back on.` });
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: getGetMySilencedNotificationsQueryKey() }),
+            qc.invalidateQueries({ queryKey: getGetMyNotificationPreferencesQueryKey() }),
+          ]);
+        },
+        onError: (e: unknown) => {
+          const msg = e instanceof Error ? e.message : "Could not re-enable notification";
+          toast({ title: "Re-enable failed", description: msg, variant: "destructive" });
+        },
+      },
+    );
+  }
+
+  return (
+    <Card data-testid="card-recently-silenced">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Bell className="w-4 h-4 text-primary" /> Recently silenced
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          Notifications you turned off in the last {windowDays} days. Re-enable any you didn't mean to silence.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!isLoading && items.length === 0 && (
+          <p className="text-sm text-muted-foreground" data-testid="text-silenced-empty">
+            You haven't silenced any notifications recently. Use the master preferences below to fine-tune what you receive.
+          </p>
+        )}
+        {!isLoading && items.length > 0 && (
+          <ul className="divide-y border rounded-md">
+            {items.map((it) => (
+              <li
+                key={it.eventType}
+                className="p-3 flex items-start justify-between gap-4"
+                data-testid={`row-silenced-${it.eventType}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{it.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Silenced {new Date(it.silencedAt).toLocaleString()} · {it.module}
+                    {!it.emailEnabled && !it.whatsappEnabled
+                      ? " · Email + WhatsApp off"
+                      : !it.emailEnabled
+                        ? " · Email off"
+                        : " · WhatsApp off"}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleReenable(it.eventType, it.label)}
+                  disabled={unsilence.isPending}
+                  data-testid={`button-reenable-${it.eventType}`}
+                >
+                  Re-enable
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function NotificationPreferencesPanel() {
   const { toast } = useToast();
@@ -897,6 +984,7 @@ export default function EssPortalPage() {
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-4">
+          <RecentlySilencedPanel />
           <NotificationPreferencesPanel />
         </TabsContent>
       </Tabs>

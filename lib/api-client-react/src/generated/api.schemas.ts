@@ -4090,6 +4090,25 @@ export type UpdateMyNotificationPreferences200 = {
   count: number;
 };
 
+export type GetMySilencedNotifications200ItemsItem = {
+  eventType: string;
+  label: string;
+  description: string;
+  module: string;
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
+  silencedAt: string;
+};
+
+export type GetMySilencedNotifications200 = {
+  windowDays: number;
+  items: GetMySilencedNotifications200ItemsItem[];
+};
+
+export type UnsilenceMyNotification200 = {
+  success: boolean;
+};
+
 export type ListHelpdeskTicketsParams = {
   status?: string;
   category?: string;
