@@ -81,6 +81,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@clerk/react": "^6.4.2"
+    "@clerk/react": "^6.4.2",
+    "html-to-image": "^1.11.13",
+    "pdf-lib": "^1.17.1"
   }
 }

@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useListOrgChart, type OrgChartEmployee } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, Users, Network, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Users, Network, TrendingUp, FileImage, FileDown, Loader2 } from "lucide-react";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
+import { toast } from "sonner";
+import { exportOrgChartPng, exportOrgChartPdf } from "./export-utils";
 
 type Node = OrgChartEmployee & { children: Node[] };
 
@@ -286,6 +288,45 @@ export default function OrgChartPage() {
   const expandAll = () => setExpandedIds(collectIds([...roots, ...orphans, ...cycles]));
   const collapseAll = () => setExpandedIds(new Set());
 
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
+
+  const exportScope = search.trim() ? `search-${search.trim()}` : "all";
+  const canExport =
+    !isLoading &&
+    (filteredRoots.length + filteredOrphans.length + filteredCycles.length) > 0;
+
+  const runExport = async (kind: "png" | "pdf") => {
+    if (!chartRef.current || exporting) return;
+    setExporting(kind);
+    try {
+      // Force-expand everything in the rendered DOM before snapshotting so
+      // the export reflects the full visible structure, not just the user's
+      // current click-state. We then restore the prior expansion below.
+      const previousExpanded = expandedIds;
+      setExpandedIds(collectIds([...roots, ...orphans, ...cycles]));
+      // Wait one paint so React commits the expansion before capture.
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      try {
+        if (kind === "png") {
+          await exportOrgChartPng(chartRef.current, exportScope);
+        } else {
+          await exportOrgChartPdf(chartRef.current, exportScope);
+        }
+        toast.success(kind === "png" ? "Org chart PNG downloaded" : "Org chart PDF downloaded");
+      } finally {
+        // Restore prior expansion regardless of success/failure.
+        setExpandedIds(previousExpanded);
+      }
+    } catch (err) {
+      console.error("[org-chart export]", err);
+      toast.error(`Failed to export org chart as ${kind.toUpperCase()}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -314,6 +355,34 @@ export default function OrgChartPage() {
           <Button variant="outline" size="sm" onClick={collapseAll}>
             Collapse all
           </Button>
+          <Button
+            variant="outline" size="sm"
+            disabled={!canExport || exporting !== null}
+            onClick={() => runExport("png")}
+            data-testid="button-export-org-chart-png"
+            title="Download the current org chart as a PNG image"
+          >
+            {exporting === "png" ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <FileImage className="w-4 h-4 mr-1" />
+            )}
+            Export PNG
+          </Button>
+          <Button
+            variant="outline" size="sm"
+            disabled={!canExport || exporting !== null}
+            onClick={() => runExport("pdf")}
+            data-testid="button-export-org-chart-pdf"
+            title="Download the current org chart as a paginated PDF"
+          >
+            {exporting === "pdf" ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <FileDown className="w-4 h-4 mr-1" />
+            )}
+            Export PDF
+          </Button>
         </div>
       </div>
 
@@ -333,6 +402,7 @@ export default function OrgChartPage() {
         </Card>
       ) : (
         <div className="overflow-x-auto pb-4">
+          <div ref={chartRef} className="bg-background p-4 min-w-fit inline-block">
           <ul className="list-none space-y-4 min-w-fit">
             {filteredRoots.map((r) => (
               <TreeNode
@@ -391,6 +461,7 @@ export default function OrgChartPage() {
               </ul>
             </div>
           )}
+          </div>
         </div>
       )}
     </div>
