@@ -9087,6 +9087,9 @@ components:
         fieldValues:
           type: object
           additionalProperties: true
+        documentRequestId:
+          type: ['integer', 'null']
+          description: When set, the corresponding pending document request is marked Fulfilled and linked to the new issued document.
 
     DocumentRequest:
       type: object

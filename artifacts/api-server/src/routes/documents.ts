@@ -134,9 +134,29 @@ router.get("/documents/issued", requireHrmsUser, requireRole(...ALL_ROLES), asyn
 router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
-    const { employeeId, documentType, templateId, fieldValues = {} } = req.body;
+    const { employeeId, documentType, templateId, fieldValues = {}, documentRequestId } = req.body;
     if (!employeeId || !documentType || !templateId) {
       res.status(400).json({ error: "employeeId, documentType, and templateId are required" }); return;
+    }
+
+    // If linked to a request, validate it matches and is still Pending
+    let linkedRequest: { id: number; status: string; employeeId: number; documentType: string; createdAt: Date | null } | null = null;
+    if (documentRequestId) {
+      const [reqRow] = await db.select({
+        id: documentRequestsTable.id,
+        status: documentRequestsTable.status,
+        employeeId: documentRequestsTable.employeeId,
+        documentType: documentRequestsTable.documentType,
+        createdAt: documentRequestsTable.createdAt,
+      }).from(documentRequestsTable).where(eq(documentRequestsTable.id, Number(documentRequestId))).limit(1);
+      if (!reqRow) { res.status(404).json({ error: "Document request not found" }); return; }
+      if (reqRow.status !== "Pending") {
+        res.status(409).json({ error: `Document request is already ${reqRow.status}` }); return;
+      }
+      if (reqRow.employeeId !== Number(employeeId) || reqRow.documentType !== documentType) {
+        res.status(400).json({ error: "documentRequestId does not match the provided employee/documentType" }); return;
+      }
+      linkedRequest = reqRow;
     }
 
     const [template] = await db.select().from(documentTemplatesTable)
@@ -185,6 +205,41 @@ router.post("/documents/generate", requireHrmsUser, requireRole(...HR_ROLES), as
     }).returning();
 
     await logAudit({ user: u, action: "generate_document", module: "documents", recordId: issued.id });
+
+    // If linked to a pending request, mark it Fulfilled and link the issued doc.
+    if (linkedRequest) {
+      await db.update(documentRequestsTable).set({
+        status: "Fulfilled",
+        issuedDocumentId: issued.id,
+        fulfilledBy: u.id,
+        fulfilledAt: new Date(),
+        hrNote: `Issued: ${filename}`,
+        updatedAt: new Date(),
+      }).where(eq(documentRequestsTable.id, linkedRequest.id));
+      await logAudit({ user: u, action: "document_request_fulfilled", module: "documents", recordId: linkedRequest.id });
+
+      const [reqEmpUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })
+        .from(hrmsUsersTable).where(eq(hrmsUsersTable.employeeId, employeeId)).limit(1);
+      if (reqEmpUser?.email) {
+        const appBase = process.env.APP_URL
+          ?? (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "");
+        const deepLink = appBase ? `${appBase.replace(/\/$/, "")}/documents` : "";
+        const requestDate = linkedRequest.createdAt
+          ? new Date(linkedRequest.createdAt).toLocaleDateString("en-IN")
+          : "";
+        dispatchNotification({
+          eventType: "document_request_fulfilled", module: "documents",
+          recipientEmail: reqEmpUser.email, recipientName: reqEmpUser.name ?? undefined,
+          recipientEmployeeDbId: employeeId,
+          variables: {
+            documentType, hrNote: `Issued: ${filename}`, requestDate, deepLink,
+            recipientName: reqEmpUser.name ?? "Team Member",
+          },
+          entityType: "document_request", entityId: linkedRequest.id,
+          channels: ["email"],
+        }).catch(() => {});
+      }
+    }
 
     // Notify the employee that a document has been issued to them
     const [empUser] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name })

@@ -2919,6 +2919,11 @@ export interface GenerateDocumentBody {
   documentType: GenerateDocumentBodyDocumentType;
   templateId: number;
   fieldValues?: GenerateDocumentBodyFieldValues;
+  /**
+   * When set, the corresponding pending document request is marked Fulfilled and linked to the new issued document.
+   * @nullable
+   */
+  documentRequestId?: number | null;
 }
 
 export type DocumentRequestStatus =

@@ -140,7 +140,6 @@ function GenerateModal({
 }) {
   const qc = useQueryClient();
   const generate = useGenerateDocument();
-  const updateRequest = useUpdateDocumentRequest();
   const { data: empList } = useListEmployees({ status: "Active", limit: 500 });
   const employees = empList?.data ?? [];
 
@@ -176,40 +175,20 @@ function GenerateModal({
       documentType: selectedTemplate.documentType as GenerateDocumentBodyDocumentType,
       templateId: Number(templateId),
       fieldValues: extraFields,
+      ...(prefill?.requestId ? { documentRequestId: prefill.requestId } : {}),
     };
 
     generate.mutate({ data: body }, {
       onSuccess: (doc) => {
         qc.invalidateQueries({ queryKey: getListIssuedDocumentsQueryKey() });
-
-        const finishUp = () => {
-          alert(`Document "${doc.filename}" generated successfully!`);
-          onClose();
-          setEmployeeId("");
-          setTemplateId("");
-          setExtraFields({});
-        };
-
         if (prefill?.requestId) {
-          updateRequest.mutate(
-            {
-              id: prefill.requestId,
-              data: {
-                status: "Fulfilled",
-                hrNote: `Issued: ${doc.filename}`,
-                issuedDocumentId: doc.id,
-              },
-            },
-            {
-              onSettled: () => {
-                qc.invalidateQueries({ queryKey: getListDocumentRequestsQueryKey() });
-                finishUp();
-              },
-            },
-          );
-        } else {
-          finishUp();
+          qc.invalidateQueries({ queryKey: getListDocumentRequestsQueryKey() });
         }
+        alert(`Document "${doc.filename}" generated successfully!`);
+        onClose();
+        setEmployeeId("");
+        setTemplateId("");
+        setExtraFields({});
       },
     });
   }

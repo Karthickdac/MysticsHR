@@ -6149,6 +6149,12 @@ export const GenerateDocumentBody = zod.object({
   ]),
   templateId: zod.number(),
   fieldValues: zod.record(zod.string(), zod.unknown()).optional(),
+  documentRequestId: zod
+    .number()
+    .nullish()
+    .describe(
+      "When set, the corresponding pending document request is marked Fulfilled and linked to the new issued document.",
+    ),
 });
 
 /**
