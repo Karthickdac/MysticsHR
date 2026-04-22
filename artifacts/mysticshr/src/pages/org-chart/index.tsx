@@ -384,7 +384,6 @@ export default function OrgChartPage() {
   // Re-hydrate when the URL changes externally (back button etc.)
   useEffect(() => {
     setFilters(parseFiltersFromSearch(urlSearch));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearch]);
 
   const updateFilters = useCallback((next: FilterState) => {
@@ -629,11 +628,14 @@ export default function OrgChartPage() {
       {!isFiltersEmpty(filters) && (
         <div className="flex flex-wrap items-center gap-2" data-testid="org-chart-filter-chips">
           {[...filters.departmentIds].map((id) => {
+            // Fall back to the raw ID if the department isn't in the current
+            // option list (e.g., loaded from a stale URL). Still render the
+            // chip so the user can clearly see and remove the active filter.
             const opt = departmentOptions.find((o) => o.value === String(id));
-            if (!opt) return null;
+            const label = opt?.label ?? `#${id}`;
             return (
               <Badge key={`d-${id}`} variant="secondary" className="gap-1 pr-1">
-                <span>Dept: {opt.label}</span>
+                <span>Dept: {label}</span>
                 <button
                   type="button"
                   className="ml-1 rounded hover:bg-muted-foreground/20 p-0.5"
