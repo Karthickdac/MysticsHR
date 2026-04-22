@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Menu, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
+import { CommandPalette } from "./CommandPalette";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetCurrentUserQueryKey } from "@workspace/api-client-react";
@@ -12,7 +13,18 @@ const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("mysticshr.sidebarCollapsed") === "1";
+  });
+  const [commandOpen, setCommandOpen] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("mysticshr.sidebarCollapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
+
   const [provisionAttempted, setProvisionAttempted] = useState(false);
   const { isLoading, isNotProvisioned } = useCurrentHrmsUser();
   const { getToken, isSignedIn } = useAuth();
@@ -79,16 +91,19 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
-      <Sidebar isOpen={sidebarOpen} setOpen={setSidebarOpen} />
+    <div className="h-screen flex bg-muted/30 overflow-hidden">
+      <Sidebar
+        isOpen={sidebarOpen}
+        setOpen={setSidebarOpen}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-border bg-background flex items-center px-4 md:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-            <Menu className="w-5 h-5" />
-          </Button>
-          <div className="ml-4 font-bold text-lg text-primary">MysticsHR</div>
-        </header>
+        <TopBar
+          onMobileMenuOpen={() => setSidebarOpen(true)}
+          onCommandOpen={() => setCommandOpen(true)}
+        />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="mx-auto w-full max-w-7xl">
@@ -96,6 +111,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </div>
   );
 }

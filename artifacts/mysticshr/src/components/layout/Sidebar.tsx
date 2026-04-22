@@ -1,144 +1,197 @@
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { useClerk, useUser } from "@clerk/react";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Building2, 
-  Briefcase, 
-  UserPlus,
-  ClipboardCheck,
-  ClipboardList,
-  ShieldCheck, 
-  FileText, 
-  Settings,
-  LogOut,
-  Menu,
-  Clock,
-  CalendarCheck,
-  Umbrella,
-  Timer,
-  Banknote,
-  Target,
-  Home,
-  Ticket,
-  FileBadge,
-  TrendingDown,
-  BarChart3,
-  Bell,
-  Network,
-} from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { filterNavByRole, type Role } from "./nav-config";
 
-export function Sidebar({ isOpen, setOpen }: { isOpen: boolean; setOpen: (v: boolean) => void }) {
-  const [location, setLocation] = useLocation();
-  const { signOut } = useClerk();
-  const { user } = useUser();
-  const { hrmsUser, role: hrmsRole } = useCurrentHrmsUser();
+interface SidebarProps {
+  isOpen: boolean;
+  setOpen: (v: boolean) => void;
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+}
 
-  const role = hrmsRole ?? "employee";
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-  const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
-    { name: "Org Chart", href: "/org-chart", icon: Network, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Recruitment", href: "/recruitment", icon: UserPlus, roles: ["super_admin", "hr_manager", "hr_executive", "hod"] },
-    { name: "Pre-Onboarding", href: "/pre-onboarding", icon: ClipboardCheck, roles: ["super_admin", "hr_manager", "hr_executive"] },
-    { name: "Onboarding", href: "/onboarding", icon: ClipboardList, roles: ["super_admin", "hr_manager", "hr_executive", "hod"] },
-    { name: "Shifts", href: "/shifts", icon: Clock, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
-    { name: "Attendance", href: "/attendance", icon: CalendarCheck, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Leave", href: "/leave", icon: Umbrella, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Permissions", href: "/permissions", icon: Timer, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Payroll", href: "/payroll", icon: Banknote, roles: ["super_admin", "hr_manager", "hr_executive", "payroll_admin", "employee"] },
-    { name: "Performance", href: "/performance", icon: Target, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "employee"] },
-    { name: "ESS Portal", href: "/ess", icon: Home, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Helpdesk", href: "/helpdesk", icon: Ticket, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Documents", href: "/documents", icon: FileBadge, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Exit & Offboarding", href: "/exit", icon: TrendingDown, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin", "employee"] },
-    { name: "Analytics", href: "/analytics", icon: BarChart3, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
-    { name: "Reports", href: "/reports", icon: FileText, roles: ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] },
-    { name: "Departments", href: "/departments", icon: Building2, roles: ["super_admin", "hr_manager", "hr_executive"] },
-    { name: "Designations", href: "/designations", icon: Briefcase, roles: ["super_admin", "hr_manager", "hr_executive"] },
-    { name: "Users", href: "/users", icon: ShieldCheck, roles: ["super_admin", "hr_manager"] },
-    { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["super_admin", "hr_manager"] },
-    { name: "Communications", href: "/communications", icon: Bell, roles: ["super_admin", "hr_manager"] },
-    { name: "Settings", href: "/settings", icon: Settings, roles: ["super_admin", "hr_manager"] },
-  ];
+export function Sidebar({ isOpen, setOpen, collapsed, setCollapsed }: SidebarProps) {
+  const [location] = useLocation();
+  const { role: hrmsRole } = useCurrentHrmsUser();
+  const role = (hrmsRole ?? "employee") as Role;
 
-  const filteredNav = navItems.filter((item) => item.roles.includes(role));
+  const groups = useMemo(() => filterNavByRole(role), [role]);
+
+  // Track per-group open state. Auto-open the group containing the active route.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const g of groups) initial[g.id] = g.defaultOpen ?? false;
+    return initial;
+  });
+
+  // If the user navigates into a collapsed group, force it open so they can see siblings.
+  const effectiveOpen = useMemo(() => {
+    const merged = { ...openGroups };
+    for (const g of groups) {
+      if (g.items.some((i) => location === i.href || location.startsWith(i.href + "/"))) {
+        merged[g.id] = true;
+      }
+    }
+    return merged;
+  }, [openGroups, groups, location]);
+
+  const toggleGroup = (id: string) =>
+    setOpenGroups((s) => ({ ...s, [id]: !(s[id] ?? effectiveOpen[id]) }));
 
   return (
-    <>
+    <TooltipProvider delayDuration={150}>
       {/* Mobile overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden" 
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setOpen(false)}
+          aria-hidden="true"
         />
       )}
-      
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border text-sidebar-foreground transition-transform duration-200 ease-in-out flex flex-col md:translate-x-0 md:static",
-        isOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl text-sidebar-primary">
-            <img src={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/logo.svg`} alt="MysticsHR" className="w-8 h-8" />
-            MysticsHR
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 bg-sidebar border-r border-sidebar-border text-sidebar-foreground transition-all duration-200 ease-in-out flex flex-col md:translate-x-0 md:static",
+          isOpen ? "translate-x-0" : "-translate-x-full",
+          collapsed ? "w-[72px]" : "w-64",
+        )}
+        data-testid="app-sidebar"
+      >
+        {/* Brand row */}
+        <div className="h-16 px-3 border-b border-sidebar-border flex items-center justify-between gap-2 shrink-0">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 font-bold text-sidebar-primary min-w-0"
+          >
+            <img src={`${BASE}/logo.svg`} alt="MysticsHR" className="w-8 h-8 shrink-0" />
+            {!collapsed && <span className="text-lg truncate">MysticsHR</span>}
           </Link>
-          <Button variant="ghost" size="icon" className="md:hidden text-sidebar-foreground" onClick={() => setOpen(false)}>
-            <Menu className="w-5 h-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden text-sidebar-foreground shrink-0"
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
           </Button>
         </div>
-        
-        <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
-          {filteredNav.map((item) => {
-            const isActive = location.startsWith(item.href);
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1" data-testid="sidebar-nav">
+          {groups.map((group) => {
+            const open = effectiveOpen[group.id] ?? group.defaultOpen ?? false;
             return (
-              <Link key={item.name} href={item.href}>
-                <div 
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors",
-                    isActive 
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                  )}
-                  onClick={() => setOpen(false)}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.name}
-                </div>
-              </Link>
+              <div key={group.id} className="mb-1">
+                {!collapsed && (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+                    data-testid={`sidebar-group-${group.id}`}
+                    aria-expanded={open}
+                  >
+                    <span>{group.label}</span>
+                    <ChevronDown
+                      className={cn(
+                        "w-3.5 h-3.5 transition-transform",
+                        open ? "rotate-0" : "-rotate-90",
+                      )}
+                    />
+                  </button>
+                )}
+                {(collapsed || open) && (
+                  <ul className="space-y-0.5 mt-0.5">
+                    {group.items.map((item) => {
+                      const isActive =
+                        location === item.href || location.startsWith(item.href + "/");
+                      const Icon = item.icon;
+                      const linkClass = cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                        collapsed && "justify-center px-0",
+                      );
+                      const link = (
+                        <Link href={item.href}>
+                          <div
+                            className={linkClass}
+                            onClick={() => setOpen(false)}
+                            data-testid={`nav-${item.href.replace(/\//g, "-")}`}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            <Icon className="w-5 h-5 shrink-0" />
+                            {!collapsed && <span className="truncate">{item.name}</span>}
+                          </div>
+                        </Link>
+                      );
+                      return (
+                        <li key={item.href}>
+                          {collapsed ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>{link}</TooltipTrigger>
+                              <TooltipContent side="right">{item.name}</TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            link
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-10 h-10 rounded-full bg-sidebar-primary/20 flex items-center justify-center text-sidebar-primary font-bold overflow-hidden">
-              {user?.imageUrl ? (
-                <img src={user.imageUrl} alt={hrmsUser?.name || user?.fullName || ""} className="w-full h-full object-cover" />
-              ) : (
-                (hrmsUser?.name || user?.fullName || "U").charAt(0).toUpperCase()
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{hrmsUser?.name || user?.fullName}</div>
-              <div className="text-xs text-sidebar-foreground/60 truncate capitalize">{role.replace("_", " ")}</div>
-            </div>
-          </div>
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-            onClick={() => signOut(() => setLocation("/"))}
+        {/* Collapse toggle (desktop only) */}
+        <div className="hidden md:flex border-t border-sidebar-border p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCollapsed(!collapsed)}
+            className={cn(
+              "w-full text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
+              collapsed && "justify-center px-0",
+            )}
+            data-testid="sidebar-collapse-toggle"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <LogOut className="w-5 h-5 mr-2" />
-            Sign Out
+            {collapsed ? (
+              <ChevronsRight className="w-4 h-4" />
+            ) : (
+              <>
+                <ChevronsLeft className="w-4 h-4 mr-2" />
+                <span className="text-xs">Collapse</span>
+              </>
+            )}
           </Button>
         </div>
-      </div>
-    </>
+      </aside>
+    </TooltipProvider>
+  );
+}
+
+/** Mobile-only menu opener — used by the TopBar. */
+export function SidebarMenuButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="md:hidden"
+      onClick={onOpen}
+      aria-label="Open menu"
+      data-testid="sidebar-mobile-toggle"
+    >
+      <Menu className="w-5 h-5" />
+    </Button>
   );
 }
