@@ -47,6 +47,11 @@ export const documentRequestsTable = pgTable("document_requests", {
   employeeId: integer("employee_id").notNull().references(() => employeesTable.id),
   documentType: hrDocumentTypeEnum("document_type").notNull(),
   reason: text("reason"),
+  // Optional template-specific values supplied by the requester (e.g.
+  // designation, ctc, probationPeriod). Prefilled into HR's Generate dialog
+  // when HR uses one-click Generate from this pending request, so HR does
+  // not have to retype them. Stored as a flat string→string map.
+  capturedFields: jsonb("captured_fields").notNull().default({}),
   status: documentRequestStatusEnum("status").notNull().default("Pending"),
   issuedDocumentId: integer("issued_document_id").references(() => issuedDocumentsTable.id),
   fulfilledBy: integer("fulfilled_by").references(() => hrmsUsersTable.id),

@@ -125,6 +125,7 @@ type GeneratePrefill = {
   employeeId: number;
   documentType: string;
   requestId: number;
+  capturedFields?: Record<string, string>;
 };
 
 function GenerateModal({
@@ -159,11 +160,12 @@ function GenerateModal({
         t => t.isActive && t.documentType === prefill.documentType,
       );
       if (match) setTemplateId(String(match.id));
+      setExtraFields(prefill.capturedFields ?? {});
     } else {
       setEmployeeId("");
       setTemplateId("");
+      setExtraFields({});
     }
-    setExtraFields({});
   }, [open, prefill, templates]);
 
   function handleGenerate(e: React.FormEvent) {
@@ -449,6 +451,7 @@ export default function DocumentsPage() {
                   employeeId: req.employeeId,
                   documentType: req.documentType,
                   requestId: req.id,
+                  capturedFields: (req.capturedFields ?? {}) as Record<string, string>,
                 });
                 setShowGenerate(true);
               }}

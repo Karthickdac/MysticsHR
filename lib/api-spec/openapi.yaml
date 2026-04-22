@@ -9324,6 +9324,10 @@ components:
         fulfilledByName: { type: ['string', 'null'] }
         fulfilledAt: { type: ['string', 'null'], format: date-time }
         hrNote: { type: ['string', 'null'] }
+        capturedFields:
+          type: object
+          additionalProperties: { type: string }
+          description: Optional template-specific values supplied by the requester (e.g. designation, ctc). Prefilled into HR's Generate dialog.
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, employeeId, documentType, status, createdAt, updatedAt]
@@ -9336,6 +9340,10 @@ components:
           type: string
           enum: [Experience Certificate, Appointment Letter, Warning Notice, Offer Letter, NOC, Relieving Letter]
         reason: { type: string, nullable: true }
+        capturedFields:
+          type: object
+          additionalProperties: { type: string }
+          description: Optional template-specific values (designation, ctc, probationPeriod, etc.) used to prefill HR's Generate dialog.
 
     UpdateDocumentRequestBody:
       type: object

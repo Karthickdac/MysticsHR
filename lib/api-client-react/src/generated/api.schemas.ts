@@ -3034,6 +3034,11 @@ export const DocumentRequestStatus = {
   Cancelled: "Cancelled",
 } as const;
 
+/**
+ * Optional template-specific values supplied by the requester (e.g. designation, ctc). Prefilled into HR's Generate dialog.
+ */
+export type DocumentRequestCapturedFields = { [key: string]: string };
+
 export interface DocumentRequest {
   id: number;
   employeeId: number;
@@ -3055,6 +3060,8 @@ export interface DocumentRequest {
   fulfilledAt?: string | null;
   /** @nullable */
   hrNote?: string | null;
+  /** Optional template-specific values supplied by the requester (e.g. designation, ctc). Prefilled into HR's Generate dialog. */
+  capturedFields?: DocumentRequestCapturedFields;
   createdAt: string;
   updatedAt: string;
 }
@@ -3071,9 +3078,16 @@ export const CreateDocumentRequestBodyDocumentType = {
   Relieving_Letter: "Relieving Letter",
 } as const;
 
+/**
+ * Optional template-specific values (designation, ctc, probationPeriod, etc.) used to prefill HR's Generate dialog.
+ */
+export type CreateDocumentRequestBodyCapturedFields = { [key: string]: string };
+
 export interface CreateDocumentRequestBody {
   documentType: CreateDocumentRequestBodyDocumentType;
   reason?: string | null;
+  /** Optional template-specific values (designation, ctc, probationPeriod, etc.) used to prefill HR's Generate dialog. */
+  capturedFields?: CreateDocumentRequestBodyCapturedFields;
 }
 
 export type UpdateDocumentRequestBodyStatus =

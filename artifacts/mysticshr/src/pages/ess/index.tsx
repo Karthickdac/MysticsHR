@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { AttachmentUploader, type UploadedAttachment } from "@/components/AttachmentUploader";
+import { getDocumentRequestFields } from "@/lib/document-fields";
 import {
   User, FileText, Calendar, Clock, Target, Wallet, Home, Phone, AlertCircle,
   ChevronRight, CheckCircle2, Eye, Download, LifeBuoy, Plus, Ticket, Send, Bell,
@@ -1057,13 +1058,28 @@ function DocumentRequestSection() {
     documentType: "Experience Certificate",
     reason: "",
   });
+  const [capturedFields, setCapturedFields] = useState<Record<string, string>>({});
+  const fieldSpecs = getDocumentRequestFields(form.documentType);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    create.mutate({ data: { ...form, reason: form.reason || null } }, {
+    // Strip empty values so we don't persist empty strings the prefill
+    // would later treat as "user supplied a blank".
+    const trimmed: Record<string, string> = {};
+    for (const [k, v] of Object.entries(capturedFields)) {
+      if (v && v.trim().length > 0) trimmed[k] = v.trim();
+    }
+    create.mutate({
+      data: {
+        ...form,
+        reason: form.reason || null,
+        capturedFields: trimmed,
+      },
+    }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getListDocumentRequestsQueryKey() });
         setForm({ documentType: "Experience Certificate", reason: "" });
+        setCapturedFields({});
       },
     });
   }
@@ -1086,9 +1102,13 @@ function DocumentRequestSection() {
             <Label>Document Type *</Label>
             <Select
               value={form.documentType}
-              onValueChange={(v: CreateDocumentRequestBodyDocumentType) =>
-                setForm(f => ({ ...f, documentType: v }))
-              }
+              onValueChange={(v: CreateDocumentRequestBodyDocumentType) => {
+                setForm(f => ({ ...f, documentType: v }));
+                // Drop captured values from the previously selected type so
+                // we don't persist hidden / stale keys the new template
+                // doesn't ask for.
+                setCapturedFields({});
+              }}
             >
               <SelectTrigger data-testid="select-document-type"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -1116,6 +1136,30 @@ function DocumentRequestSection() {
               {create.isPending ? "Submitting..." : "Submit Request"}
             </Button>
           </div>
+          {fieldSpecs.length > 0 && (
+            <div className="md:col-span-3 rounded-md border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                Optional details for this document — saves HR a step when they generate it
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {fieldSpecs.map(spec => (
+                  <div key={spec.key}>
+                    <Label className="text-xs">{spec.label}</Label>
+                    <Input
+                      data-testid={`input-captured-${spec.key}`}
+                      type={spec.type === "date" ? "date" : "text"}
+                      value={capturedFields[spec.key] ?? ""}
+                      onChange={e =>
+                        setCapturedFields(f => ({ ...f, [spec.key]: e.target.value }))
+                      }
+                      placeholder={spec.placeholder}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </form>
 
         <div className="mt-6">

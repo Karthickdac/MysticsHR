@@ -6599,6 +6599,12 @@ export const ListDocumentRequestsResponseItem = zod.object({
   fulfilledByName: zod.string().nullish(),
   fulfilledAt: zod.coerce.date().nullish(),
   hrNote: zod.string().nullish(),
+  capturedFields: zod
+    .record(zod.string(), zod.string())
+    .optional()
+    .describe(
+      "Optional template-specific values supplied by the requester (e.g. designation, ctc). Prefilled into HR's Generate dialog.",
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -6619,6 +6625,12 @@ export const CreateDocumentRequestBody = zod.object({
     "Relieving Letter",
   ]),
   reason: zod.string().nullish(),
+  capturedFields: zod
+    .record(zod.string(), zod.string())
+    .optional()
+    .describe(
+      "Optional template-specific values (designation, ctc, probationPeriod, etc.) used to prefill HR's Generate dialog.",
+    ),
 });
 
 /**
@@ -6647,6 +6659,12 @@ export const UpdateDocumentRequestResponse = zod.object({
   fulfilledByName: zod.string().nullish(),
   fulfilledAt: zod.coerce.date().nullish(),
   hrNote: zod.string().nullish(),
+  capturedFields: zod
+    .record(zod.string(), zod.string())
+    .optional()
+    .describe(
+      "Optional template-specific values supplied by the requester (e.g. designation, ctc). Prefilled into HR's Generate dialog.",
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });

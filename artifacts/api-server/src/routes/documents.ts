@@ -515,6 +515,7 @@ router.get("/documents/requests", requireHrmsUser, requireRole(...ALL_ROLES), as
       employeeId: documentRequestsTable.employeeId,
       documentType: documentRequestsTable.documentType,
       reason: documentRequestsTable.reason,
+      capturedFields: documentRequestsTable.capturedFields,
       status: documentRequestsTable.status,
       issuedDocumentId: documentRequestsTable.issuedDocumentId,
       fulfilledBy: documentRequestsTable.fulfilledBy,
@@ -539,6 +540,7 @@ router.get("/documents/requests", requireHrmsUser, requireRole(...ALL_ROLES), as
       employeeCode: r.employeeCode,
       documentType: r.documentType,
       reason: r.reason,
+      capturedFields: (r.capturedFields ?? {}) as Record<string, string>,
       status: r.status,
       issuedDocumentId: r.issuedDocumentId,
       fulfilledBy: r.fulfilledBy,
@@ -554,9 +556,23 @@ router.get("/documents/requests", requireHrmsUser, requireRole(...ALL_ROLES), as
 router.post("/documents/requests", requireHrmsUser, requireRole(...ALL_ROLES), async (req, res) => {
   try {
     const u = req.hrmsUser!;
-    const { documentType, reason } = req.body;
+    const { documentType, reason, capturedFields } = req.body;
     if (!documentType) {
       res.status(400).json({ error: "documentType is required" }); return;
+    }
+    // Sanitise capturedFields to a flat string→string map, dropping anything
+    // that isn't primitive. Stops a caller from stuffing nested objects /
+    // arrays into the column where HR's prefill expects scalar values.
+    let sanitisedFields: Record<string, string> = {};
+    if (capturedFields && typeof capturedFields === "object" && !Array.isArray(capturedFields)) {
+      for (const [k, v] of Object.entries(capturedFields as Record<string, unknown>)) {
+        if (typeof k !== "string" || k.length === 0 || k.length > 64) continue;
+        if (v === null || v === undefined || v === "") continue;
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+          const str = String(v);
+          if (str.length <= 1000) sanitisedFields[k] = str;
+        }
+      }
     }
     const empId = await getEmployeeIdForUser(u.id);
     if (!empId) { res.status(400).json({ error: "No employee record linked to your account" }); return; }
@@ -565,6 +581,7 @@ router.post("/documents/requests", requireHrmsUser, requireRole(...ALL_ROLES), a
       employeeId: empId,
       documentType,
       reason: reason ?? null,
+      capturedFields: sanitisedFields,
     }).returning();
 
     // Notify HR managers in-app
