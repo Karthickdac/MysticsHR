@@ -328,6 +328,24 @@ router.post("/helpdesk/tickets", requireHrmsUser, requireRole(...ALL_ROLES), asy
       });
     }
 
+    // Confirmation to the requester that we received their ticket. Best-effort:
+    // we use the requester's own user account email/name from req.hrmsUser; if
+    // the calling user has no email on file (rare — service accounts) the
+    // dispatch is skipped silently.
+    if (u.email) {
+      dispatchNotification({
+        eventType: "helpdesk_ticket_confirmation", module: "helpdesk",
+        recipientEmail: u.email, recipientName: u.name ?? undefined,
+        recipientEmployeeDbId: emp?.id ?? null,
+        variables: {
+          ticketId: String(ticket.id), subject, category, priority,
+          slaDeadline: slaDeadline.toISOString(),
+          recipientName: u.name ?? "Team Member",
+        },
+        entityType: "helpdesk_ticket", entityId: ticket.id,
+      }).catch(() => {});
+    }
+
     // Notify assignee about new ticket
     if (assignedToUserId) {
       const [assignee] = await db.select({ email: hrmsUsersTable.email, name: hrmsUsersTable.name, employeeId: hrmsUsersTable.employeeId })
