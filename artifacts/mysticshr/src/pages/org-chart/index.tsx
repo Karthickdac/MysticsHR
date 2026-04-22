@@ -458,10 +458,11 @@ export default function OrgChartPage() {
             </div>
           )}
 
-          {/* Export-only footer: rendered into the snapshot region while an
-              export is in progress so the PNG and PDF outputs always carry
-              the company name and export date. */}
-          {exporting !== null && (
+          {/* Export-only footer rendered into the snapshot region for PNG
+              exports. PDF exports get an equivalent footer drawn directly
+              by pdf-lib (with page numbers) so we skip the in-DOM footer
+              there to avoid duplicate footer content. */}
+          {exporting === "png" && (
             <div
               data-testid="org-chart-export-footer"
               className="mt-6 pt-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between"
