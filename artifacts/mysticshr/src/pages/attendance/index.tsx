@@ -229,7 +229,7 @@ function HrAttendanceView() {
                       <td className="px-4 py-2 space-y-1">
                         {r.isHrOverride && <Badge variant="outline" className="text-xs">HR Override</Badge>}
                         {(() => {
-                          const flags = (r as { suspicionFlags?: Array<{ code: string; reason: string }> }).suspicionFlags ?? [];
+                          const flags = r.suspicionFlags ?? [];
                           if (flags.length === 0) return null;
                           return (
                             <TooltipProvider delayDuration={150}>

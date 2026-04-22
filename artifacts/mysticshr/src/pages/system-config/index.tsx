@@ -1394,24 +1394,25 @@ function AttendanceSuspicionTab() {
   const [maxAccuracy, setMaxAccuracy] = useState<string>("200");
   const [maxRadius, setMaxRadius] = useState<string>("500");
   const [offices, setOffices] = useState<Array<{ name: string; latitude: number; longitude: number; location?: string | null }>>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    if (data && !loaded) {
-      setMaxAccuracy(String(data.maxAccuracyMeters ?? 200));
-      setMaxRadius(String(data.maxRadiusMeters ?? 500));
-      setOffices(data.offices ?? []);
-      setLoaded(true);
-    }
-  }, [data, loaded]);
+    if (!data || dirty) return;
+    setMaxAccuracy(String(data.maxAccuracyMeters ?? 200));
+    setMaxRadius(String(data.maxRadiusMeters ?? 500));
+    setOffices(data.offices ?? []);
+  }, [data, dirty]);
 
   function addOffice() {
+    setDirty(true);
     setOffices((p) => [...p, { name: "", latitude: 0, longitude: 0, location: "" }]);
   }
   function removeOffice(idx: number) {
+    setDirty(true);
     setOffices((p) => p.filter((_, i) => i !== idx));
   }
   function updateOffice(idx: number, patch: Partial<{ name: string; latitude: number; longitude: number; location: string | null }>) {
+    setDirty(true);
     setOffices((p) => p.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
   }
 
@@ -1429,6 +1430,7 @@ function AttendanceSuspicionTab() {
     }
     await update.mutateAsync({ data: { maxAccuracyMeters: acc, maxRadiusMeters: rad, offices } });
     toast({ title: "Suspicion settings saved" });
+    setDirty(false);
     void qc.invalidateQueries({ queryKey: getGetAttendanceSuspicionConfigQueryKey() });
   }
 
