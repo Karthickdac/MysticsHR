@@ -12,3 +12,39 @@ id = "zIGGQ2x2zf7oe6IIqNikD"
 uri = "file://docs/DEMO.pdf"
 type = "pdf"
 title = "MysticsHR — Demo Documentation (PDF, fixed screenshots)"
+
+[[outputs]]
+id = "sLrr31aTeE3T4iOdqQlTm"
+uri = "file://docs/role-demos/super_admin.pdf"
+type = "pdf"
+title = "Super Admin — Demo"
+
+[[outputs]]
+id = "u6xHjNHrgpNTD13vVJ5PG"
+uri = "file://docs/role-demos/hr_manager.pdf"
+type = "pdf"
+title = "HR Manager — Demo"
+
+[[outputs]]
+id = "AfO5sjEyr4W1Z6d9JEuo7"
+uri = "file://docs/role-demos/payroll_admin.pdf"
+type = "pdf"
+title = "Payroll Admin — Demo"
+
+[[outputs]]
+id = "qWFUW0VvHvr-sfrnR1vMN"
+uri = "file://docs/role-demos/hr_executive.pdf"
+type = "pdf"
+title = "HR Executive — Demo"
+
+[[outputs]]
+id = "dszUESCqOd1pDklFVhAYg"
+uri = "file://docs/role-demos/hod.pdf"
+type = "pdf"
+title = "HOD — Demo"
+
+[[outputs]]
+id = "YD_XSrna6gBJVTXwi0iIo"
+uri = "file://docs/role-demos/employee.pdf"
+type = "pdf"
+title = "Employee (ESS) — Demo"

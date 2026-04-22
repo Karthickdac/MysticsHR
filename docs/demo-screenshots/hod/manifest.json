@@ -1,0 +1,47 @@
+{
+  "role": "hod",
+  "display": "HOD (Suresh Babu)",
+  "description": "Department head focused on the team: see team members, approve leave, run mid-year and annual evaluations, monitor attendance.",
+  "shots": [
+    {
+      "path": "/dashboard",
+      "file": "01-dashboard.png",
+      "title": "Dashboard"
+    },
+    {
+      "path": "/employees",
+      "file": "02-team.png",
+      "title": "Team Members"
+    },
+    {
+      "path": "/org-chart",
+      "file": "03-org-chart.png",
+      "title": "Org Chart"
+    },
+    {
+      "path": "/attendance/summary",
+      "file": "04-attendance-summary.png",
+      "title": "Team Attendance Summary"
+    },
+    {
+      "path": "/leave/approvals",
+      "file": "05-leave-approvals.png",
+      "title": "Leave Approvals"
+    },
+    {
+      "path": "/leave/calendar",
+      "file": "06-leave-calendar.png",
+      "title": "Team Leave Calendar"
+    },
+    {
+      "path": "/performance",
+      "file": "07-performance.png",
+      "title": "Active Performance Cycle"
+    },
+    {
+      "path": "/performance/appraisals",
+      "file": "08-appraisals.png",
+      "title": "Team Appraisals"
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "role": "hr_manager",
+  "display": "HR Manager (Priya Venkataraman)",
+  "description": "Owns the HR lifecycle: directory, onboarding, leave, performance, communications. Cannot touch payroll runs or system role configuration.",
+  "shots": [
+    {
+      "path": "/dashboard",
+      "file": "01-dashboard.png",
+      "title": "Dashboard"
+    },
+    {
+      "path": "/employees",
+      "file": "02-employees.png",
+      "title": "Employee Directory"
+    },
+    {
+      "path": "/employees/new",
+      "file": "03-new-employee.png",
+      "title": "Add New Employee"
+    },
+    {
+      "path": "/departments",
+      "file": "04-departments.png",
+      "title": "Departments"
+    },
+    {
+      "path": "/designations",
+      "file": "05-designations.png",
+      "title": "Designations"
+    },
+    {
+      "path": "/org-chart",
+      "file": "06-org-chart.png",
+      "title": "Org Chart"
+    },
+    {
+      "path": "/onboarding",
+      "file": "07-onboarding.png",
+      "title": "Onboarding Pipeline"
+    },
+    {
+      "path": "/pre-onboarding",
+      "file": "08-pre-onboarding.png",
+      "title": "Pre-onboarding"
+    },
+    {
+      "path": "/recruitment",
+      "file": "09-recruitment.png",
+      "title": "Recruitment"
+    },
+    {
+      "path": "/attendance/summary",
+      "file": "10-attendance-summary.png",
+      "title": "Attendance Summary"
+    },
+    {
+      "path": "/attendance/regularization",
+      "file": "11-regularization.png",
+      "title": "Regularization Approvals"
+    },
+    {
+      "path": "/leave/approvals",
+      "file": "12-leave-approvals.png",
+      "title": "Leave Approvals"
+    },
+    {
+      "path": "/leave/calendar",
+      "file": "13-leave-calendar.png",
+      "title": "Leave Calendar"
+    },
+    {
+      "path": "/leave/types",
+      "file": "14-leave-types.png",
+      "title": "Leave Types"
+    },
+    {
+      "path": "/leave/policies",
+      "file": "15-leave-policies.png",
+      "title": "Leave Policies"
+    },
+    {
+      "path": "/performance",
+      "file": "16-performance.png",
+      "title": "Performance Cycles"
+    },
+    {
+      "path": "/performance/goals",
+      "file": "17-goals.png",
+      "title": "Goals"
+    },
+    {
+      "path": "/performance/appraisals",
+      "file": "18-appraisals.png",
+      "title": "Appraisals"
+    },
+    {
+      "path": "/documents",
+      "file": "19-documents.png",
+      "title": "Documents"
+    },
+    {
+      "path": "/communications",
+      "file": "20-communications.png",
+      "title": "Communications"
+    },
+    {
+      "path": "/analytics",
+      "file": "21-analytics.png",
+      "title": "Analytics"
+    },
+    {
+      "path": "/reports",
+      "file": "22-reports.png",
+      "title": "Reports"
+    }
+  ]
+}

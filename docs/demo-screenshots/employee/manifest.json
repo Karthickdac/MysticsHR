@@ -1,0 +1,42 @@
+{
+  "role": "employee",
+  "display": "Employee — ESS (Kavitha Nair)",
+  "description": "Employee Self-Service. Marks attendance, applies for leave, sees payslips, raises helpdesk tickets, downloads documents.",
+  "shots": [
+    {
+      "path": "/dashboard",
+      "file": "01-dashboard.png",
+      "title": "Dashboard"
+    },
+    {
+      "path": "/ess",
+      "file": "02-ess.png",
+      "title": "ESS Hub"
+    },
+    {
+      "path": "/my-attendance",
+      "file": "03-my-attendance.png",
+      "title": "My Attendance"
+    },
+    {
+      "path": "/leave",
+      "file": "04-my-leave.png",
+      "title": "My Leave"
+    },
+    {
+      "path": "/leave/calendar",
+      "file": "05-leave-calendar.png",
+      "title": "Leave Calendar"
+    },
+    {
+      "path": "/helpdesk",
+      "file": "06-helpdesk.png",
+      "title": "My Helpdesk Tickets"
+    },
+    {
+      "path": "/documents",
+      "file": "07-documents.png",
+      "title": "My Documents"
+    }
+  ]
+}

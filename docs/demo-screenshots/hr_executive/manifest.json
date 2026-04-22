@@ -1,0 +1,42 @@
+{
+  "role": "hr_executive",
+  "display": "HR Executive (Meena Rajesh)",
+  "description": "Day-to-day HR operations: onboarding tasks, candidate coordination, helpdesk first-response, document issuance.",
+  "shots": [
+    {
+      "path": "/dashboard",
+      "file": "01-dashboard.png",
+      "title": "Dashboard"
+    },
+    {
+      "path": "/employees",
+      "file": "02-employees.png",
+      "title": "Employee Directory (read)"
+    },
+    {
+      "path": "/onboarding",
+      "file": "03-onboarding.png",
+      "title": "Onboarding Pipeline"
+    },
+    {
+      "path": "/pre-onboarding",
+      "file": "04-pre-onboarding.png",
+      "title": "Pre-onboarding"
+    },
+    {
+      "path": "/recruitment",
+      "file": "05-recruitment.png",
+      "title": "Recruitment"
+    },
+    {
+      "path": "/helpdesk",
+      "file": "06-helpdesk.png",
+      "title": "Helpdesk Tickets"
+    },
+    {
+      "path": "/documents",
+      "file": "07-documents.png",
+      "title": "Documents"
+    }
+  ]
+}

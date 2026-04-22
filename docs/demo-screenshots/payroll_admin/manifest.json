@@ -1,0 +1,42 @@
+{
+  "role": "payroll_admin",
+  "display": "Payroll Admin (Ravi Kumar)",
+  "description": "Owns payroll execution end-to-end: salary structures, monthly runs, payslips, statutory reports, and tax declarations.",
+  "shots": [
+    {
+      "path": "/dashboard",
+      "file": "01-dashboard.png",
+      "title": "Dashboard"
+    },
+    {
+      "path": "/payroll",
+      "file": "02-payroll-runs.png",
+      "title": "Payroll Runs"
+    },
+    {
+      "path": "/payroll/salary-structures",
+      "file": "03-salary-structures.png",
+      "title": "Salary Structures"
+    },
+    {
+      "path": "/payroll/payslips",
+      "file": "04-payslips.png",
+      "title": "Payslips"
+    },
+    {
+      "path": "/payroll/reports",
+      "file": "05-payroll-reports.png",
+      "title": "Payroll Reports"
+    },
+    {
+      "path": "/payroll/tax-declaration",
+      "file": "06-tax-declaration.png",
+      "title": "Tax Declarations"
+    },
+    {
+      "path": "/employees",
+      "file": "07-employees.png",
+      "title": "Employee Directory (read)"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "role": "super_admin",
+  "display": "Super Admin (Arjun Sharma)",
+  "description": "Has access to every module. Use this account for full-system demos, configuration walkthroughs, and audit reviews.",
+  "shots": [
+    {
+      "path": "/dashboard",
+      "file": "01-dashboard.png",
+      "title": "Dashboard"
+    },
+    {
+      "path": "/employees",
+      "file": "02-employees.png",
+      "title": "Employee Directory"
+    },
+    {
+      "path": "/departments",
+      "file": "03-departments.png",
+      "title": "Departments"
+    },
+    {
+      "path": "/designations",
+      "file": "04-designations.png",
+      "title": "Designations"
+    },
+    {
+      "path": "/org-chart",
+      "file": "05-org-chart.png",
+      "title": "Org Chart"
+    },
+    {
+      "path": "/payroll",
+      "file": "06-payroll.png",
+      "title": "Payroll Runs"
+    },
+    {
+      "path": "/performance",
+      "file": "07-performance.png",
+      "title": "Performance Cycles"
+    },
+    {
+      "path": "/users",
+      "file": "08-users.png",
+      "title": "User Management"
+    },
+    {
+      "path": "/permissions",
+      "file": "09-permissions.png",
+      "title": "Role Permissions"
+    },
+    {
+      "path": "/audit-logs",
+      "file": "10-audit-logs.png",
+      "title": "Audit Log"
+    },
+    {
+      "path": "/settings",
+      "file": "11-settings.png",
+      "title": "System Settings"
+    },
+    {
+      "path": "/analytics",
+      "file": "12-analytics.png",
+      "title": "Analytics"
+    }
+  ]
+}
