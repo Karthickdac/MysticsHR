@@ -1,0 +1,109 @@
+
+You have new mail.
+Last login: Sat May  2 04:42:32 2026 from 169.254.0.1
+root@srv1609330:~# cd /home/automystics-mysticshr/htdocs/mysticshr.automystics.tech
+root@srv1609330:/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech# cd mysticshr
+-bash: cd: mysticshr: No such file or directory
+root@srv1609330:/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech# cd ~/htdocs/mysticshr.automystics.tech
+git pull origin main
+pnpm install --frozen-lockfile
+pnpm --filter @workspace/db run push          # creates the api_keys table
+pnpm --filter @workspace/api-server run build
+pnpm --filter @workspace/mysticshr run build
+pm2 restart mysticshr-api
+remote: Enumerating objects: 69, done.
+remote: Counting objects: 100% (69/69), done.
+remote: Compressing objects: 100% (17/17), done.
+remote: Total 46 (delta 29), reused 45 (delta 28), pack-reused 0 (from 0)
+Unpacking objects: 100% (46/46), 324.59 KiB | 9.02 MiB/s, done.
+From https://github.com/Karthickdac/MysticsHR
+ * branch            main       -> FETCH_HEAD
+   da31e21..e686b7e  main       -> origin/main
+Updating da31e21..e686b7e
+Fast-forward
+ artifacts/api-server/src/lib/apiKeys.ts                                                          | 137 ++++++++++++++++++++++++++++++++++
+ artifacts/api-server/src/openapi.ts                                                              | 308 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ artifacts/api-server/src/routes/api-keys.ts                                                      | 142 ++++++++++++++++++++++++++++++++++++
+ artifacts/api-server/src/routes/index.ts                                                         |  32 ++++++++
+ artifacts/api-server/src/routes/payroll.ts                                                       |  59 +++++++++++++++
+ artifacts/api-server/src/routes/v1.ts                                                            | 284 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ artifacts/api-server/src/types.d.ts                                                              |   3 +-
+ artifacts/mysticshr/src/App.tsx                                                                  |   9 +++
+ artifacts/mysticshr/src/components/layout/nav-config.ts                                          |   8 ++
+ artifacts/mysticshr/src/pages/settings/api-keys.tsx                                              | 303 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ attached_assets/Pasted-git-pull-pnpm-filter-workspace-mysticshr-run-build-pm2-_1776882902957.txt |  26 +++++++
+ attached_assets/image_1776883014657.png                                                          | Bin 0 -> 108257 bytes
+ attached_assets/image_1776883098521.png                                                          | Bin 0 -> 220789 bytes
+ lib/db/src/schema/api_keys.ts                                                                    |  40 ++++++++++
+ lib/db/src/schema/index.ts                                                                       |   1 +
+ replit.md                                                                                        |   1 +
+ 16 files changed, 1352 insertions(+), 1 deletion(-)
+ create mode 100644 artifacts/api-server/src/lib/apiKeys.ts
+ create mode 100644 artifacts/api-server/src/openapi.ts
+ create mode 100644 artifacts/api-server/src/routes/api-keys.ts
+ create mode 100644 artifacts/api-server/src/routes/v1.ts
+ create mode 100644 artifacts/mysticshr/src/pages/settings/api-keys.tsx
+ create mode 100644 attached_assets/Pasted-git-pull-pnpm-filter-workspace-mysticshr-run-build-pm2-_1776882902957.txt
+ create mode 100644 attached_assets/image_1776883014657.png
+ create mode 100644 attached_assets/image_1776883098521.png
+ create mode 100644 lib/db/src/schema/api_keys.ts
+Scope: all 9 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+└─ Done in 41ms
+╭ Warning ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                            │
+│   Ignored build scripts: @clerk/shared@4.8.2.                                              │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.   │
+│                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────╯
+Done in 1.9s using pnpm v10.33.1
+
+> @workspace/db@0.0.0 push /root/lib/db
+> drizzle-kit push --config ./drizzle.config.ts
+
+Reading config file '/root/lib/db/drizzle.config.ts'
+DATABASE_URL, ensure the database is provisioned
+/root/lib/db:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/db@0.0.0 push: `drizzle-kit push --config ./drizzle.config.ts`
+Exit status 1
+
+> @workspace/api-server@0.0.0 build /root/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                       6.7mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.0kb
+  dist/pino-pretty.mjs               114.6kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                  11.8mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           203.9kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 896ms
+
+> @workspace/mysticshr@0.0.0 build /root/artifacts/mysticshr
+> vite build --config vite.config.ts
+
+failed to load config from /root/artifacts/mysticshr/vite.config.ts
+error during build:
+Error: PORT environment variable is required but was not provided.
+    at file:///root/artifacts/mysticshr/node_modules/.vite-temp/vite.config.ts.timestamp-1777719800476-2fee2518e172f.mjs:10:9
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async loadConfigFromBundledFile (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35920:12)
+    at async bundleAndLoadConfigFile (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35808:17)
+    at async loadConfigFromFile (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35775:42)
+    at async resolveConfig (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:35424:22)
+    at async createBuilder (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:33879:19)
+    at async CAC.<anonymous> (file:///root/node_modules/.pnpm/vite@7.3.2_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/cli.js:629:10)
+/root/artifacts/mysticshr:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/mysticshr@0.0.0 build: `vite build --config vite.config.ts`
+Exit status 1
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace mysticshr-api not found
+root@srv1609330:~/htdocs/mysticshr.automystics.tech# 
