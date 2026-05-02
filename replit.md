@@ -35,6 +35,7 @@ The project's directory structure segregates `lib` for shared components like AP
 - **Document Generation**: Utilizes `pdf-lib` for generating dynamic PDFs (e.g., ID cards, offer letters, relieving letters) with template substitution.
 - **Reporting & Analytics**: Features an analytics dashboard with KPIs (headcount, attrition, attendance), pre-built reports, a custom report builder, and a report scheduler.
 - **Helpdesk Ticketing**: Implements ticket management with comments, SLA tracking, and role-based visibility.
+- **Public API (v1)**: External integrations call `/api/v1/*` (employees, departments, attendance, payslips, leave-balances) using API keys in the format `mhr_live_<prefix>_<secret>` sent as `Authorization: Bearer …`. Keys carry granular scopes (`employees:read`, `departments:read`, `attendance:read`, `payslips:read`, `leave:read`); only the SHA-256 hash is persisted. Super admins manage keys at `/settings/api-keys`. OpenAPI spec served at `/api/openapi.json`, Swagger UI at `/api/docs`. Both successful calls and failed auth attempts are written to the audit log.
 - **Field-level Auditing**: `employee_history` table records changes to employee profiles for audit trails.
 - **Atomicity**: All critical mutations are wrapped in database transactions to ensure data consistency.
 

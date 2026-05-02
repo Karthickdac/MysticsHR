@@ -24,6 +24,7 @@ import {
   Network,
   LifeBuoy,
   Sparkles,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -302,6 +303,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Settings,
         roles: ["super_admin", "hr_manager"],
         keywords: ["configuration", "preferences", "system"],
+      },
+      {
+        name: "API Keys",
+        href: "/settings/api-keys",
+        icon: KeyRound,
+        roles: ["super_admin"],
+        keywords: ["integration", "external", "token", "developer"],
       },
     ],
   },
