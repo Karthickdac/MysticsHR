@@ -25,6 +25,7 @@ import {
   LifeBuoy,
   Sparkles,
   KeyRound,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -310,6 +311,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: KeyRound,
         roles: ["super_admin"],
         keywords: ["integration", "external", "token", "developer"],
+      },
+      {
+        name: "API Docs",
+        href: "/settings/api-docs",
+        icon: BookOpen,
+        roles: ["super_admin"],
+        keywords: ["openapi", "swagger", "reference", "developer", "integration"],
       },
     ],
   },

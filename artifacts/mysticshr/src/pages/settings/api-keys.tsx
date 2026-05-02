@@ -144,7 +144,7 @@ export default function ApiKeysPage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Issue keys for external apps to read MysticsHR data via{" "}
-            <a className="underline" href={`${BASE_URL}/api/docs`} target="_blank" rel="noreferrer">
+            <a className="underline" href={`${BASE_URL}/settings/api-docs`}>
               the public API
             </a>.
           </p>

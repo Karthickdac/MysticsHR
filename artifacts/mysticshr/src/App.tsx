@@ -59,6 +59,7 @@ import ReportsPage from "@/pages/reports/index";
 import CommunicationsPage from "@/pages/communications/index";
 import SystemConfigPage from "@/pages/system-config/index";
 import ApiKeysPage from "@/pages/settings/api-keys";
+import ApiDocsPage from "@/pages/settings/api-docs";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCurrentHrmsUser, type HrmsRole, hasRole } from "@/lib/useCurrentHrmsUser";
 
@@ -707,6 +708,14 @@ function ClerkProviderWithRoutes() {
             <ProtectedRoute>
               <RoleProtectedRoute allowedRoles={["super_admin"]}>
                 <ApiKeysPage />
+              </RoleProtectedRoute>
+            </ProtectedRoute>
+          </Route>
+
+          <Route path="/settings/api-docs">
+            <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={["super_admin"]}>
+                <ApiDocsPage />
               </RoleProtectedRoute>
             </ProtectedRoute>
           </Route>
