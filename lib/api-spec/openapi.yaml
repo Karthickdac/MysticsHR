@@ -569,6 +569,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/EmployeeEducation"
 
+  /employees/{id}/education/import:
+    post:
+      summary: Bulk import education records via CSV data
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+              required: [rows]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
   /employee-education/{id}:
     patch:
       summary: Update education record
@@ -631,6 +658,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/EmployeeWorkExperience"
 
+  /employees/{id}/work-experience/import:
+    post:
+      summary: Bulk import work experience records via CSV data
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+              required: [rows]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
   /employee-work-experience/{id}:
     patch:
       summary: Update work experience record
@@ -692,6 +746,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EmployeeDocument"
+
+  /employees/{id}/emp-documents/import:
+    post:
+      summary: Bulk import employee documents via CSV data
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+              required: [rows]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
 
   /emp-documents/{id}:
     patch:

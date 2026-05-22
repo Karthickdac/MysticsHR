@@ -221,6 +221,49 @@ router.post("/employees/:id/education", requireHrmsUser, requireRole(...HR_ROLES
   }
 });
 
+router.post("/employees/:id/education/import", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { rows } = req.body as { rows: Record<string, string>[] };
+    if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    let imported = 0;
+    const errors: { row: number; error: string }[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] ?? {};
+      try {
+        const degree = String(r.degree ?? "").trim();
+        const institution = String(r.institution ?? "").trim();
+        if (!degree || !institution) {
+          errors.push({ row: i + 1, error: "degree and institution are required" });
+          continue;
+        }
+        const startYear = r.startYear ? parseInt(String(r.startYear), 10) : null;
+        const endYear = r.endYear ? parseInt(String(r.endYear), 10) : null;
+        if (r.startYear && Number.isNaN(startYear)) { errors.push({ row: i + 1, error: "startYear must be a number" }); continue; }
+        if (r.endYear && Number.isNaN(endYear)) { errors.push({ row: i + 1, error: "endYear must be a number" }); continue; }
+        await db.insert(employeeEducationTable).values({
+          employeeId: id,
+          degree,
+          institution,
+          fieldOfStudy: r.fieldOfStudy ? String(r.fieldOfStudy) : null,
+          startYear,
+          endYear,
+          grade: r.grade ? String(r.grade) : null,
+        });
+        imported++;
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        errors.push({ row: i + 1, error: e?.message ?? "Unknown error" });
+      }
+    }
+    await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "EmployeeEducation", recordId: id, newValue: `${imported} imported`, ipAddress: req.ip });
+    res.json({ imported, skipped: errors.length, errors });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.patch("/employee-education/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
@@ -295,6 +338,49 @@ router.post("/employees/:id/work-experience", requireHrmsUser, requireRole(...HR
       .returning();
     await logAudit({ user: req.hrmsUser, action: "CREATE", module: "EmployeeWorkExp", recordId: row.id, ipAddress: req.ip });
     res.status(201).json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/work-experience/import", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { rows } = req.body as { rows: Record<string, string>[] };
+    if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    let imported = 0;
+    const errors: { row: number; error: string }[] = [];
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] ?? {};
+      try {
+        const company = String(r.company ?? "").trim();
+        const designation = String(r.designation ?? "").trim();
+        if (!company || !designation) {
+          errors.push({ row: i + 1, error: "company and designation are required" });
+          continue;
+        }
+        if (r.startDate && !dateRe.test(String(r.startDate))) { errors.push({ row: i + 1, error: "startDate must be YYYY-MM-DD" }); continue; }
+        if (r.endDate && !dateRe.test(String(r.endDate))) { errors.push({ row: i + 1, error: "endDate must be YYYY-MM-DD" }); continue; }
+        await db.insert(employeeWorkExperienceTable).values({
+          employeeId: id,
+          company,
+          designation,
+          location: r.location ? String(r.location) : null,
+          startDate: r.startDate ? String(r.startDate) : null,
+          endDate: r.endDate ? String(r.endDate) : null,
+          description: r.description ? String(r.description) : null,
+          ctcDrawn: r.ctcDrawn ? String(r.ctcDrawn) : null,
+        });
+        imported++;
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        errors.push({ row: i + 1, error: e?.message ?? "Unknown error" });
+      }
+    }
+    await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "EmployeeWorkExp", recordId: id, newValue: `${imported} imported`, ipAddress: req.ip });
+    res.json({ imported, skipped: errors.length, errors });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -386,6 +472,52 @@ router.post("/employees/:id/emp-documents", requireHrmsUser, requireRole(...HR_R
       .returning();
     await logAudit({ user: req.hrmsUser, action: "CREATE", module: "EmployeeDocuments", recordId: row.id, ipAddress: req.ip });
     res.status(201).json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/emp-documents/import", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { rows } = req.body as { rows: Record<string, string>[] };
+    if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    let imported = 0;
+    const errors: { row: number; error: string }[] = [];
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] ?? {};
+      try {
+        const documentType = String(r.documentType ?? "").trim();
+        const documentName = String(r.documentName ?? "").trim();
+        if (!documentType || !documentName) {
+          errors.push({ row: i + 1, error: "documentType and documentName are required" });
+          continue;
+        }
+        if (r.issueDate && !dateRe.test(String(r.issueDate))) { errors.push({ row: i + 1, error: "issueDate must be YYYY-MM-DD" }); continue; }
+        if (r.expiryDate && !dateRe.test(String(r.expiryDate))) { errors.push({ row: i + 1, error: "expiryDate must be YYYY-MM-DD" }); continue; }
+        const alertDays = r.alertDays ? parseInt(String(r.alertDays), 10) : 30;
+        if (r.alertDays && Number.isNaN(alertDays)) { errors.push({ row: i + 1, error: "alertDays must be a number" }); continue; }
+        await db.insert(employeeDocumentsTable).values({
+          employeeId: id,
+          documentType,
+          documentName,
+          fileUrl: r.fileUrl ? String(r.fileUrl) : null,
+          issueDate: r.issueDate ? String(r.issueDate) : null,
+          expiryDate: r.expiryDate ? String(r.expiryDate) : null,
+          alertDays,
+          notes: r.notes ? String(r.notes) : null,
+          uploadedById: req.hrmsUser?.id ?? null,
+        });
+        imported++;
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        errors.push({ row: i + 1, error: e?.message ?? "Unknown error" });
+      }
+    }
+    await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "EmployeeDocuments", recordId: id, newValue: `${imported} imported`, ipAddress: req.ip });
+    res.json({ imported, skipped: errors.length, errors });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

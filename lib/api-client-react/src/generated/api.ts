@@ -254,8 +254,11 @@ import type {
   PermissionRegister,
   PostDepartmentsIdShiftAssignments201,
   PostEmployeesBulkImportBody,
+  PostEmployeesIdEducationImportBody,
+  PostEmployeesIdEmpDocumentsImportBody,
   PostEmployeesIdOnboardingChecklistBody,
   PostEmployeesIdOnboardingChecklistWelcomeEmail200,
+  PostEmployeesIdWorkExperienceImportBody,
   PostOnboardingTasksIdCompleteBody,
   PreOnboardingDocument,
   PreOnboardingRecord,
@@ -2664,6 +2667,97 @@ export const usePostEmployeesIdEducation = <
 };
 
 /**
+ * @summary Bulk import education records via CSV data
+ */
+export const getPostEmployeesIdEducationImportUrl = (id: number) => {
+  return `/api/employees/${id}/education/import`;
+};
+
+export const postEmployeesIdEducationImport = async (
+  id: number,
+  postEmployeesIdEducationImportBody: PostEmployeesIdEducationImportBody,
+  options?: RequestInit,
+): Promise<BulkImportResult> => {
+  return customFetch<BulkImportResult>(
+    getPostEmployeesIdEducationImportUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(postEmployeesIdEducationImportBody),
+    },
+  );
+};
+
+export const getPostEmployeesIdEducationImportMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdEducationImport>>,
+    TError,
+    { id: number; data: BodyType<PostEmployeesIdEducationImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postEmployeesIdEducationImport>>,
+  TError,
+  { id: number; data: BodyType<PostEmployeesIdEducationImportBody> },
+  TContext
+> => {
+  const mutationKey = ["postEmployeesIdEducationImport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postEmployeesIdEducationImport>>,
+    { id: number; data: BodyType<PostEmployeesIdEducationImportBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postEmployeesIdEducationImport(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostEmployeesIdEducationImportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postEmployeesIdEducationImport>>
+>;
+export type PostEmployeesIdEducationImportMutationBody =
+  BodyType<PostEmployeesIdEducationImportBody>;
+export type PostEmployeesIdEducationImportMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Bulk import education records via CSV data
+ */
+export const usePostEmployeesIdEducationImport = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdEducationImport>>,
+    TError,
+    { id: number; data: BodyType<PostEmployeesIdEducationImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postEmployeesIdEducationImport>>,
+  TError,
+  { id: number; data: BodyType<PostEmployeesIdEducationImportBody> },
+  TContext
+> => {
+  return useMutation(getPostEmployeesIdEducationImportMutationOptions(options));
+};
+
+/**
  * @summary Update education record
  */
 export const getPatchEmployeeEducationIdUrl = (id: number) => {
@@ -3019,6 +3113,100 @@ export const usePostEmployeesIdWorkExperience = <
 };
 
 /**
+ * @summary Bulk import work experience records via CSV data
+ */
+export const getPostEmployeesIdWorkExperienceImportUrl = (id: number) => {
+  return `/api/employees/${id}/work-experience/import`;
+};
+
+export const postEmployeesIdWorkExperienceImport = async (
+  id: number,
+  postEmployeesIdWorkExperienceImportBody: PostEmployeesIdWorkExperienceImportBody,
+  options?: RequestInit,
+): Promise<BulkImportResult> => {
+  return customFetch<BulkImportResult>(
+    getPostEmployeesIdWorkExperienceImportUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(postEmployeesIdWorkExperienceImportBody),
+    },
+  );
+};
+
+export const getPostEmployeesIdWorkExperienceImportMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdWorkExperienceImport>>,
+    TError,
+    { id: number; data: BodyType<PostEmployeesIdWorkExperienceImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postEmployeesIdWorkExperienceImport>>,
+  TError,
+  { id: number; data: BodyType<PostEmployeesIdWorkExperienceImportBody> },
+  TContext
+> => {
+  const mutationKey = ["postEmployeesIdWorkExperienceImport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postEmployeesIdWorkExperienceImport>>,
+    { id: number; data: BodyType<PostEmployeesIdWorkExperienceImportBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postEmployeesIdWorkExperienceImport(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostEmployeesIdWorkExperienceImportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postEmployeesIdWorkExperienceImport>>
+>;
+export type PostEmployeesIdWorkExperienceImportMutationBody =
+  BodyType<PostEmployeesIdWorkExperienceImportBody>;
+export type PostEmployeesIdWorkExperienceImportMutationError =
+  ErrorType<unknown>;
+
+/**
+ * @summary Bulk import work experience records via CSV data
+ */
+export const usePostEmployeesIdWorkExperienceImport = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdWorkExperienceImport>>,
+    TError,
+    { id: number; data: BodyType<PostEmployeesIdWorkExperienceImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postEmployeesIdWorkExperienceImport>>,
+  TError,
+  { id: number; data: BodyType<PostEmployeesIdWorkExperienceImportBody> },
+  TContext
+> => {
+  return useMutation(
+    getPostEmployeesIdWorkExperienceImportMutationOptions(options),
+  );
+};
+
+/**
  * @summary Update work experience record
  */
 export const getPatchEmployeeWorkExperienceIdUrl = (id: number) => {
@@ -3368,6 +3556,99 @@ export const usePostEmployeesIdEmpDocuments = <
   TContext
 > => {
   return useMutation(getPostEmployeesIdEmpDocumentsMutationOptions(options));
+};
+
+/**
+ * @summary Bulk import employee documents via CSV data
+ */
+export const getPostEmployeesIdEmpDocumentsImportUrl = (id: number) => {
+  return `/api/employees/${id}/emp-documents/import`;
+};
+
+export const postEmployeesIdEmpDocumentsImport = async (
+  id: number,
+  postEmployeesIdEmpDocumentsImportBody: PostEmployeesIdEmpDocumentsImportBody,
+  options?: RequestInit,
+): Promise<BulkImportResult> => {
+  return customFetch<BulkImportResult>(
+    getPostEmployeesIdEmpDocumentsImportUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(postEmployeesIdEmpDocumentsImportBody),
+    },
+  );
+};
+
+export const getPostEmployeesIdEmpDocumentsImportMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdEmpDocumentsImport>>,
+    TError,
+    { id: number; data: BodyType<PostEmployeesIdEmpDocumentsImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postEmployeesIdEmpDocumentsImport>>,
+  TError,
+  { id: number; data: BodyType<PostEmployeesIdEmpDocumentsImportBody> },
+  TContext
+> => {
+  const mutationKey = ["postEmployeesIdEmpDocumentsImport"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postEmployeesIdEmpDocumentsImport>>,
+    { id: number; data: BodyType<PostEmployeesIdEmpDocumentsImportBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return postEmployeesIdEmpDocumentsImport(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostEmployeesIdEmpDocumentsImportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postEmployeesIdEmpDocumentsImport>>
+>;
+export type PostEmployeesIdEmpDocumentsImportMutationBody =
+  BodyType<PostEmployeesIdEmpDocumentsImportBody>;
+export type PostEmployeesIdEmpDocumentsImportMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Bulk import employee documents via CSV data
+ */
+export const usePostEmployeesIdEmpDocumentsImport = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postEmployeesIdEmpDocumentsImport>>,
+    TError,
+    { id: number; data: BodyType<PostEmployeesIdEmpDocumentsImportBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postEmployeesIdEmpDocumentsImport>>,
+  TError,
+  { id: number; data: BodyType<PostEmployeesIdEmpDocumentsImportBody> },
+  TContext
+> => {
+  return useMutation(
+    getPostEmployeesIdEmpDocumentsImportMutationOptions(options),
+  );
 };
 
 /**

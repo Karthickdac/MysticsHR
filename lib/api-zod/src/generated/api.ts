@@ -644,6 +644,28 @@ export const PostEmployeesIdEducationBody = zod.object({
 });
 
 /**
+ * @summary Bulk import education records via CSV data
+ */
+export const PostEmployeesIdEducationImportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdEducationImportBody = zod.object({
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+export const PostEmployeesIdEducationImportResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number(),
+      error: zod.string(),
+    }),
+  ),
+});
+
+/**
  * @summary Update education record
  */
 export const PatchEmployeeEducationIdParams = zod.object({
@@ -718,6 +740,28 @@ export const PostEmployeesIdWorkExperienceBody = zod.object({
   endDate: zod.coerce.date().nullish(),
   description: zod.string().nullish(),
   ctcDrawn: zod.string().nullish(),
+});
+
+/**
+ * @summary Bulk import work experience records via CSV data
+ */
+export const PostEmployeesIdWorkExperienceImportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdWorkExperienceImportBody = zod.object({
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+export const PostEmployeesIdWorkExperienceImportResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number(),
+      error: zod.string(),
+    }),
+  ),
 });
 
 /**
@@ -799,6 +843,28 @@ export const PostEmployeesIdEmpDocumentsBody = zod.object({
   expiryDate: zod.coerce.date().nullish(),
   alertDays: zod.number().nullish(),
   notes: zod.string().nullish(),
+});
+
+/**
+ * @summary Bulk import employee documents via CSV data
+ */
+export const PostEmployeesIdEmpDocumentsImportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdEmpDocumentsImportBody = zod.object({
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+export const PostEmployeesIdEmpDocumentsImportResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number(),
+      error: zod.string(),
+    }),
+  ),
 });
 
 /**

@@ -9,14 +9,17 @@ import {
   getGetEmployeeQueryKey,
   useGetEmployeesIdEducation,
   usePostEmployeesIdEducation,
+  usePostEmployeesIdEducationImport,
   usePatchEmployeeEducationId,
   useDeleteEmployeeEducationId,
   useGetEmployeesIdWorkExperience,
   usePostEmployeesIdWorkExperience,
+  usePostEmployeesIdWorkExperienceImport,
   usePatchEmployeeWorkExperienceId,
   useDeleteEmployeeWorkExperienceId,
   useGetEmployeesIdEmpDocuments,
   usePostEmployeesIdEmpDocuments,
+  usePostEmployeesIdEmpDocumentsImport,
   usePatchEmpDocumentsId,
   useDeleteEmpDocumentsId,
   useGetEmployeesIdHistory,
@@ -49,8 +52,38 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Plus, Pencil, Trash2,
   GraduationCap, Briefcase, FileText, History, ClipboardList, Download,
-  TrendingUp,
+  TrendingUp, Upload,
 } from "lucide-react";
+import { CsvImportModal, type CsvColumn } from "@/components/CsvImportModal";
+
+const EDUCATION_CSV_COLUMNS: CsvColumn[] = [
+  { key: "degree", label: "Degree", required: true, example: "B.Tech" },
+  { key: "institution", label: "Institution", required: true, example: "IIT Bombay" },
+  { key: "fieldOfStudy", label: "Field of Study", example: "Computer Science" },
+  { key: "startYear", label: "Start Year", example: "2015" },
+  { key: "endYear", label: "End Year", example: "2019" },
+  { key: "grade", label: "Grade / %", example: "8.5 CGPA" },
+];
+
+const WORK_EXP_CSV_COLUMNS: CsvColumn[] = [
+  { key: "company", label: "Company", required: true, example: "Acme Corp" },
+  { key: "designation", label: "Designation", required: true, example: "Senior Engineer" },
+  { key: "location", label: "Location", example: "Bengaluru" },
+  { key: "startDate", label: "Start Date (YYYY-MM-DD)", example: "2020-01-15" },
+  { key: "endDate", label: "End Date (YYYY-MM-DD)", example: "2023-06-30" },
+  { key: "description", label: "Description", example: "Led platform team" },
+  { key: "ctcDrawn", label: "CTC Drawn", example: "1800000" },
+];
+
+const DOCUMENTS_CSV_COLUMNS: CsvColumn[] = [
+  { key: "documentType", label: "Document Type", required: true, example: "PAN Card" },
+  { key: "documentName", label: "Document Name", required: true, example: "PAN — ABCDE1234F" },
+  { key: "fileUrl", label: "File URL", example: "https://example.com/file.pdf" },
+  { key: "issueDate", label: "Issue Date (YYYY-MM-DD)", example: "2020-01-15" },
+  { key: "expiryDate", label: "Expiry Date (YYYY-MM-DD)", example: "2030-01-15" },
+  { key: "alertDays", label: "Alert Days Before Expiry", example: "30" },
+  { key: "notes", label: "Notes", example: "" },
+];
 import { format } from "date-fns";
 import { useCurrentHrmsUser, hasRole } from "@/lib/useCurrentHrmsUser";
 import { listTimezones } from "@/lib/timezones";
@@ -124,6 +157,8 @@ function EducationSection({ employeeId, canEdit }: { employeeId: number; canEdit
   const create = usePostEmployeesIdEducation({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdEducationQueryKey(employeeId) }) } });
   const patch = usePatchEmployeeEducationId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdEducationQueryKey(employeeId) }) } });
   const del = useDeleteEmployeeEducationId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdEducationQueryKey(employeeId) }) } });
+  const importMut = usePostEmployeesIdEducationImport();
+  const [importOpen, setImportOpen] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<EmployeeEducation | null>(null);
@@ -144,7 +179,12 @@ function EducationSection({ employeeId, canEdit }: { employeeId: number; canEdit
 
   return (
     <div>
-      <SectionHeader title="Education" action={canEdit && <Button size="sm" onClick={openCreate}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>} />
+      <SectionHeader title="Education" action={canEdit && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="w-3.5 h-3.5 mr-1" />Import CSV</Button>
+          <Button size="sm" onClick={openCreate}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>
+        </div>
+      )} />
       {records.length === 0 && <p className="text-sm text-muted-foreground italic">No education records.</p>}
       <div className="space-y-3">
         {records.map((r) => (
@@ -184,6 +224,15 @@ function EducationSection({ employeeId, canEdit }: { employeeId: number; canEdit
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CsvImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import Education from CSV"
+        templateFileName="education_import_template.csv"
+        columns={EDUCATION_CSV_COLUMNS}
+        onImport={async (rows) => await importMut.mutateAsync({ id: employeeId, data: { rows } })}
+        onImported={() => qc.invalidateQueries({ queryKey: getGetEmployeesIdEducationQueryKey(employeeId) })}
+      />
     </div>
   );
 }
@@ -194,6 +243,8 @@ function WorkExpSection({ employeeId, canEdit }: { employeeId: number; canEdit: 
   const create = usePostEmployeesIdWorkExperience({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdWorkExperienceQueryKey(employeeId) }) } });
   const patch = usePatchEmployeeWorkExperienceId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdWorkExperienceQueryKey(employeeId) }) } });
   const del = useDeleteEmployeeWorkExperienceId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdWorkExperienceQueryKey(employeeId) }) } });
+  const importMut = usePostEmployeesIdWorkExperienceImport();
+  const [importOpen, setImportOpen] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<EmployeeWorkExperience | null>(null);
@@ -215,7 +266,12 @@ function WorkExpSection({ employeeId, canEdit }: { employeeId: number; canEdit: 
 
   return (
     <div>
-      <SectionHeader title="Work Experience" action={canEdit && <Button size="sm" onClick={openCreate}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>} />
+      <SectionHeader title="Work Experience" action={canEdit && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="w-3.5 h-3.5 mr-1" />Import CSV</Button>
+          <Button size="sm" onClick={openCreate}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>
+        </div>
+      )} />
       {records.length === 0 && <p className="text-sm text-muted-foreground italic">No work experience records.</p>}
       <div className="space-y-3">
         {records.map((r) => (
@@ -259,6 +315,15 @@ function WorkExpSection({ employeeId, canEdit }: { employeeId: number; canEdit: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CsvImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import Work Experience from CSV"
+        templateFileName="work_experience_import_template.csv"
+        columns={WORK_EXP_CSV_COLUMNS}
+        onImport={async (rows) => await importMut.mutateAsync({ id: employeeId, data: { rows } })}
+        onImported={() => qc.invalidateQueries({ queryKey: getGetEmployeesIdWorkExperienceQueryKey(employeeId) })}
+      />
     </div>
   );
 }
@@ -268,6 +333,8 @@ function DocumentsSection({ employeeId, canEdit }: { employeeId: number; canEdit
   const { data: docs = [] } = useGetEmployeesIdEmpDocuments(employeeId);
   const create = usePostEmployeesIdEmpDocuments({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdEmpDocumentsQueryKey(employeeId) }) } });
   const del = useDeleteEmpDocumentsId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdEmpDocumentsQueryKey(employeeId) }) } });
+  const importMut = usePostEmployeesIdEmpDocumentsImport();
+  const [importOpen, setImportOpen] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [docType, setDocType] = useState("");
@@ -287,7 +354,12 @@ function DocumentsSection({ employeeId, canEdit }: { employeeId: number; canEdit
 
   return (
     <div>
-      <SectionHeader title="Document Repository" action={canEdit && <Button size="sm" onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5 mr-1" />Upload</Button>} />
+      <SectionHeader title="Document Repository" action={canEdit && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="w-3.5 h-3.5 mr-1" />Import CSV</Button>
+          <Button size="sm" onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5 mr-1" />Upload</Button>
+        </div>
+      )} />
       {docs.length === 0 && <p className="text-sm text-muted-foreground italic">No documents uploaded.</p>}
       <div className="space-y-2">
         {(docs as EmployeeDocument[]).map((d) => (
@@ -333,6 +405,15 @@ function DocumentsSection({ employeeId, canEdit }: { employeeId: number; canEdit
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CsvImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import Documents from CSV"
+        templateFileName="documents_import_template.csv"
+        columns={DOCUMENTS_CSV_COLUMNS}
+        onImport={async (rows) => await importMut.mutateAsync({ id: employeeId, data: { rows } })}
+        onImported={() => qc.invalidateQueries({ queryKey: getGetEmployeesIdEmpDocumentsQueryKey(employeeId) })}
+      />
     </div>
   );
 }

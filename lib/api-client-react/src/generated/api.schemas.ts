@@ -3625,6 +3625,30 @@ export type PostEmployeesBulkImportBody = {
   rows: PostEmployeesBulkImportBodyRowsItem[];
 };
 
+export type PostEmployeesIdEducationImportBodyRowsItem = {
+  [key: string]: unknown;
+};
+
+export type PostEmployeesIdEducationImportBody = {
+  rows: PostEmployeesIdEducationImportBodyRowsItem[];
+};
+
+export type PostEmployeesIdWorkExperienceImportBodyRowsItem = {
+  [key: string]: unknown;
+};
+
+export type PostEmployeesIdWorkExperienceImportBody = {
+  rows: PostEmployeesIdWorkExperienceImportBodyRowsItem[];
+};
+
+export type PostEmployeesIdEmpDocumentsImportBodyRowsItem = {
+  [key: string]: unknown;
+};
+
+export type PostEmployeesIdEmpDocumentsImportBody = {
+  rows: PostEmployeesIdEmpDocumentsImportBodyRowsItem[];
+};
+
 export type GetOnboardingChecklistsParams = {
   status?: string;
 };
