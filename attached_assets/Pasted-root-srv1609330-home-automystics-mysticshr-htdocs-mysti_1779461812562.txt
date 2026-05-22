@@ -1,0 +1,54 @@
+root@srv1609330:/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech# # 1. Look at the HTML the server returns
+curl -s https://mysticshr.automystics.tech/ | head -30
+
+# 2. Pick one asset path from that HTML and try it
+curl -sI https://mysticshr.automystics.tech/assets/  # we'll refine after step 1
+
+# 3. Show what assets exist on disk
+ls /home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public/
+ls /home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public/assets/ | head
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>MysticsHR</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/assets/index-Dt-3hydU.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D0rH7OK-.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+HTTP/2 200 
+server: nginx
+date: Fri, 22 May 2026 14:56:38 GMT
+content-type: text/html; charset=utf-8
+content-length: 805
+vary: Accept-Encoding
+x-powered-by: Express
+vary: Origin
+access-control-allow-credentials: true
+x-clerk-auth-reason: dev-browser-missing
+x-clerk-auth-status: signed-out
+accept-ranges: bytes
+cache-control: public, max-age=0
+last-modified: Fri, 22 May 2026 14:06:19 GMT
+etag: W/"325-19e5002294e"
+x-frame-options: SAMEORIGIN
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+x-permitted-cross-domain-policies: master-only
+referrer-policy: same-origin
+alt-svc: h3=":443"; ma=86400
+
+assets  favicon.svg  index.html  logo.svg  opengraph.jpg
+index-D0rH7OK-.css
+index-Dt-3hydU.js
+payroll-chart-harness-CsGaJZ2E.js
+payroll-reports-harness-D7fPQZh8.js
+root@srv1609330:/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech# 
