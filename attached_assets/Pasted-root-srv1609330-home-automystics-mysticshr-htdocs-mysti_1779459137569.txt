@@ -1,0 +1,24 @@
+root@srv1609330:/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech# cd /home/automystics-mysticshr/htdocs/mysticshr.automystics.tech
+
+PORT=3010 NODE_ENV=production pm2 start \
+  artifacts/api-server/dist/index.mjs \
+  --name mysticshr-api \
+  --cwd /home/automystics-mysticshr/htdocs/mysticshr.automystics.tech
+
+pm2 save
+[PM2] Starting /home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/dist/index.mjs in fork_mode (1 instance)
+[PM2] Done.
+┌────┬───────────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name                  │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 2  │ automystics-api       │ default     │ 0.0.0   │ fork    │ 178189   │ 5m     │ 12   │ online    │ 0%       │ 101.8mb  │ root     │ disabled │
+│ 0  │ fitro360              │ default     │ 1.0.0   │ fork    │ 178157   │ 5m     │ 12   │ online    │ 0%       │ 104.3mb  │ root     │ disabled │
+│ 1  │ kalvicore-api         │ default     │ 0.0.0   │ fork    │ 178160   │ 5m     │ 12   │ online    │ 0%       │ 97.5mb   │ root     │ disabled │
+│ 8  │ mystics-api           │ default     │ 0.0.0   │ fork    │ 178224   │ 5m     │ 13   │ online    │ 0%       │ 245.1mb  │ root     │ disabled │
+│ 9  │ mysticshr-api         │ default     │ 0.0.0   │ fork    │ 194365   │ 0s     │ 0    │ online    │ 0%       │ 9.5mb    │ root     │ disabled │
+│ 4  │ people-connect-api    │ default     │ 0.0.0   │ fork    │ 178192   │ 5m     │ 13   │ online    │ 0%       │ 183.6mb  │ root     │ disabled │
+│ 6  │ tkprabhu-api          │ default     │ 0.0.0   │ fork    │ 178210   │ 5m     │ 35   │ online    │ 0%       │ 183.6mb  │ root     │ disabled │
+└────┴───────────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+root@srv1609330:/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech# 
