@@ -1,0 +1,75 @@
+┌────┬───────────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name                  │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 2  │ automystics-api       │ default     │ 0.0.0   │ fork    │ 178189   │ 39m    │ 12   │ online    │ 0%       │ 106.3mb  │ root     │ disabled │
+│ 0  │ fitro360              │ default     │ 1.0.0   │ fork    │ 178157   │ 39m    │ 12   │ online    │ 0%       │ 106.4mb  │ root     │ disabled │
+│ 1  │ kalvicore-api         │ default     │ 0.0.0   │ fork    │ 178160   │ 39m    │ 12   │ online    │ 0%       │ 99.5mb   │ root     │ disabled │
+│ 8  │ mystics-api           │ default     │ 0.0.0   │ fork    │ 178224   │ 39m    │ 13   │ online    │ 0%       │ 246.5mb  │ root     │ disabled │
+│ 11 │ mysticshr-api         │ default     │ 0.0.0   │ fork    │ 301670   │ 0s     │ 1173 │ online    │ 0%       │ 14.9mb   │ root     │ disabled │
+│ 4  │ people-connect-api    │ default     │ 0.0.0   │ fork    │ 178192   │ 39m    │ 13   │ online    │ 0%       │ 186.2mb  │ root     │ disabled │
+│ 6  │ tkprabhu-api          │ default     │ 0.0.0   │ fork    │ 178210   │ 39m    │ 35   │ online    │ 0%       │ 185.1mb  │ root     │ disabled │
+└────┴───────────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[TAILING] Tailing last 20 lines for [mysticshr-api] process (change the value with --lines option)
+/root/.pm2/logs/mysticshr-api-error.log last 20 lines:
+11|mystics | (node:301031) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301105) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301172) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301237) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301309) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301381) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301448) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301520) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301587) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301670) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+
+/root/.pm2/logs/mysticshr-api-out.log last 20 lines:
+11|mystics | eady in use :::8080","stack":"Error: listen EADDRINUSE: address already in use :::8080\n    at Server.setupListenHandle [as _listen2] (node:net:1940:16)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2102:7)\n    at Function.listen (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:605:24)\n    at <anonymous> (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/src/index.ts:50:5)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)","code":"EADDRINUSE","errno":-98,"syscall":"listen","address":"::","port":8080},"msg":"Error listening on port"}
+11|mystics | {"level":30,"time":1779461141054,"pid":301448,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+11|mystics | {"level":50,"time":1779461141057,"pid":301448,"hostname":"srv1609330","err":{"type":"Error","message":"listen EADDRINUSE: address already in use :::8080","stack":"Error: listen EADDRINUSE: address already in use :::8080\n    at Server.setupListenHandle [as _listen2] (node:net:1940:16)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2102:7)\n    at Function.listen (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:605:24)\n    at <anonymous> (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/src/index.ts:50:5)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)","code":"EADDRINUSE","errno":-98,"syscall":"listen","address":"::","port":8080},"msg":"Error listening on port"}
+11|mystics | {"level":30,"time":1779461142301,"pid":301520,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+11|mystics | {"level":50,"time":1779461142305,"pid":301520,"hostname":"srv1609330","err":{"type":"Error","message":"listen EADDRINUSE: address already in use :::8080","stack":"Error: listen EADDRINUSE: address already in use :::8080\n    at Server.setupListenHandle [as _listen2] (node:net:1940:16)\n    at listenInCluster (node:net:1997:12)\n    at Server.listen (node:net:2102:7)\n    at Function.listen (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:605:24)\n    at <anonymous> (/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/api-server/src/index.ts:50:5)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)","code":"EADDRINUSE","errno":-98,"syscall":"listen","address":"::","port":8080},"msg":"Error listening on port"}
+11|mystics | {"level":30,"time":1779461143461,"pid":301587,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+11|mystics | {"level":30,"time":1779461144555,"pid":301670,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+11|mystics | {"level":30,"time":1779461144557,"pid":301670,"hostname":"srv1609330","port":3010,"msg":"Server listening"}
+11|mystics | {"level":30,"time":1779461144612,"pid":301670,"hostname":"srv1609330","msg":"[scheduler] started — runs every hour at :00 + notification jobs"}
+
+HTTP/1.1 404 Not Found
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+x-clerk-auth-reason: dev-browser-missing
+x-clerk-auth-status: signed-out
+Content-Security-Policy: default-src 'none'
+X-Content-Type-Options: nosniff
+Content-Type: text/html; charset=utf-8
+Content-Length: 149
+Date: Fri, 22 May 2026 14:45:45 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/health</pre>
+</body>
+</html>
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+x-clerk-auth-reason: dev-browser-missing
+root@srv1609330:/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech# 
