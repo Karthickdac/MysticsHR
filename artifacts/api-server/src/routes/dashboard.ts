@@ -1,12 +1,15 @@
 import { Router } from "express";
-import { requireHrmsUser } from "../lib/auth";
+import { requireHrmsUser, requireRole } from "../lib/auth";
+
+const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
 import { db } from "../lib/db";
 import {
   employeesTable,
   departmentsTable,
   auditLogsTable,
+  employeeCertificationsTable,
 } from "@workspace/db/schema";
-import { eq, and, sql, desc, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, asc, isNull, isNotNull, lte } from "drizzle-orm";
 
 const router = Router();
 
@@ -137,6 +140,69 @@ router.get("/dashboard/employee-status-breakdown", requireHrmsUser, async (req, 
       .orderBy(desc(sql`count(*)`));
 
     res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/dashboard/expiring-certifications", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+  try {
+    const daysParam = parseInt(String(req.query.days ?? "60"), 10);
+    const days = Number.isFinite(daysParam) ? Math.min(Math.max(daysParam, 1), 365) : 60;
+
+    const rows = await db
+      .select({
+        id: employeeCertificationsTable.id,
+        name: employeeCertificationsTable.name,
+        issuingOrganization: employeeCertificationsTable.issuingOrganization,
+        expiryDate: employeeCertificationsTable.expiryDate,
+        employeeId: employeesTable.id,
+        employeeCode: employeesTable.employeeId,
+        firstName: employeesTable.firstName,
+        lastName: employeesTable.lastName,
+        departmentName: departmentsTable.name,
+      })
+      .from(employeeCertificationsTable)
+      .innerJoin(employeesTable, eq(employeeCertificationsTable.employeeId, employeesTable.id))
+      .leftJoin(departmentsTable, eq(employeesTable.departmentId, departmentsTable.id))
+      .where(
+        and(
+          isNotNull(employeeCertificationsTable.expiryDate),
+          isNull(employeesTable.deletedAt),
+          lte(
+            employeeCertificationsTable.expiryDate,
+            sql`(CURRENT_DATE + (${days} || ' days')::interval)::date`
+          )
+        )
+      )
+      .orderBy(asc(employeeCertificationsTable.expiryDate));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const items = rows.map((r) => {
+      const expiry = r.expiryDate ? new Date(r.expiryDate) : null;
+      const daysUntilExpiry = expiry
+        ? Math.floor((expiry.getTime() - today.getTime()) / 86400000)
+        : 0;
+      const bucket: "expired" | "7" | "30" | "60" =
+        daysUntilExpiry < 0 ? "expired" : daysUntilExpiry <= 7 ? "7" : daysUntilExpiry <= 30 ? "30" : "60";
+      return {
+        id: r.id,
+        name: r.name,
+        issuingOrganization: r.issuingOrganization,
+        expiryDate: r.expiryDate ?? "",
+        daysUntilExpiry,
+        bucket,
+        employeeId: r.employeeId,
+        employeeCode: r.employeeCode,
+        employeeName: `${r.firstName} ${r.lastName}`.trim(),
+        departmentName: r.departmentName ?? null,
+      };
+    });
+
+    res.json(items);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -65,6 +65,36 @@ export const GetDashboardHeadcountByDepartmentResponse = zod.array(
 );
 
 /**
+ * @summary List employee certifications expiring within N days (including already expired)
+ */
+export const getDashboardExpiringCertificationsQueryDaysDefault = 60;
+export const getDashboardExpiringCertificationsQueryDaysMax = 365;
+
+export const GetDashboardExpiringCertificationsQueryParams = zod.object({
+  days: zod.coerce
+    .number()
+    .min(1)
+    .max(getDashboardExpiringCertificationsQueryDaysMax)
+    .default(getDashboardExpiringCertificationsQueryDaysDefault),
+});
+
+export const GetDashboardExpiringCertificationsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  issuingOrganization: zod.string(),
+  expiryDate: zod.string(),
+  daysUntilExpiry: zod.number(),
+  bucket: zod.enum(["expired", "7", "30", "60"]),
+  employeeId: zod.number(),
+  employeeCode: zod.string(),
+  employeeName: zod.string(),
+  departmentName: zod.string().nullish(),
+});
+export const GetDashboardExpiringCertificationsResponse = zod.array(
+  GetDashboardExpiringCertificationsResponseItem,
+);
+
+/**
  * @summary Employee count by status
  */
 export const GetDashboardEmployeeStatusBreakdownResponseItem = zod.object({

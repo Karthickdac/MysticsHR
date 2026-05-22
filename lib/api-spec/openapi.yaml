@@ -116,6 +116,29 @@ paths:
                 items:
                   $ref: "#/components/schemas/HeadcountByDepartment"
 
+  /dashboard/expiring-certifications:
+    get:
+      operationId: getDashboardExpiringCertifications
+      tags: [dashboard]
+      summary: List employee certifications expiring within N days (including already expired)
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 60
+            minimum: 1
+            maximum: 365
+      responses:
+        "200":
+          description: Expiring certifications, ordered by expiry date ascending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExpiringCertification"
+
   /dashboard/employee-status-breakdown:
     get:
       operationId: getDashboardEmployeeStatusBreakdown
@@ -6996,6 +7019,42 @@ components:
       required:
         - status
         - count
+
+    ExpiringCertification:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        issuingOrganization:
+          type: string
+        expiryDate:
+          type: string
+        daysUntilExpiry:
+          type: integer
+        bucket:
+          type: string
+          enum: [expired, "7", "30", "60"]
+        employeeId:
+          type: integer
+        employeeCode:
+          type: string
+        employeeName:
+          type: string
+        departmentName:
+          type: string
+          nullable: true
+      required:
+        - id
+        - name
+        - issuingOrganization
+        - expiryDate
+        - daysUntilExpiry
+        - bucket
+        - employeeId
+        - employeeCode
+        - employeeName
 
     # ──────────────────────────────────────────────
     # DEPARTMENTS

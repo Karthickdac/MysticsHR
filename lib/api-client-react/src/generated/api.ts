@@ -117,6 +117,7 @@ import type {
   ExitInterview,
   ExitRequest,
   ExitRequestDetail,
+  ExpiringCertification,
   FinalizePayrollRun200,
   FnfApproveBody,
   FnfApproveResult,
@@ -133,6 +134,7 @@ import type {
   GetAttritionReportParams,
   GetBankTransferReportParams,
   GetCycleAveragesParams,
+  GetDashboardExpiringCertificationsParams,
   GetDashboardRecentActivityParams,
   GetEmployeeDirectoryReport200,
   GetEmployeeDirectoryReportParams,
@@ -687,6 +689,116 @@ export function useGetDashboardHeadcountByDepartment<
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions =
     getGetDashboardHeadcountByDepartmentQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List employee certifications expiring within N days (including already expired)
+ */
+export const getGetDashboardExpiringCertificationsUrl = (
+  params?: GetDashboardExpiringCertificationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/dashboard/expiring-certifications?${stringifiedParams}`
+    : `/api/dashboard/expiring-certifications`;
+};
+
+export const getDashboardExpiringCertifications = async (
+  params?: GetDashboardExpiringCertificationsParams,
+  options?: RequestInit,
+): Promise<ExpiringCertification[]> => {
+  return customFetch<ExpiringCertification[]>(
+    getGetDashboardExpiringCertificationsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetDashboardExpiringCertificationsQueryKey = (
+  params?: GetDashboardExpiringCertificationsParams,
+) => {
+  return [
+    `/api/dashboard/expiring-certifications`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetDashboardExpiringCertificationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDashboardExpiringCertifications>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetDashboardExpiringCertificationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDashboardExpiringCertifications>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetDashboardExpiringCertificationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDashboardExpiringCertifications>>
+  > = ({ signal }) =>
+    getDashboardExpiringCertifications(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDashboardExpiringCertifications>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDashboardExpiringCertificationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDashboardExpiringCertifications>>
+>;
+export type GetDashboardExpiringCertificationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List employee certifications expiring within N days (including already expired)
+ */
+
+export function useGetDashboardExpiringCertifications<
+  TData = Awaited<ReturnType<typeof getDashboardExpiringCertifications>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetDashboardExpiringCertificationsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDashboardExpiringCertifications>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDashboardExpiringCertificationsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

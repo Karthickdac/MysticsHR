@@ -519,6 +519,29 @@ export interface StatusCount {
   count: number;
 }
 
+export type ExpiringCertificationBucket =
+  (typeof ExpiringCertificationBucket)[keyof typeof ExpiringCertificationBucket];
+
+export const ExpiringCertificationBucket = {
+  expired: "expired",
+  NUMBER_7: "7",
+  NUMBER_30: "30",
+  NUMBER_60: "60",
+} as const;
+
+export interface ExpiringCertification {
+  id: number;
+  name: string;
+  issuingOrganization: string;
+  expiryDate: string;
+  daysUntilExpiry: number;
+  bucket: ExpiringCertificationBucket;
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  departmentName?: string | null;
+}
+
 export interface Department {
   id: number;
   name: string;
@@ -3670,6 +3693,14 @@ export interface StorageCleanupRunResult {
 
 export type GetDashboardRecentActivityParams = {
   limit?: number;
+};
+
+export type GetDashboardExpiringCertificationsParams = {
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  days?: number;
 };
 
 export type ListDesignationsParams = {

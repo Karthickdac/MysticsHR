@@ -2,18 +2,23 @@ import {
   useGetDashboardKpis, 
   useGetDashboardRecentActivity, 
   useGetDashboardHeadcountByDepartment,
-  useGetDashboardEmployeeStatusBreakdown 
+  useGetDashboardEmployeeStatusBreakdown,
+  useGetDashboardExpiringCertifications,
+  getGetDashboardExpiringCertificationsQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend 
 } from "recharts";
-import { Users, UserCheck, TrendingDown, Calendar, BriefcaseBusiness, Clock, UserX, Activity, type LucideIcon } from "lucide-react";
+import { Users, UserCheck, TrendingDown, Calendar, BriefcaseBusiness, Clock, UserX, Activity, BadgeCheck, type LucideIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClockInWidget } from "@/components/attendance/ClockInWidget";
 import { useCurrentHrmsUser } from "@/lib/useCurrentHrmsUser";
+import { Link } from "wouter";
+
+const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
 
 const STATUS_COLORS: Record<string, string> = {
   "Active": "hsl(145 58% 36%)",
@@ -55,6 +60,12 @@ export default function DashboardPage() {
   const statusBreakdown = Array.isArray(statusBreakdownRaw) ? statusBreakdownRaw : [];
   const { hrmsUser } = useCurrentHrmsUser();
   const showClockWidget = !!hrmsUser?.employeeId;
+  const canSeeExpiringCerts = hrmsUser?.role != null && (HR_READ_ROLES as readonly string[]).includes(hrmsUser.role);
+  const { data: expiringCertsRaw, isLoading: expiringLoading } = useGetDashboardExpiringCertifications(
+    { days: 60 },
+    { query: { enabled: canSeeExpiringCerts, queryKey: getGetDashboardExpiringCertificationsQueryKey({ days: 60 }) } }
+  );
+  const expiringCerts = Array.isArray(expiringCertsRaw) ? expiringCertsRaw : [];
 
   return (
     <div className="space-y-6">
@@ -150,6 +161,65 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Expiring Certifications */}
+      {canSeeExpiringCerts && (
+      <Card className="border-border">
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <BadgeCheck className="w-4 h-4 text-primary" />
+            Expiring Certifications
+            <span className="text-xs font-normal text-muted-foreground">next 60 days</span>
+          </CardTitle>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Expired {expiringCerts.filter(c => c.bucket === "expired").length}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> ≤7d {expiringCerts.filter(c => c.bucket === "7").length}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> ≤30d {expiringCerts.filter(c => c.bucket === "30").length}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> ≤60d {expiringCerts.filter(c => c.bucket === "60").length}</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {expiringLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : !expiringCerts.length ? (
+            <p className="text-muted-foreground text-sm py-8 text-center">No certifications expiring in the next 60 days</p>
+          ) : (
+            <div className="divide-y divide-border max-h-80 overflow-y-auto">
+              {expiringCerts.map((c) => {
+                const badgeClass =
+                  c.bucket === "expired" ? "bg-red-500/10 text-red-600 border-red-500/30" :
+                  c.bucket === "7" ? "bg-orange-500/10 text-orange-600 border-orange-500/30" :
+                  c.bucket === "30" ? "bg-amber-500/10 text-amber-700 border-amber-500/30" :
+                  "bg-yellow-500/10 text-yellow-700 border-yellow-500/30";
+                const label =
+                  c.daysUntilExpiry < 0 ? `Expired ${Math.abs(c.daysUntilExpiry)}d ago` :
+                  c.daysUntilExpiry === 0 ? "Expires today" :
+                  `In ${c.daysUntilExpiry}d`;
+                return (
+                  <div key={c.id} className="py-3 flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5">
+                      <BadgeCheck className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {c.name} <span className="text-muted-foreground font-normal">· {c.issuingOrganization}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        <Link href={`/employees/${c.employeeId}`} className="hover:underline text-primary">
+                          {c.employeeName} ({c.employeeCode})
+                        </Link>
+                        {c.departmentName ? ` · ${c.departmentName}` : ""} · expires {c.expiryDate}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 font-medium border ${badgeClass}`}>{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      )}
 
       {/* Recent Activity */}
       <Card className="border-border">
