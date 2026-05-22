@@ -23,6 +23,24 @@ import {
   usePostEmployeesIdEmpDocumentsImport,
   usePatchEmpDocumentsId,
   useDeleteEmpDocumentsId,
+  useGetEmployeesIdSkills,
+  usePostEmployeesIdSkills,
+  usePostEmployeesIdSkillsImport,
+  usePatchEmployeeSkillsId,
+  useDeleteEmployeeSkillsId,
+  useGetEmployeesIdCertifications,
+  usePostEmployeesIdCertifications,
+  usePostEmployeesIdCertificationsImport,
+  usePatchEmployeeCertificationsId,
+  useDeleteEmployeeCertificationsId,
+  useGetEmployeesIdFamilyMembers,
+  usePostEmployeesIdFamilyMembers,
+  usePostEmployeesIdFamilyMembersImport,
+  usePatchEmployeeFamilyMembersId,
+  useDeleteEmployeeFamilyMembersId,
+  getGetEmployeesIdSkillsQueryKey,
+  getGetEmployeesIdCertificationsQueryKey,
+  getGetEmployeesIdFamilyMembersQueryKey,
   useGetEmployeesIdHistory,
   useGetEmployeesIdOnboardingChecklist,
   usePostEmployeesIdOnboardingChecklist,
@@ -37,6 +55,9 @@ import type {
   EmployeeEducation,
   EmployeeWorkExperience,
   EmployeeDocument,
+  EmployeeSkill,
+  EmployeeCertification,
+  EmployeeFamilyMember,
   OnboardingTask,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -53,7 +74,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Plus, Pencil, Trash2,
   GraduationCap, Briefcase, FileText, History, ClipboardList, Download,
-  TrendingUp, Upload,
+  TrendingUp, Upload, Award, BadgeCheck, Users,
 } from "lucide-react";
 import { CsvImportModal, type CsvColumn } from "@/components/CsvImportModal";
 
@@ -74,6 +95,32 @@ const WORK_EXP_CSV_COLUMNS: CsvColumn[] = [
   { key: "endDate", label: "End Date (YYYY-MM-DD)", example: "2023-06-30" },
   { key: "description", label: "Description", example: "Led platform team" },
   { key: "ctcDrawn", label: "CTC Drawn", example: "1800000" },
+];
+
+const SKILLS_CSV_COLUMNS: CsvColumn[] = [
+  { key: "name", label: "Skill", required: true, example: "TypeScript" },
+  { key: "proficiency", label: "Proficiency", example: "Advanced" },
+  { key: "yearsOfExperience", label: "Years of Experience", example: "5" },
+  { key: "lastUsedYear", label: "Last Used Year", example: "2025" },
+];
+
+const CERTIFICATIONS_CSV_COLUMNS: CsvColumn[] = [
+  { key: "name", label: "Certification", required: true, example: "AWS Solutions Architect" },
+  { key: "issuingOrganization", label: "Issuing Organization", required: true, example: "Amazon Web Services" },
+  { key: "credentialId", label: "Credential ID", example: "AWS-12345" },
+  { key: "credentialUrl", label: "Credential URL", example: "https://verify.aws/abc" },
+  { key: "issueDate", label: "Issue Date (YYYY-MM-DD)", example: "2023-04-12" },
+  { key: "expiryDate", label: "Expiry Date (YYYY-MM-DD)", example: "2026-04-12" },
+];
+
+const FAMILY_CSV_COLUMNS: CsvColumn[] = [
+  { key: "name", label: "Name", required: true, example: "Priya Sharma" },
+  { key: "relation", label: "Relation", required: true, example: "Spouse" },
+  { key: "dateOfBirth", label: "Date of Birth (YYYY-MM-DD)", example: "1990-05-12" },
+  { key: "gender", label: "Gender", example: "Female" },
+  { key: "phone", label: "Phone", example: "+91 9876543210" },
+  { key: "occupation", label: "Occupation", example: "Teacher" },
+  { key: "isDependent", label: "Dependent? (true/false)", example: "true" },
 ];
 
 const DOCUMENTS_CSV_COLUMNS: CsvColumn[] = [
@@ -437,6 +484,305 @@ function DocumentsSection({ employeeId, canEdit }: { employeeId: number; canEdit
   );
 }
 
+function SkillsSection({ employeeId, canEdit }: { employeeId: number; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const { data: records = [] } = useGetEmployeesIdSkills(employeeId);
+  const create = usePostEmployeesIdSkills({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdSkillsQueryKey(employeeId) }) } });
+  const patch = usePatchEmployeeSkillsId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdSkillsQueryKey(employeeId) }) } });
+  const del = useDeleteEmployeeSkillsId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdSkillsQueryKey(employeeId) }) } });
+  const importMut = usePostEmployeesIdSkillsImport();
+  const [importOpen, setImportOpen] = useState(false);
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<EmployeeSkill | null>(null);
+  const [name, setName] = useState("");
+  const [proficiency, setProficiency] = useState("");
+  const [yoe, setYoe] = useState("");
+  const [lastUsed, setLastUsed] = useState("");
+
+  function openCreate() { setEditing(null); setName(""); setProficiency(""); setYoe(""); setLastUsed(""); setOpen(true); }
+  function openEdit(r: EmployeeSkill) { setEditing(r); setName(r.name); setProficiency(r.proficiency ?? ""); setYoe(String(r.yearsOfExperience ?? "")); setLastUsed(String(r.lastUsedYear ?? "")); setOpen(true); }
+  function save() {
+    const payload = { name, proficiency: proficiency || null, yearsOfExperience: yoe ? parseInt(yoe, 10) : null, lastUsedYear: lastUsed ? parseInt(lastUsed, 10) : null };
+    if (editing) patch.mutate({ id: editing.id, data: payload }, { onSuccess: () => setOpen(false) });
+    else create.mutate({ id: employeeId, data: payload }, { onSuccess: () => setOpen(false) });
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Skills" action={canEdit && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="w-3.5 h-3.5 mr-1" />Import CSV</Button>
+          <Button size="sm" onClick={openCreate}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>
+        </div>
+      )} />
+      {records.length === 0 && <p className="text-sm text-muted-foreground italic">No skills recorded.</p>}
+      <div className="space-y-2">
+        {(records as EmployeeSkill[]).map((r) => (
+          <div key={r.id} className="flex items-start justify-between p-3 rounded-lg border border-border">
+            <div>
+              <p className="font-medium text-sm">{r.name}{r.proficiency ? <Badge variant="outline" className="ml-2 text-xs">{r.proficiency}</Badge> : null}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {r.yearsOfExperience != null ? `${r.yearsOfExperience} yrs` : ""}
+                {r.yearsOfExperience != null && r.lastUsedYear != null ? " · " : ""}
+                {r.lastUsedYear != null ? `Last used ${r.lastUsedYear}` : ""}
+              </p>
+            </div>
+            {canEdit && (
+              <div className="flex gap-1">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)}><Pencil className="w-3.5 h-3.5" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => del.mutate({ id: r.id })}><Trash2 className="w-3.5 h-3.5" /></Button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editing ? "Edit Skill" : "Add Skill"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>Skill *</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label>Proficiency</Label>
+                <Select value={proficiency || "_none"} onValueChange={(v) => setProficiency(v === "_none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">—</SelectItem>
+                    <SelectItem value="Beginner">Beginner</SelectItem>
+                    <SelectItem value="Intermediate">Intermediate</SelectItem>
+                    <SelectItem value="Advanced">Advanced</SelectItem>
+                    <SelectItem value="Expert">Expert</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Years</Label><Input type="number" value={yoe} onChange={(e) => setYoe(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Last Used Year</Label><Input type="number" value={lastUsed} onChange={(e) => setLastUsed(e.target.value)} /></div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!name || create.isPending || patch.isPending}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <CsvImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import Skills from CSV"
+        templateFileName="skills_import_template.csv"
+        columns={SKILLS_CSV_COLUMNS}
+        onImport={async (rows) => await importMut.mutateAsync({ id: employeeId, data: { rows } })}
+        onImported={() => qc.invalidateQueries({ queryKey: getGetEmployeesIdSkillsQueryKey(employeeId) })}
+      />
+    </div>
+  );
+}
+
+function CertificationsSection({ employeeId, canEdit }: { employeeId: number; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const { data: records = [] } = useGetEmployeesIdCertifications(employeeId);
+  const create = usePostEmployeesIdCertifications({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdCertificationsQueryKey(employeeId) }) } });
+  const patch = usePatchEmployeeCertificationsId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdCertificationsQueryKey(employeeId) }) } });
+  const del = useDeleteEmployeeCertificationsId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdCertificationsQueryKey(employeeId) }) } });
+  const importMut = usePostEmployeesIdCertificationsImport();
+  const [importOpen, setImportOpen] = useState(false);
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<EmployeeCertification | null>(null);
+  const [name, setName] = useState("");
+  const [org, setOrg] = useState("");
+  const [credId, setCredId] = useState("");
+  const [credUrl, setCredUrl] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+
+  function openCreate() { setEditing(null); setName(""); setOrg(""); setCredId(""); setCredUrl(""); setIssueDate(""); setExpiryDate(""); setOpen(true); }
+  function openEdit(r: EmployeeCertification) {
+    setEditing(r); setName(r.name); setOrg(r.issuingOrganization);
+    setCredId(r.credentialId ?? ""); setCredUrl(r.credentialUrl ?? "");
+    setIssueDate(r.issueDate ?? ""); setExpiryDate(r.expiryDate ?? ""); setOpen(true);
+  }
+  function save() {
+    const payload = { name, issuingOrganization: org, credentialId: credId || null, credentialUrl: credUrl || null, issueDate: issueDate || null, expiryDate: expiryDate || null };
+    if (editing) patch.mutate({ id: editing.id, data: payload }, { onSuccess: () => setOpen(false) });
+    else create.mutate({ id: employeeId, data: payload }, { onSuccess: () => setOpen(false) });
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Certifications" action={canEdit && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="w-3.5 h-3.5 mr-1" />Import CSV</Button>
+          <Button size="sm" onClick={openCreate}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>
+        </div>
+      )} />
+      {records.length === 0 && <p className="text-sm text-muted-foreground italic">No certifications recorded.</p>}
+      <div className="space-y-3">
+        {(records as EmployeeCertification[]).map((r) => (
+          <div key={r.id} className="flex items-start justify-between p-3 rounded-lg border border-border">
+            <div>
+              <p className="font-medium text-sm">{r.name}</p>
+              <p className="text-sm text-muted-foreground">{r.issuingOrganization}{r.credentialId ? ` · ${r.credentialId}` : ""}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {r.issueDate ? `Issued ${r.issueDate}` : ""}
+                {r.issueDate && r.expiryDate ? " · " : ""}
+                {r.expiryDate ? `Expires ${r.expiryDate}` : ""}
+              </p>
+            </div>
+            <div className="flex gap-1 items-center">
+              {r.credentialUrl && (
+                <a href={r.credentialUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="icon" variant="ghost" className="h-7 w-7"><Download className="w-3.5 h-3.5" /></Button>
+                </a>
+              )}
+              {canEdit && (
+                <>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)}><Pencil className="w-3.5 h-3.5" /></Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => del.mutate({ id: r.id })}><Trash2 className="w-3.5 h-3.5" /></Button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? "Edit Certification" : "Add Certification"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Issuing Organization *</Label><Input value={org} onChange={(e) => setOrg(e.target.value)} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Credential ID</Label><Input value={credId} onChange={(e) => setCredId(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Credential URL</Label><Input value={credUrl} onChange={(e) => setCredUrl(e.target.value)} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Issue Date</Label><Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Expiry Date</Label><Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} /></div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!name || !org || create.isPending || patch.isPending}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <CsvImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import Certifications from CSV"
+        templateFileName="certifications_import_template.csv"
+        columns={CERTIFICATIONS_CSV_COLUMNS}
+        onImport={async (rows) => await importMut.mutateAsync({ id: employeeId, data: { rows } })}
+        onImported={() => qc.invalidateQueries({ queryKey: getGetEmployeesIdCertificationsQueryKey(employeeId) })}
+      />
+    </div>
+  );
+}
+
+function FamilySection({ employeeId, canEdit }: { employeeId: number; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const { data: records = [] } = useGetEmployeesIdFamilyMembers(employeeId);
+  const create = usePostEmployeesIdFamilyMembers({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdFamilyMembersQueryKey(employeeId) }) } });
+  const patch = usePatchEmployeeFamilyMembersId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdFamilyMembersQueryKey(employeeId) }) } });
+  const del = useDeleteEmployeeFamilyMembersId({ mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getGetEmployeesIdFamilyMembersQueryKey(employeeId) }) } });
+  const importMut = usePostEmployeesIdFamilyMembersImport();
+  const [importOpen, setImportOpen] = useState(false);
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<EmployeeFamilyMember | null>(null);
+  const [name, setName] = useState("");
+  const [relation, setRelation] = useState("");
+  const [dob, setDob] = useState("");
+  const [gender, setGender] = useState("");
+  const [phone, setPhone] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [isDependent, setIsDependent] = useState(false);
+
+  function openCreate() { setEditing(null); setName(""); setRelation(""); setDob(""); setGender(""); setPhone(""); setOccupation(""); setIsDependent(false); setOpen(true); }
+  function openEdit(r: EmployeeFamilyMember) {
+    setEditing(r); setName(r.name); setRelation(r.relation); setDob(r.dateOfBirth ?? "");
+    setGender(r.gender ?? ""); setPhone(r.phone ?? ""); setOccupation(r.occupation ?? "");
+    setIsDependent(!!r.isDependent); setOpen(true);
+  }
+  function save() {
+    const payload = { name, relation, dateOfBirth: dob || null, gender: gender || null, phone: phone || null, occupation: occupation || null, isDependent };
+    if (editing) patch.mutate({ id: editing.id, data: payload }, { onSuccess: () => setOpen(false) });
+    else create.mutate({ id: employeeId, data: payload }, { onSuccess: () => setOpen(false) });
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Family Members" action={canEdit && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="w-3.5 h-3.5 mr-1" />Import CSV</Button>
+          <Button size="sm" onClick={openCreate}><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>
+        </div>
+      )} />
+      {records.length === 0 && <p className="text-sm text-muted-foreground italic">No family members recorded.</p>}
+      <div className="space-y-3">
+        {(records as EmployeeFamilyMember[]).map((r) => (
+          <div key={r.id} className="flex items-start justify-between p-3 rounded-lg border border-border">
+            <div>
+              <p className="font-medium text-sm">{r.name}{r.isDependent && <Badge variant="outline" className="ml-2 text-xs">Dependent</Badge>}</p>
+              <p className="text-sm text-muted-foreground">{r.relation}{r.occupation ? ` · ${r.occupation}` : ""}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {r.dateOfBirth ? `DOB ${r.dateOfBirth}` : ""}
+                {r.dateOfBirth && r.phone ? " · " : ""}
+                {r.phone ?? ""}
+              </p>
+            </div>
+            {canEdit && (
+              <div className="flex gap-1">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)}><Pencil className="w-3.5 h-3.5" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => del.mutate({ id: r.id })}><Trash2 className="w-3.5 h-3.5" /></Button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? "Edit Family Member" : "Add Family Member"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Relation *</Label><Input value={relation} onChange={(e) => setRelation(e.target.value)} placeholder="Spouse, Father, Child…" /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5"><Label>Date of Birth</Label><Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Gender</Label><Input value={gender} onChange={(e) => setGender(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="space-y-1.5"><Label>Occupation</Label><Input value={occupation} onChange={(e) => setOccupation(e.target.value)} /></div>
+              <label className="flex items-center gap-2 text-sm h-10">
+                <input type="checkbox" checked={isDependent} onChange={(e) => setIsDependent(e.target.checked)} />
+                Mark as dependent
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={!name || !relation || create.isPending || patch.isPending}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <CsvImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import Family Members from CSV"
+        templateFileName="family_members_import_template.csv"
+        columns={FAMILY_CSV_COLUMNS}
+        onImport={async (rows) => await importMut.mutateAsync({ id: employeeId, data: { rows } })}
+        onImported={() => qc.invalidateQueries({ queryKey: getGetEmployeesIdFamilyMembersQueryKey(employeeId) })}
+      />
+    </div>
+  );
+}
+
 function HistorySection({ employeeId }: { employeeId: number }) {
   const { data: history = [] } = useGetEmployeesIdHistory(employeeId);
   return (
@@ -557,7 +903,7 @@ export default function EmployeeDetailPage() {
 
   const validTabs = [
     "personal", "statutory", "address", "employment", "education",
-    "workexp", "documents", "history", "onboarding",
+    "workexp", "skills", "certifications", "family", "documents", "history", "onboarding",
     ...(canViewPerformanceHistory ? ["performance"] : []),
   ];
   const tabFromUrl = new URLSearchParams(search).get("tab");
@@ -685,6 +1031,9 @@ export default function EmployeeDetailPage() {
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="education"><GraduationCap className="w-3.5 h-3.5 mr-1" />Education</TabsTrigger>
           <TabsTrigger value="workexp"><Briefcase className="w-3.5 h-3.5 mr-1" />Work History</TabsTrigger>
+          <TabsTrigger value="skills"><Award className="w-3.5 h-3.5 mr-1" />Skills</TabsTrigger>
+          <TabsTrigger value="certifications"><BadgeCheck className="w-3.5 h-3.5 mr-1" />Certifications</TabsTrigger>
+          <TabsTrigger value="family"><Users className="w-3.5 h-3.5 mr-1" />Family</TabsTrigger>
           <TabsTrigger value="documents"><FileText className="w-3.5 h-3.5 mr-1" />Documents</TabsTrigger>
           <TabsTrigger value="history"><History className="w-3.5 h-3.5 mr-1" />History</TabsTrigger>
           <TabsTrigger value="onboarding"><ClipboardList className="w-3.5 h-3.5 mr-1" />Onboarding</TabsTrigger>
@@ -815,6 +1164,30 @@ export default function EmployeeDetailPage() {
           <Card>
             <CardContent className="p-6">
               <WorkExpSection employeeId={empId} canEdit={canEdit} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="skills">
+          <Card>
+            <CardContent className="p-6">
+              <SkillsSection employeeId={empId} canEdit={canEdit} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="certifications">
+          <Card>
+            <CardContent className="p-6">
+              <CertificationsSection employeeId={empId} canEdit={canEdit} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="family">
+          <Card>
+            <CardContent className="p-6">
+              <FamilySection employeeId={empId} canEdit={canEdit} />
             </CardContent>
           </Card>
         </TabsContent>

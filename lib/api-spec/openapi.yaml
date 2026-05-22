@@ -713,6 +713,273 @@ paths:
         "204":
           description: Deleted
 
+  /employees/{id}/skills:
+    get:
+      summary: List employee skills
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Skill records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeSkill"
+    post:
+      summary: Add skill record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeSkillBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSkill"
+
+  /employees/{id}/skills/import:
+    post:
+      summary: Bulk import skill records via CSV data
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+              required: [rows]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
+  /employee-skills/{id}:
+    patch:
+      summary: Update skill record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeSkillBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSkill"
+    delete:
+      summary: Delete skill record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /employees/{id}/certifications:
+    get:
+      summary: List employee certifications
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Certification records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeCertification"
+    post:
+      summary: Add certification record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeCertificationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeCertification"
+
+  /employees/{id}/certifications/import:
+    post:
+      summary: Bulk import certification records via CSV data
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+              required: [rows]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
+  /employee-certifications/{id}:
+    patch:
+      summary: Update certification record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeCertificationBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeCertification"
+    delete:
+      summary: Delete certification record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /employees/{id}/family-members:
+    get:
+      summary: List employee family members
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Family member records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeFamilyMember"
+    post:
+      summary: Add family member record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeFamilyMemberBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeFamilyMember"
+
+  /employees/{id}/family-members/import:
+    post:
+      summary: Bulk import family member records via CSV data
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+              required: [rows]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+
+  /employee-family-members/{id}:
+    patch:
+      summary: Update family member record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeFamilyMemberBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeFamilyMember"
+    delete:
+      summary: Delete family member record
+      tags: [EmployeeProfiles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
   /employees/{id}/emp-documents:
     get:
       summary: List employee documents
@@ -7949,6 +8216,82 @@ components:
         alertDays: { type: ["integer", "null"] }
         notes: { type: ["string", "null"] }
       required: [documentType, documentName]
+
+    EmployeeSkill:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        name: { type: string }
+        proficiency: { type: ["string", "null"] }
+        yearsOfExperience: { type: ["integer", "null"] }
+        lastUsedYear: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, name, createdAt, updatedAt]
+
+    CreateEmployeeSkillBody:
+      type: object
+      properties:
+        name: { type: string }
+        proficiency: { type: ["string", "null"] }
+        yearsOfExperience: { type: ["integer", "null"] }
+        lastUsedYear: { type: ["integer", "null"] }
+      required: [name]
+
+    EmployeeCertification:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        name: { type: string }
+        issuingOrganization: { type: string }
+        credentialId: { type: ["string", "null"] }
+        credentialUrl: { type: ["string", "null"] }
+        issueDate: { type: ["string", "null"], format: date }
+        expiryDate: { type: ["string", "null"], format: date }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, name, issuingOrganization, createdAt, updatedAt]
+
+    CreateEmployeeCertificationBody:
+      type: object
+      properties:
+        name: { type: string }
+        issuingOrganization: { type: string }
+        credentialId: { type: ["string", "null"] }
+        credentialUrl: { type: ["string", "null"] }
+        issueDate: { type: ["string", "null"], format: date }
+        expiryDate: { type: ["string", "null"], format: date }
+      required: [name, issuingOrganization]
+
+    EmployeeFamilyMember:
+      type: object
+      properties:
+        id: { type: integer }
+        employeeId: { type: integer }
+        name: { type: string }
+        relation: { type: string }
+        dateOfBirth: { type: ["string", "null"], format: date }
+        gender: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        occupation: { type: ["string", "null"] }
+        isDependent: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, employeeId, name, relation, isDependent, createdAt, updatedAt]
+
+    CreateEmployeeFamilyMemberBody:
+      type: object
+      properties:
+        name: { type: string }
+        relation: { type: string }
+        dateOfBirth: { type: ["string", "null"], format: date }
+        gender: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        occupation: { type: ["string", "null"] }
+        isDependent: { type: boolean }
+      required: [name, relation]
 
     EmployeeHistory:
       type: object

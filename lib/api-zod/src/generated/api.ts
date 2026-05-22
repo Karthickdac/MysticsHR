@@ -803,6 +803,293 @@ export const DeleteEmployeeWorkExperienceIdParams = zod.object({
 });
 
 /**
+ * @summary List employee skills
+ */
+export const GetEmployeesIdSkillsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdSkillsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  proficiency: zod.string().nullish(),
+  yearsOfExperience: zod.number().nullish(),
+  lastUsedYear: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdSkillsResponse = zod.array(
+  GetEmployeesIdSkillsResponseItem,
+);
+
+/**
+ * @summary Add skill record
+ */
+export const PostEmployeesIdSkillsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdSkillsBody = zod.object({
+  name: zod.string(),
+  proficiency: zod.string().nullish(),
+  yearsOfExperience: zod.number().nullish(),
+  lastUsedYear: zod.number().nullish(),
+});
+
+/**
+ * @summary Bulk import skill records via CSV data
+ */
+export const PostEmployeesIdSkillsImportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdSkillsImportBody = zod.object({
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+export const PostEmployeesIdSkillsImportResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number(),
+      error: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update skill record
+ */
+export const PatchEmployeeSkillsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchEmployeeSkillsIdBody = zod.object({
+  name: zod.string(),
+  proficiency: zod.string().nullish(),
+  yearsOfExperience: zod.number().nullish(),
+  lastUsedYear: zod.number().nullish(),
+});
+
+export const PatchEmployeeSkillsIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  proficiency: zod.string().nullish(),
+  yearsOfExperience: zod.number().nullish(),
+  lastUsedYear: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete skill record
+ */
+export const DeleteEmployeeSkillsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List employee certifications
+ */
+export const GetEmployeesIdCertificationsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdCertificationsResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  issuingOrganization: zod.string(),
+  credentialId: zod.string().nullish(),
+  credentialUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdCertificationsResponse = zod.array(
+  GetEmployeesIdCertificationsResponseItem,
+);
+
+/**
+ * @summary Add certification record
+ */
+export const PostEmployeesIdCertificationsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdCertificationsBody = zod.object({
+  name: zod.string(),
+  issuingOrganization: zod.string(),
+  credentialId: zod.string().nullish(),
+  credentialUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+});
+
+/**
+ * @summary Bulk import certification records via CSV data
+ */
+export const PostEmployeesIdCertificationsImportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdCertificationsImportBody = zod.object({
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+export const PostEmployeesIdCertificationsImportResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number(),
+      error: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update certification record
+ */
+export const PatchEmployeeCertificationsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchEmployeeCertificationsIdBody = zod.object({
+  name: zod.string(),
+  issuingOrganization: zod.string(),
+  credentialId: zod.string().nullish(),
+  credentialUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+});
+
+export const PatchEmployeeCertificationsIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  issuingOrganization: zod.string(),
+  credentialId: zod.string().nullish(),
+  credentialUrl: zod.string().nullish(),
+  issueDate: zod.coerce.date().nullish(),
+  expiryDate: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete certification record
+ */
+export const DeleteEmployeeCertificationsIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List employee family members
+ */
+export const GetEmployeesIdFamilyMembersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetEmployeesIdFamilyMembersResponseItem = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  relation: zod.string(),
+  dateOfBirth: zod.coerce.date().nullish(),
+  gender: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  occupation: zod.string().nullish(),
+  isDependent: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const GetEmployeesIdFamilyMembersResponse = zod.array(
+  GetEmployeesIdFamilyMembersResponseItem,
+);
+
+/**
+ * @summary Add family member record
+ */
+export const PostEmployeesIdFamilyMembersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdFamilyMembersBody = zod.object({
+  name: zod.string(),
+  relation: zod.string(),
+  dateOfBirth: zod.coerce.date().nullish(),
+  gender: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  occupation: zod.string().nullish(),
+  isDependent: zod.boolean().optional(),
+});
+
+/**
+ * @summary Bulk import family member records via CSV data
+ */
+export const PostEmployeesIdFamilyMembersImportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PostEmployeesIdFamilyMembersImportBody = zod.object({
+  rows: zod.array(zod.record(zod.string(), zod.unknown())),
+});
+
+export const PostEmployeesIdFamilyMembersImportResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number(),
+      error: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Update family member record
+ */
+export const PatchEmployeeFamilyMembersIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PatchEmployeeFamilyMembersIdBody = zod.object({
+  name: zod.string(),
+  relation: zod.string(),
+  dateOfBirth: zod.coerce.date().nullish(),
+  gender: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  occupation: zod.string().nullish(),
+  isDependent: zod.boolean().optional(),
+});
+
+export const PatchEmployeeFamilyMembersIdResponse = zod.object({
+  id: zod.number(),
+  employeeId: zod.number(),
+  name: zod.string(),
+  relation: zod.string(),
+  dateOfBirth: zod.coerce.date().nullish(),
+  gender: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  occupation: zod.string().nullish(),
+  isDependent: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete family member record
+ */
+export const DeleteEmployeeFamilyMembersIdParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List employee documents
  */
 export const GetEmployeesIdEmpDocumentsParams = zod.object({

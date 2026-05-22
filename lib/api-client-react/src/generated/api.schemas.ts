@@ -1417,6 +1417,92 @@ export interface CreateEmployeeDocumentBody {
   notes?: string | null;
 }
 
+export interface EmployeeSkill {
+  id: number;
+  employeeId: number;
+  name: string;
+  /** @nullable */
+  proficiency?: string | null;
+  /** @nullable */
+  yearsOfExperience?: number | null;
+  /** @nullable */
+  lastUsedYear?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeSkillBody {
+  name: string;
+  /** @nullable */
+  proficiency?: string | null;
+  /** @nullable */
+  yearsOfExperience?: number | null;
+  /** @nullable */
+  lastUsedYear?: number | null;
+}
+
+export interface EmployeeCertification {
+  id: number;
+  employeeId: number;
+  name: string;
+  issuingOrganization: string;
+  /** @nullable */
+  credentialId?: string | null;
+  /** @nullable */
+  credentialUrl?: string | null;
+  /** @nullable */
+  issueDate?: string | null;
+  /** @nullable */
+  expiryDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeCertificationBody {
+  name: string;
+  issuingOrganization: string;
+  /** @nullable */
+  credentialId?: string | null;
+  /** @nullable */
+  credentialUrl?: string | null;
+  /** @nullable */
+  issueDate?: string | null;
+  /** @nullable */
+  expiryDate?: string | null;
+}
+
+export interface EmployeeFamilyMember {
+  id: number;
+  employeeId: number;
+  name: string;
+  relation: string;
+  /** @nullable */
+  dateOfBirth?: string | null;
+  /** @nullable */
+  gender?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  occupation?: string | null;
+  isDependent: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeFamilyMemberBody {
+  name: string;
+  relation: string;
+  /** @nullable */
+  dateOfBirth?: string | null;
+  /** @nullable */
+  gender?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  occupation?: string | null;
+  isDependent?: boolean;
+}
+
 export interface EmployeeHistory {
   id: number;
   employeeId: number;
@@ -3639,6 +3725,30 @@ export type PostEmployeesIdWorkExperienceImportBodyRowsItem = {
 
 export type PostEmployeesIdWorkExperienceImportBody = {
   rows: PostEmployeesIdWorkExperienceImportBodyRowsItem[];
+};
+
+export type PostEmployeesIdSkillsImportBodyRowsItem = {
+  [key: string]: unknown;
+};
+
+export type PostEmployeesIdSkillsImportBody = {
+  rows: PostEmployeesIdSkillsImportBodyRowsItem[];
+};
+
+export type PostEmployeesIdCertificationsImportBodyRowsItem = {
+  [key: string]: unknown;
+};
+
+export type PostEmployeesIdCertificationsImportBody = {
+  rows: PostEmployeesIdCertificationsImportBodyRowsItem[];
+};
+
+export type PostEmployeesIdFamilyMembersImportBodyRowsItem = {
+  [key: string]: unknown;
+};
+
+export type PostEmployeesIdFamilyMembersImportBody = {
+  rows: PostEmployeesIdFamilyMembersImportBodyRowsItem[];
 };
 
 export type PostEmployeesIdEmpDocumentsImportBodyRowsItem = {

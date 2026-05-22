@@ -8,6 +8,9 @@ import {
   employeeEducationTable,
   employeeWorkExperienceTable,
   employeeDocumentsTable,
+  employeeSkillsTable,
+  employeeCertificationsTable,
+  employeeFamilyMembersTable,
   employeeHistoryTable,
   employeesTable,
   departmentsTable,
@@ -573,6 +576,345 @@ router.delete("/emp-documents/:id", requireHrmsUser, requireRole(...HR_ROLES), a
     const id = parseInt(String(req.params.id), 10);
     await db.delete(employeeDocumentsTable).where(eq(employeeDocumentsTable.id, id));
     await logAudit({ user: req.hrmsUser, action: "DELETE", module: "EmployeeDocuments", recordId: id, ipAddress: req.ip });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ──────────────────────────────────────────────
+// SKILLS
+// ──────────────────────────────────────────────
+router.get("/employees/:id/skills", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const rows = await db
+      .select()
+      .from(employeeSkillsTable)
+      .where(eq(employeeSkillsTable.employeeId, id))
+      .orderBy(employeeSkillsTable.name);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/skills", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { name, proficiency, yearsOfExperience, lastUsedYear } = req.body;
+    if (!name) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    const [row] = await db
+      .insert(employeeSkillsTable)
+      .values({ employeeId: id, name, proficiency, yearsOfExperience, lastUsedYear })
+      .returning();
+    await logAudit({ user: req.hrmsUser, action: "CREATE", module: "EmployeeSkills", recordId: row.id, ipAddress: req.ip });
+    res.status(201).json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/skills/import", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { rows } = req.body as { rows: Record<string, string>[] };
+    if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    if (rows.length > MAX_IMPORT_ROWS) { res.status(400).json({ error: tooManyRowsMessage }); return; }
+    let imported = 0;
+    const errors: { row: number; error: string }[] = [];
+    const allowedProf = new Set(["Beginner", "Intermediate", "Advanced", "Expert"]);
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] ?? {};
+      try {
+        const name = String(r.name ?? "").trim();
+        if (!name) { errors.push({ row: i + 1, error: "name is required" }); continue; }
+        const proficiency = r.proficiency ? String(r.proficiency).trim() : null;
+        if (proficiency && !allowedProf.has(proficiency)) {
+          errors.push({ row: i + 1, error: `proficiency must be one of: ${Array.from(allowedProf).join(", ")}` });
+          continue;
+        }
+        const yearsOfExperience = r.yearsOfExperience ? parseInt(String(r.yearsOfExperience), 10) : null;
+        if (r.yearsOfExperience && Number.isNaN(yearsOfExperience)) { errors.push({ row: i + 1, error: "yearsOfExperience must be a number" }); continue; }
+        const lastUsedYear = r.lastUsedYear ? parseInt(String(r.lastUsedYear), 10) : null;
+        if (r.lastUsedYear && Number.isNaN(lastUsedYear)) { errors.push({ row: i + 1, error: "lastUsedYear must be a number" }); continue; }
+        await db.insert(employeeSkillsTable).values({
+          employeeId: id,
+          name,
+          proficiency,
+          yearsOfExperience,
+          lastUsedYear,
+        });
+        imported++;
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        errors.push({ row: i + 1, error: e?.message ?? "Unknown error" });
+      }
+    }
+    await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "EmployeeSkills", recordId: id, newValue: `${imported} imported`, ipAddress: req.ip });
+    res.json({ imported, skipped: errors.length, errors });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/employee-skills/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { name, proficiency, yearsOfExperience, lastUsedYear } = req.body;
+    const [existing] = await db.select().from(employeeSkillsTable).where(eq(employeeSkillsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    const [row] = await db
+      .update(employeeSkillsTable)
+      .set({ name, proficiency, yearsOfExperience, lastUsedYear, updatedAt: new Date() })
+      .where(eq(employeeSkillsTable.id, id))
+      .returning();
+    await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "EmployeeSkills", recordId: id, ipAddress: req.ip });
+    res.json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/employee-skills/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    await db.delete(employeeSkillsTable).where(eq(employeeSkillsTable.id, id));
+    await logAudit({ user: req.hrmsUser, action: "DELETE", module: "EmployeeSkills", recordId: id, ipAddress: req.ip });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ──────────────────────────────────────────────
+// CERTIFICATIONS
+// ──────────────────────────────────────────────
+router.get("/employees/:id/certifications", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const rows = await db
+      .select()
+      .from(employeeCertificationsTable)
+      .where(eq(employeeCertificationsTable.employeeId, id))
+      .orderBy(desc(employeeCertificationsTable.issueDate));
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/certifications", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { name, issuingOrganization, credentialId, credentialUrl, issueDate, expiryDate } = req.body;
+    if (!name || !issuingOrganization) {
+      res.status(400).json({ error: "name and issuingOrganization are required" });
+      return;
+    }
+    const [row] = await db
+      .insert(employeeCertificationsTable)
+      .values({ employeeId: id, name, issuingOrganization, credentialId, credentialUrl, issueDate, expiryDate })
+      .returning();
+    await logAudit({ user: req.hrmsUser, action: "CREATE", module: "EmployeeCertifications", recordId: row.id, ipAddress: req.ip });
+    res.status(201).json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/certifications/import", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { rows } = req.body as { rows: Record<string, string>[] };
+    if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    if (rows.length > MAX_IMPORT_ROWS) { res.status(400).json({ error: tooManyRowsMessage }); return; }
+    let imported = 0;
+    const errors: { row: number; error: string }[] = [];
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] ?? {};
+      try {
+        const name = String(r.name ?? "").trim();
+        const issuingOrganization = String(r.issuingOrganization ?? "").trim();
+        if (!name || !issuingOrganization) {
+          errors.push({ row: i + 1, error: "name and issuingOrganization are required" });
+          continue;
+        }
+        if (r.issueDate && !dateRe.test(String(r.issueDate))) { errors.push({ row: i + 1, error: "issueDate must be YYYY-MM-DD" }); continue; }
+        if (r.expiryDate && !dateRe.test(String(r.expiryDate))) { errors.push({ row: i + 1, error: "expiryDate must be YYYY-MM-DD" }); continue; }
+        await db.insert(employeeCertificationsTable).values({
+          employeeId: id,
+          name,
+          issuingOrganization,
+          credentialId: r.credentialId ? String(r.credentialId) : null,
+          credentialUrl: r.credentialUrl ? String(r.credentialUrl) : null,
+          issueDate: r.issueDate ? String(r.issueDate) : null,
+          expiryDate: r.expiryDate ? String(r.expiryDate) : null,
+        });
+        imported++;
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        errors.push({ row: i + 1, error: e?.message ?? "Unknown error" });
+      }
+    }
+    await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "EmployeeCertifications", recordId: id, newValue: `${imported} imported`, ipAddress: req.ip });
+    res.json({ imported, skipped: errors.length, errors });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/employee-certifications/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { name, issuingOrganization, credentialId, credentialUrl, issueDate, expiryDate } = req.body;
+    const [existing] = await db.select().from(employeeCertificationsTable).where(eq(employeeCertificationsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    const [row] = await db
+      .update(employeeCertificationsTable)
+      .set({ name, issuingOrganization, credentialId, credentialUrl, issueDate, expiryDate, updatedAt: new Date() })
+      .where(eq(employeeCertificationsTable.id, id))
+      .returning();
+    await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "EmployeeCertifications", recordId: id, ipAddress: req.ip });
+    res.json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/employee-certifications/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    await db.delete(employeeCertificationsTable).where(eq(employeeCertificationsTable.id, id));
+    await logAudit({ user: req.hrmsUser, action: "DELETE", module: "EmployeeCertifications", recordId: id, ipAddress: req.ip });
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ──────────────────────────────────────────────
+// FAMILY MEMBERS
+// ──────────────────────────────────────────────
+router.get("/employees/:id/family-members", requireHrmsUser, requireRole(...HR_READ_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const rows = await db
+      .select()
+      .from(employeeFamilyMembersTable)
+      .where(eq(employeeFamilyMembersTable.employeeId, id))
+      .orderBy(employeeFamilyMembersTable.name);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/family-members", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { name, relation, dateOfBirth, gender, phone, occupation, isDependent } = req.body;
+    if (!name || !relation) {
+      res.status(400).json({ error: "name and relation are required" });
+      return;
+    }
+    const [row] = await db
+      .insert(employeeFamilyMembersTable)
+      .values({ employeeId: id, name, relation, dateOfBirth, gender, phone, occupation, isDependent: !!isDependent })
+      .returning();
+    await logAudit({ user: req.hrmsUser, action: "CREATE", module: "EmployeeFamily", recordId: row.id, ipAddress: req.ip });
+    res.status(201).json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/employees/:id/family-members/import", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { rows } = req.body as { rows: Record<string, string>[] };
+    if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    if (rows.length > MAX_IMPORT_ROWS) { res.status(400).json({ error: tooManyRowsMessage }); return; }
+    let imported = 0;
+    const errors: { row: number; error: string }[] = [];
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    const truthy = new Set(["true", "yes", "y", "1"]);
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] ?? {};
+      try {
+        const name = String(r.name ?? "").trim();
+        const relation = String(r.relation ?? "").trim();
+        if (!name || !relation) {
+          errors.push({ row: i + 1, error: "name and relation are required" });
+          continue;
+        }
+        if (r.dateOfBirth && !dateRe.test(String(r.dateOfBirth))) { errors.push({ row: i + 1, error: "dateOfBirth must be YYYY-MM-DD" }); continue; }
+        const isDependent = r.isDependent ? truthy.has(String(r.isDependent).trim().toLowerCase()) : false;
+        await db.insert(employeeFamilyMembersTable).values({
+          employeeId: id,
+          name,
+          relation,
+          dateOfBirth: r.dateOfBirth ? String(r.dateOfBirth) : null,
+          gender: r.gender ? String(r.gender) : null,
+          phone: r.phone ? String(r.phone) : null,
+          occupation: r.occupation ? String(r.occupation) : null,
+          isDependent,
+        });
+        imported++;
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        errors.push({ row: i + 1, error: e?.message ?? "Unknown error" });
+      }
+    }
+    await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "EmployeeFamily", recordId: id, newValue: `${imported} imported`, ipAddress: req.ip });
+    res.json({ imported, skipped: errors.length, errors });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/employee-family-members/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const { name, relation, dateOfBirth, gender, phone, occupation, isDependent } = req.body;
+    const [existing] = await db.select().from(employeeFamilyMembersTable).where(eq(employeeFamilyMembersTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    const [row] = await db
+      .update(employeeFamilyMembersTable)
+      .set({ name, relation, dateOfBirth, gender, phone, occupation, isDependent: !!isDependent, updatedAt: new Date() })
+      .where(eq(employeeFamilyMembersTable.id, id))
+      .returning();
+    await logAudit({ user: req.hrmsUser, action: "UPDATE", module: "EmployeeFamily", recordId: id, ipAddress: req.ip });
+    res.json(row);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/employee-family-members/:id", requireHrmsUser, requireRole(...HR_ROLES), async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    await db.delete(employeeFamilyMembersTable).where(eq(employeeFamilyMembersTable.id, id));
+    await logAudit({ user: req.hrmsUser, action: "DELETE", module: "EmployeeFamily", recordId: id, ipAddress: req.ip });
     res.status(204).send();
   } catch (err) {
     console.error(err);
