@@ -40,8 +40,8 @@ const EMPLOYMENT_TYPE_COLORS: Record<string, string> = {
 };
 
 const CSV_TEMPLATE = [
-  "firstName,lastName,email,phone,employeeId,departmentId,designationId,dateOfJoining,employmentType,status",
-  "Jane,Doe,jane.doe@automystics.com,9876543210,EMP001,1,1,2024-01-15,Permanent,Active",
+  "employeeId,firstName,lastName,email,phone,dateOfBirth,gender,location,employmentType,status,dateOfJoining",
+  "EMP001,Jane,Doe,jane.doe@automystics.com,9876543210,1995-04-12,Female,Chennai,Permanent,Active,2024-01-15",
 ].join("\n");
 
 const PAGE_SIZE = 12;
