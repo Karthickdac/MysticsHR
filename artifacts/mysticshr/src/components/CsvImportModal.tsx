@@ -32,7 +32,42 @@ type PreviewRow = {
   // Filled when fileMatch is active: undefined = no filename in row, null = no
   // zip loaded or no match, otherwise the matched zip entry.
   match?: ZipEntry | null;
+  // Human-readable reason the matched file can't be uploaded (oversized or
+  // disallowed type). Row still imports, but the file column is cleared.
+  fileError?: string;
 };
+
+// Keep these in sync with artifacts/api-server/src/routes/storage.ts.
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const ALLOWED_UPLOAD_MIMES = new Set<string>([
+  "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+]);
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function validateZipEntry(entry: ZipEntry): string | undefined {
+  if (entry.size > MAX_UPLOAD_BYTES) {
+    return `${entry.name} is ${formatBytes(entry.size)}, max is ${formatBytes(MAX_UPLOAD_BYTES)}`;
+  }
+  const mime = guessMime(entry.name);
+  if (!ALLOWED_UPLOAD_MIMES.has(mime)) {
+    return `${entry.name} has an unsupported file type (${mime || "unknown"})`;
+  }
+  return undefined;
+}
 
 type ZipEntry = {
   name: string; // basename used for matching
@@ -110,10 +145,11 @@ function recomputeMatches(
   if (!fileMatch) return rows;
   return rows.map((r) => {
     const raw = (r.data[fileMatch.column] ?? "").trim();
-    if (!raw || isHttpUrl(raw)) return { ...r, match: undefined };
+    if (!raw || isHttpUrl(raw)) return { ...r, match: undefined, fileError: undefined };
     const lookup = basename(raw).toLowerCase();
     const match = entriesByName?.get(lookup) ?? null;
-    return { ...r, match };
+    const fileError = match ? validateZipEntry(match) : undefined;
+    return { ...r, match, fileError };
   });
 }
 
@@ -251,13 +287,23 @@ export function CsvImportModal({
       // before the CSV is posted to the server. Failures fall back to
       // clearing the column and surface as warnings via the import result.
       const toUpload = fileMatch && onUploadFile
-        ? validRows.filter((r) => r.match)
+        ? validRows.filter((r) => r.match && !r.fileError)
         : [];
-      let payloadRows: Record<string, string>[];
+      // Surface pre-validation failures (oversized / disallowed MIME) as
+      // skipped-file warnings so the row still imports without a file URL
+      // instead of failing the network call mid-batch.
+      const preSkipped: { row: number; error: string }[] = [];
+      if (fileMatch && onUploadFile) {
+        for (const r of validRows) {
+          if (r.match && r.fileError) {
+            preSkipped.push({ row: preview.indexOf(r) + 1, error: `Skipped file: ${r.fileError}` });
+          }
+        }
+      }
       const uploadErrors: { row: number; error: string }[] = [];
+      const urls = new Map<PreviewRow, string | null>();
       if (toUpload.length > 0 && fileMatch && onUploadFile) {
         setUploadProgress({ done: 0, total: toUpload.length });
-        const urls = new Map<PreviewRow, string | null>();
         for (let i = 0; i < toUpload.length; i++) {
           const row = toUpload[i];
           try {
@@ -271,23 +317,28 @@ export function CsvImportModal({
           }
           setUploadProgress({ done: i + 1, total: toUpload.length });
         }
-        payloadRows = validRows.map((r) => {
-          const data = { ...r.data };
+      }
+      // Unified payload construction: substitute upload URLs when present and
+      // always clear the file column for pre-skipped (oversized/disallowed)
+      // rows, even when no uploads ran at all.
+      const payloadRows: Record<string, string>[] = validRows.map((r) => {
+        const data = { ...r.data };
+        if (fileMatch) {
           if (urls.has(r)) {
             const url = urls.get(r);
             if (url) data[fileMatch.column] = url;
             else delete data[fileMatch.column];
+          } else if (r.fileError) {
+            delete data[fileMatch.column];
           }
-          return data;
-        });
-      } else {
-        payloadRows = validRows.map((r) => r.data);
-      }
+        }
+        return data;
+      });
       const r = await onImport(payloadRows);
       setResult({
         ...r,
-        skipped: r.skipped + uploadErrors.length,
-        errors: [...uploadErrors, ...r.errors],
+        skipped: r.skipped + uploadErrors.length + preSkipped.length,
+        errors: [...preSkipped, ...uploadErrors, ...r.errors],
       });
       onImported?.();
     } catch (err: unknown) {
@@ -304,7 +355,7 @@ export function CsvImportModal({
   // File-match summary: count rows that name a file vs files matched vs
   // unused entries in the zip, so HR can see at a glance whether their
   // folder lines up with the CSV.
-  let matchSummary: { wanted: number; matched: number; unmatchedRows: string[]; unusedFiles: string[] } | null = null;
+  let matchSummary: { wanted: number; matched: number; unmatchedRows: string[]; unusedFiles: string[]; skipped: string[] } | null = null;
   if (fileMatch && preview) {
     const wantedRows = preview.filter((r) => {
       const v = (r.data[fileMatch.column] ?? "").trim();
@@ -318,11 +369,15 @@ export function CsvImportModal({
     const unusedFiles = zipEntries
       ? Array.from(zipEntries.values()).filter((e) => !usedKeys.has(e.name.toLowerCase())).map((e) => e.fullPath)
       : [];
+    const skipped = matchedRows
+      .filter((r) => r.fileError)
+      .map((r) => r.fileError!);
     matchSummary = {
       wanted: wantedRows.length,
       matched: matchedRows.length,
       unmatchedRows,
       unusedFiles,
+      skipped,
     };
   }
 
@@ -446,6 +501,13 @@ export function CsvImportModal({
                   {matchSummary.unmatchedRows.length > 5 ? `, +${matchSummary.unmatchedRows.length - 5} more` : ""}
                 </p>
               )}
+              {matchSummary.skipped.length > 0 && (
+                <p className="text-amber-700">
+                  {matchSummary.skipped.length} file(s) will be skipped (row still imports without a file URL):
+                  {" "}{matchSummary.skipped.slice(0, 3).join("; ")}
+                  {matchSummary.skipped.length > 3 ? `; +${matchSummary.skipped.length - 3} more` : ""}
+                </p>
+              )}
               {matchSummary.unusedFiles.length > 0 && (
                 <p className="text-amber-700">
                   Unused files in zip: {matchSummary.unusedFiles.slice(0, 5).join(", ")}
@@ -485,8 +547,11 @@ export function CsvImportModal({
                           return (
                             <td key={c.key} className="px-2 py-1.5 whitespace-nowrap">
                               {cellValue || <span className="text-muted-foreground italic">—</span>}
-                              {isMatchCol && row.match && (
-                                <span className="ml-1.5 text-[10px] text-green-700">✓ uploaded</span>
+                              {isMatchCol && row.match && !row.fileError && (
+                                <span className="ml-1.5 text-[10px] text-green-700">✓ ready ({formatBytes(row.match.size)})</span>
+                              )}
+                              {isMatchCol && row.match && row.fileError && (
+                                <span className="ml-1.5 text-[10px] text-amber-700" title={row.fileError}>⚠ {row.fileError}</span>
                               )}
                               {isMatchCol && row.match === null && cellValue && !isHttpUrl(cellValue) && (
                                 <span className="ml-1.5 text-[10px] text-amber-700">no file</span>
