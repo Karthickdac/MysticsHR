@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, FileDown, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { extractError } from "@/lib/utils";
 
 export type CsvColumn = {
   key: string;
@@ -146,7 +147,7 @@ export function CsvImportModal({ open, onOpenChange, title, templateFileName, co
       setResult(r);
       onImported?.();
     } catch (err: unknown) {
-      setParseError(err instanceof Error ? err.message : "Import failed");
+      setParseError(extractError(err, err instanceof Error ? err.message : "Import failed"));
     } finally {
       setImporting(false);
     }

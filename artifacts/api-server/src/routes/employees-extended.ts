@@ -23,6 +23,9 @@ const router = Router();
 const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
 const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
 
+const MAX_IMPORT_ROWS = 1000;
+const tooManyRowsMessage = `Too many rows: limit is ${MAX_IMPORT_ROWS} per import. Split your file into smaller batches and try again.`;
+
 router.post(
   "/employees/bulk-import",
   requireHrmsUser,
@@ -32,6 +35,10 @@ router.post(
       const { rows } = req.body as { rows: Record<string, string>[] };
       if (!Array.isArray(rows)) {
         res.status(400).json({ error: "rows must be an array" });
+        return;
+      }
+      if (rows.length > MAX_IMPORT_ROWS) {
+        res.status(400).json({ error: tooManyRowsMessage });
         return;
       }
       let imported = 0;
@@ -226,6 +233,7 @@ router.post("/employees/:id/education/import", requireHrmsUser, requireRole(...H
     const id = parseInt(String(req.params.id), 10);
     const { rows } = req.body as { rows: Record<string, string>[] };
     if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    if (rows.length > MAX_IMPORT_ROWS) { res.status(400).json({ error: tooManyRowsMessage }); return; }
     let imported = 0;
     const errors: { row: number; error: string }[] = [];
     for (let i = 0; i < rows.length; i++) {
@@ -349,6 +357,7 @@ router.post("/employees/:id/work-experience/import", requireHrmsUser, requireRol
     const id = parseInt(String(req.params.id), 10);
     const { rows } = req.body as { rows: Record<string, string>[] };
     if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    if (rows.length > MAX_IMPORT_ROWS) { res.status(400).json({ error: tooManyRowsMessage }); return; }
     let imported = 0;
     const errors: { row: number; error: string }[] = [];
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -483,6 +492,7 @@ router.post("/employees/:id/emp-documents/import", requireHrmsUser, requireRole(
     const id = parseInt(String(req.params.id), 10);
     const { rows } = req.body as { rows: Record<string, string>[] };
     if (!Array.isArray(rows)) { res.status(400).json({ error: "rows must be an array" }); return; }
+    if (rows.length > MAX_IMPORT_ROWS) { res.status(400).json({ error: tooManyRowsMessage }); return; }
     let imported = 0;
     const errors: { row: number; error: string }[] = [];
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
