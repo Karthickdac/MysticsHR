@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams, useSearch } from "wouter";
+import { requestUploadUrl } from "@workspace/api-client-react";
 import {
   useGetEmployee,
   useGetEmployeesIdProfile,
@@ -411,6 +412,24 @@ function DocumentsSection({ employeeId, canEdit }: { employeeId: number; canEdit
         title="Import Documents from CSV"
         templateFileName="documents_import_template.csv"
         columns={DOCUMENTS_CSV_COLUMNS}
+        fileMatch={{
+          column: "fileUrl",
+          helpText: 'For each row, put the filename (e.g. "pan-card.pdf") in the "File URL" column. We\'ll match it to a file in the zip and upload it. Rows with a full https:// URL are left as-is.',
+        }}
+        onUploadFile={async (f) => {
+          const { uploadURL, objectPath } = await requestUploadUrl({
+            name: f.name,
+            size: f.size,
+            contentType: f.type || "application/octet-stream",
+          });
+          const putRes = await fetch(uploadURL, {
+            method: "PUT",
+            headers: { "Content-Type": f.type || "application/octet-stream" },
+            body: f,
+          });
+          if (!putRes.ok) throw new Error(`upload PUT failed (${putRes.status})`);
+          return `/api/storage${objectPath}`;
+        }}
         onImport={async (rows) => await importMut.mutateAsync({ id: employeeId, data: { rows } })}
         onImported={() => qc.invalidateQueries({ queryKey: getGetEmployeesIdEmpDocumentsQueryKey(employeeId) })}
       />

@@ -17,6 +17,7 @@ import {
   ticketAttachmentsTable,
   helpdeskTicketsTable,
   employeesTable,
+  employeeDocumentsTable,
 } from "@workspace/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
@@ -51,27 +52,46 @@ async function userCanAccessAttachment(userId: number, role: string, objectPath:
     .from(ticketAttachmentsTable)
     .where(eq(ticketAttachmentsTable.objectPath, objectPath))
     .limit(1);
-  if (!attachment) return false;
-  if (HR_ROLES.has(role)) return true;
+  if (attachment) {
+    if (HR_ROLES.has(role)) return true;
 
-  const [ticket] = await db.select({
-    raisedByEmployeeId: helpdeskTicketsTable.raisedByEmployeeId,
-    assignedToUserId: helpdeskTicketsTable.assignedToUserId,
-  }).from(helpdeskTicketsTable).where(eq(helpdeskTicketsTable.id, attachment.ticketId));
-  if (!ticket) return false;
-  if (ticket.assignedToUserId === userId) return true;
+    const [ticket] = await db.select({
+      raisedByEmployeeId: helpdeskTicketsTable.raisedByEmployeeId,
+      assignedToUserId: helpdeskTicketsTable.assignedToUserId,
+    }).from(helpdeskTicketsTable).where(eq(helpdeskTicketsTable.id, attachment.ticketId));
+    if (!ticket) return false;
+    if (ticket.assignedToUserId === userId) return true;
 
-  // Find the employee record(s) belonging to this user (used for raised-by + HOD checks).
-  const empRows = await db.select({ id: employeesTable.id })
-    .from(employeesTable).where(eq(employeesTable.userId, userId));
-  if (ticket.raisedByEmployeeId && empRows.some(e => e.id === ticket.raisedByEmployeeId)) return true;
+    // Find the employee record(s) belonging to this user (used for raised-by + HOD checks).
+    const empRows = await db.select({ id: employeesTable.id })
+      .from(employeesTable).where(eq(employeesTable.userId, userId));
+    if (ticket.raisedByEmployeeId && empRows.some(e => e.id === ticket.raisedByEmployeeId)) return true;
 
-  if (role === "hod" && empRows.length > 0 && ticket.raisedByEmployeeId !== null) {
-    const hodEmpIds = empRows.map(e => e.id);
-    const reports = await db.select({ id: employeesTable.id }).from(employeesTable)
-      .where(inArray(employeesTable.managerId, hodEmpIds));
-    const teamIds = new Set<number>([...hodEmpIds, ...reports.map(r => r.id)]);
-    if (teamIds.has(ticket.raisedByEmployeeId)) return true;
+    if (role === "hod" && empRows.length > 0 && ticket.raisedByEmployeeId !== null) {
+      const hodEmpIds = empRows.map(e => e.id);
+      const reports = await db.select({ id: employeesTable.id }).from(employeesTable)
+        .where(inArray(employeesTable.managerId, hodEmpIds));
+      const teamIds = new Set<number>([...hodEmpIds, ...reports.map(r => r.id)]);
+      if (teamIds.has(ticket.raisedByEmployeeId)) return true;
+    }
+    return false;
+  }
+
+  // Employee documents (e.g. PAN scans) uploaded via the CSV-import bulk flow
+  // store the served URL `/api/storage<objectPath>` in `fileUrl`. We match
+  // either the bare object path or the api-prefixed form so a value pasted
+  // into the manual upload dialog also works.
+  const apiPrefixed = `/api/storage${objectPath}`;
+  const docRows = await db.select({ employeeId: employeeDocumentsTable.employeeId })
+    .from(employeeDocumentsTable)
+    .where(inArray(employeeDocumentsTable.fileUrl, [objectPath, apiPrefixed]));
+  if (docRows.length > 0) {
+    if (HR_ROLES.has(role)) return true;
+    // The employee whose document this is can always read it back.
+    const empRows = await db.select({ id: employeesTable.id })
+      .from(employeesTable).where(eq(employeesTable.userId, userId));
+    const ownEmpIds = new Set(empRows.map(e => e.id));
+    if (docRows.some(d => ownEmpIds.has(d.employeeId))) return true;
   }
 
   return false;
