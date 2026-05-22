@@ -208,6 +208,8 @@ import type {
   ListBlackoutDatesParams,
   ListCandidatesParams,
   ListDesignationsParams,
+  ListDistinctEmployeeCertifications200,
+  ListDistinctEmployeeSkills200,
   ListDocumentRequestsParams,
   ListEmployeesParams,
   ListExitRequestsParams,
@@ -2013,6 +2015,166 @@ export const useUpdateMyTimezone = <
 > => {
   return useMutation(getUpdateMyTimezoneMutationOptions(options));
 };
+
+/**
+ * @summary List distinct skill names held by any non-deleted employee
+ */
+export const getListDistinctEmployeeSkillsUrl = () => {
+  return `/api/employees/skills/distinct`;
+};
+
+export const listDistinctEmployeeSkills = async (
+  options?: RequestInit,
+): Promise<ListDistinctEmployeeSkills200> => {
+  return customFetch<ListDistinctEmployeeSkills200>(
+    getListDistinctEmployeeSkillsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListDistinctEmployeeSkillsQueryKey = () => {
+  return [`/api/employees/skills/distinct`] as const;
+};
+
+export const getListDistinctEmployeeSkillsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDistinctEmployeeSkills>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDistinctEmployeeSkills>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDistinctEmployeeSkillsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDistinctEmployeeSkills>>
+  > = ({ signal }) => listDistinctEmployeeSkills({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDistinctEmployeeSkills>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDistinctEmployeeSkillsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDistinctEmployeeSkills>>
+>;
+export type ListDistinctEmployeeSkillsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List distinct skill names held by any non-deleted employee
+ */
+
+export function useListDistinctEmployeeSkills<
+  TData = Awaited<ReturnType<typeof listDistinctEmployeeSkills>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDistinctEmployeeSkills>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDistinctEmployeeSkillsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List distinct certification names held by any non-deleted employee
+ */
+export const getListDistinctEmployeeCertificationsUrl = () => {
+  return `/api/employees/certifications/distinct`;
+};
+
+export const listDistinctEmployeeCertifications = async (
+  options?: RequestInit,
+): Promise<ListDistinctEmployeeCertifications200> => {
+  return customFetch<ListDistinctEmployeeCertifications200>(
+    getListDistinctEmployeeCertificationsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListDistinctEmployeeCertificationsQueryKey = () => {
+  return [`/api/employees/certifications/distinct`] as const;
+};
+
+export const getListDistinctEmployeeCertificationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDistinctEmployeeCertifications>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDistinctEmployeeCertifications>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDistinctEmployeeCertificationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDistinctEmployeeCertifications>>
+  > = ({ signal }) =>
+    listDistinctEmployeeCertifications({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDistinctEmployeeCertifications>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDistinctEmployeeCertificationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDistinctEmployeeCertifications>>
+>;
+export type ListDistinctEmployeeCertificationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List distinct certification names held by any non-deleted employee
+ */
+
+export function useListDistinctEmployeeCertifications<
+  TData = Awaited<ReturnType<typeof listDistinctEmployeeCertifications>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDistinctEmployeeCertifications>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions =
+    getListDistinctEmployeeCertificationsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List active employees with the minimal fields needed for an org chart

@@ -3723,6 +3723,16 @@ export type ListEmployeesParams = {
    * @nullable
    */
   search?: string | null;
+  /**
+   * Substring match (case-insensitive) on an employee's skill name. Returns employees who have at least one matching skill.
+   * @nullable
+   */
+  skill?: string | null;
+  /**
+   * Substring match (case-insensitive) on an employee's certification name. Returns employees who hold at least one matching certification.
+   * @nullable
+   */
+  certification?: string | null;
   limit?: number;
   offset?: number;
 };
@@ -3730,6 +3740,14 @@ export type ListEmployeesParams = {
 export type UpdateMyTimezoneBody = {
   /** IANA timezone identifier (e.g. "Asia/Kolkata"). */
   timezone: string;
+};
+
+export type ListDistinctEmployeeSkills200 = {
+  data?: string[];
+};
+
+export type ListDistinctEmployeeCertifications200 = {
+  data?: string[];
 };
 
 export type ListOrgChart200 = {

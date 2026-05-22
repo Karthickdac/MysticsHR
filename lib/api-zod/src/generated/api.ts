@@ -274,6 +274,18 @@ export const ListEmployeesQueryParams = zod.object({
   status: zod.coerce.string().nullish(),
   departmentId: zod.coerce.number().nullish(),
   search: zod.coerce.string().nullish(),
+  skill: zod.coerce
+    .string()
+    .nullish()
+    .describe(
+      "Substring match (case-insensitive) on an employee's skill name. Returns employees who have at least one matching skill.",
+    ),
+  certification: zod.coerce
+    .string()
+    .nullish()
+    .describe(
+      "Substring match (case-insensitive) on an employee's certification name. Returns employees who hold at least one matching certification.",
+    ),
   limit: zod.coerce.number().default(listEmployeesQueryLimitDefault),
   offset: zod.coerce.number().default(listEmployeesQueryOffsetDefault),
 });
@@ -381,6 +393,20 @@ export const UpdateMyTimezoneResponse = zod.object({
   isDeleted: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List distinct skill names held by any non-deleted employee
+ */
+export const ListDistinctEmployeeSkillsResponse = zod.object({
+  data: zod.array(zod.string()).optional(),
+});
+
+/**
+ * @summary List distinct certification names held by any non-deleted employee
+ */
+export const ListDistinctEmployeeCertificationsResponse = zod.object({
+  data: zod.array(zod.string()).optional(),
 });
 
 /**

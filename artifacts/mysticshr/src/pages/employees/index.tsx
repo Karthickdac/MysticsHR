@@ -1,6 +1,14 @@
 import { useState, useRef } from "react";
 import { Link } from "wouter";
-import { useListEmployees, useListDepartments, usePostEmployeesBulkImport, type BulkImportResult, type PostEmployeesBulkImportBodyRowsItem } from "@workspace/api-client-react";
+import {
+  useListEmployees,
+  useListDepartments,
+  useListDistinctEmployeeSkills,
+  useListDistinctEmployeeCertifications,
+  usePostEmployeesBulkImport,
+  type BulkImportResult,
+  type PostEmployeesBulkImportBodyRowsItem,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,6 +50,8 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("");
+  const [skillFilter, setSkillFilter] = useState<string>("");
+  const [certFilter, setCertFilter] = useState<string>("");
   const [page, setPage] = useState(0);
   const debouncedSearch = useDebounce(search, 300);
 
@@ -55,10 +65,14 @@ export default function EmployeesPage() {
   const bulkImport = usePostEmployeesBulkImport();
 
   const { data: departments } = useListDepartments();
+  const { data: skillsList } = useListDistinctEmployeeSkills();
+  const { data: certsList } = useListDistinctEmployeeCertifications();
   const { data, isLoading } = useListEmployees({
     search: debouncedSearch || undefined,
     status: statusFilter || undefined,
     departmentId: deptFilter ? parseInt(deptFilter, 10) : undefined,
+    skill: skillFilter || undefined,
+    certification: certFilter || undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
@@ -164,7 +178,58 @@ export default function EmployeesPage() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={skillFilter || "_all"} onValueChange={(v) => { setSkillFilter(v === "_all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Skills" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">All Skills</SelectItem>
+            {skillsList?.data?.map((name) => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={certFilter || "_all"} onValueChange={(v) => { setCertFilter(v === "_all" ? "" : v); setPage(0); }}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="All Certifications" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">All Certifications</SelectItem>
+            {certsList?.data?.map((name) => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
+
+      {(skillFilter || certFilter) && (
+        <div className="flex flex-wrap gap-2">
+          {skillFilter && (
+            <Badge variant="secondary" className="gap-1.5 pr-1">
+              Skill: {skillFilter}
+              <button
+                aria-label={`Clear skill filter ${skillFilter}`}
+                className="rounded-full hover:bg-muted-foreground/20 p-0.5"
+                onClick={() => { setSkillFilter(""); setPage(0); }}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
+          {certFilter && (
+            <Badge variant="secondary" className="gap-1.5 pr-1">
+              Certification: {certFilter}
+              <button
+                aria-label={`Clear certification filter ${certFilter}`}
+                className="rounded-full hover:bg-muted-foreground/20 p-0.5"
+                onClick={() => { setCertFilter(""); setPage(0); }}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
+        </div>
+      )}
 
       {/* Employee Grid */}
       {isLoading ? (

@@ -362,6 +362,16 @@ paths:
           in: query
           schema:
             type: ["string", "null"]
+        - name: skill
+          in: query
+          description: Substring match (case-insensitive) on an employee's skill name. Returns employees who have at least one matching skill.
+          schema:
+            type: ["string", "null"]
+        - name: certification
+          in: query
+          description: Substring match (case-insensitive) on an employee's certification name. Returns employees who hold at least one matching certification.
+          schema:
+            type: ["string", "null"]
         - name: limit
           in: query
           schema:
@@ -425,6 +435,42 @@ paths:
           description: Invalid timezone identifier
         "403":
           description: User not linked to an employee record
+
+  /employees/skills/distinct:
+    get:
+      operationId: listDistinctEmployeeSkills
+      tags: [employees]
+      summary: List distinct skill names held by any non-deleted employee
+      responses:
+        "200":
+          description: Distinct skill names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+
+  /employees/certifications/distinct:
+    get:
+      operationId: listDistinctEmployeeCertifications
+      tags: [employees]
+      summary: List distinct certification names held by any non-deleted employee
+      responses:
+        "200":
+          description: Distinct certification names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
 
   /employees/org-chart:
     get:

@@ -2,8 +2,15 @@ import { Router } from "express";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
-import { employeesTable, departmentsTable, designationsTable, systemSettingsTable } from "@workspace/db/schema";
-import { eq, isNull, and, sql, desc } from "drizzle-orm";
+import {
+  employeesTable,
+  departmentsTable,
+  designationsTable,
+  systemSettingsTable,
+  employeeSkillsTable,
+  employeeCertificationsTable,
+} from "@workspace/db/schema";
+import { eq, isNull, and, sql, desc, asc } from "drizzle-orm";
 import { autoCreateOnboardingChecklist } from "../lib/onboarding-utils";
 import { recordHistory } from "../lib/history-utils";
 import { seedNotificationPreferencesForEmployee } from "../lib/notification-service";
@@ -88,7 +95,10 @@ router.patch("/employees/me/timezone", requireHrmsUser, async (req, res) => {
 
 router.get("/employees", requireHrmsUser, async (req, res) => {
   try {
-    const { status, departmentId, search, limit = "50", offset = "0" } = req.query as Record<string, string>;
+    const {
+      status, departmentId, search, skill, certification,
+      limit = "50", offset = "0",
+    } = req.query as Record<string, string>;
 
     const conditions = [isNull(employeesTable.deletedAt)];
 
@@ -101,6 +111,21 @@ router.get("/employees", requireHrmsUser, async (req, res) => {
     if (search) {
       conditions.push(
         sql`(${employeesTable.firstName} ilike ${`%${search}%`} OR ${employeesTable.lastName} ilike ${`%${search}%`} OR ${employeesTable.email} ilike ${`%${search}%`} OR ${employeesTable.employeeId} ilike ${`%${search}%`})`
+      );
+    }
+    if (skill && skill.trim()) {
+      // EXISTS subquery: employee has at least one skill whose name matches.
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM ${employeeSkillsTable}
+          WHERE ${employeeSkillsTable.employeeId} = ${employeesTable.id}
+          AND ${employeeSkillsTable.name} ilike ${`%${skill.trim()}%`})`
+      );
+    }
+    if (certification && certification.trim()) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM ${employeeCertificationsTable}
+          WHERE ${employeeCertificationsTable.employeeId} = ${employeesTable.id}
+          AND ${employeeCertificationsTable.name} ilike ${`%${certification.trim()}%`})`
       );
     }
 
@@ -226,6 +251,38 @@ router.get("/employees/org-chart", requireHrmsUser, async (_req, res) => {
       .where(and(isNull(employeesTable.deletedAt), eq(employeesTable.isActive, true)));
 
     res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Distinct skill names across all employees — powers the skill filter dropdown.
+router.get("/employees/skills/distinct", requireHrmsUser, async (_req, res) => {
+  try {
+    const rows = await db
+      .selectDistinct({ name: employeeSkillsTable.name })
+      .from(employeeSkillsTable)
+      .innerJoin(employeesTable, eq(employeesTable.id, employeeSkillsTable.employeeId))
+      .where(isNull(employeesTable.deletedAt))
+      .orderBy(asc(employeeSkillsTable.name));
+    res.json({ data: rows.map((r) => r.name) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Distinct certification names across all employees — powers the cert filter.
+router.get("/employees/certifications/distinct", requireHrmsUser, async (_req, res) => {
+  try {
+    const rows = await db
+      .selectDistinct({ name: employeeCertificationsTable.name })
+      .from(employeeCertificationsTable)
+      .innerJoin(employeesTable, eq(employeesTable.id, employeeCertificationsTable.employeeId))
+      .where(isNull(employeesTable.deletedAt))
+      .orderBy(asc(employeeCertificationsTable.name));
+    res.json({ data: rows.map((r) => r.name) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
