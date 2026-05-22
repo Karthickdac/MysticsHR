@@ -1,0 +1,74 @@
+[PM2] [mysticshr-api](11) ✓
+┌────┬───────────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name                  │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼───────────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 2  │ automystics-api       │ default     │ 0.0.0   │ fork    │ 178189   │ 47m    │ 12   │ online    │ 0%       │ 106.4mb  │ root     │ disabled │
+│ 0  │ fitro360              │ default     │ 1.0.0   │ fork    │ 178157   │ 47m    │ 12   │ online    │ 0%       │ 107.8mb  │ root     │ disabled │
+│ 1  │ kalvicore-api         │ default     │ 0.0.0   │ fork    │ 178160   │ 47m    │ 12   │ online    │ 0%       │ 99.6mb   │ root     │ disabled │
+│ 8  │ mystics-api           │ default     │ 0.0.0   │ fork    │ 178224   │ 47m    │ 13   │ online    │ 0%       │ 246.7mb  │ root     │ disabled │
+│ 11 │ mysticshr-api         │ default     │ 0.0.0   │ fork    │ 325092   │ 0s     │ 1174 │ online    │ 0%       │ 22.4mb   │ root     │ disabled │
+│ 4  │ people-connect-api    │ default     │ 0.0.0   │ fork    │ 178192   │ 47m    │ 13   │ online    │ 0%       │ 186.2mb  │ root     │ disabled │
+│ 6  │ tkprabhu-api          │ default     │ 0.0.0   │ fork    │ 178210   │ 47m    │ 35   │ online    │ 0%       │ 185.1mb  │ root     │ disabled │
+└────┴───────────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[TAILING] Tailing last 10 lines for [mysticshr-api] process (change the value with --lines option)
+/root/.pm2/logs/mysticshr-api-error.log last 10 lines:
+11|mystics | (node:301448) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301520) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301587) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:301670) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+11|mystics | (node:325092) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+11|mystics | (Use `node --trace-deprecation ...` to show where the warning was created)
+
+/root/.pm2/logs/mysticshr-api-out.log last 10 lines:
+11|mystics | {"level":30,"time":1779461143461,"pid":301587,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+11|mystics | {"level":30,"time":1779461144555,"pid":301670,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+11|mystics | {"level":30,"time":1779461144557,"pid":301670,"hostname":"srv1609330","port":3010,"msg":"Server listening"}
+11|mystics | {"level":30,"time":1779461144612,"pid":301670,"hostname":"srv1609330","msg":"[scheduler] started — runs every hour at :00 + notification jobs"}
+11|mystics | {"level":30,"time":1779461145931,"pid":301670,"hostname":"srv1609330","req":{"id":1,"method":"GET","url":"/api/health"},"res":{"statusCode":404},"responseTime":21,"msg":"request completed"}
+11|mystics | {"level":30,"time":1779461145947,"pid":301670,"hostname":"srv1609330","req":{"id":2,"method":"HEAD","url":"/"},"res":{"statusCode":200},"responseTime":6,"msg":"request completed"}
+11|mystics | {"level":30,"time":1779461159642,"pid":301670,"hostname":"srv1609330","fy":"2025-26","eligible":7,"sent":7,"skipped":0,"msg":"[scheduler] dispatchForm16ForFy completed"}
+11|mystics | {"level":30,"time":1779461626533,"pid":325092,"hostname":"srv1609330","spaDir":"/home/automystics-mysticshr/htdocs/mysticshr.automystics.tech/artifacts/mysticshr/dist/public","msg":"Serving SPA in production"}
+11|mystics | {"level":30,"time":1779461626536,"pid":325092,"hostname":"srv1609330","port":3210,"msg":"Server listening"}
+11|mystics | {"level":30,"time":1779461626592,"pid":325092,"hostname":"srv1609330","msg":"[scheduler] started — runs every hour at :00 + notification jobs"}
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+x-clerk-auth-reason: dev-browser-missing
+x-clerk-auth-status: signed-out
+Accept-Ranges: bytes
+Cache-Control: public, max-age=0
+Last-Modified: Fri, 22 May 2026 14:06:19 GMT
+ETag: W/"325-19e5002294e"
+Content-Type: text/html; charset=utf-8
+Content-Length: 805
+Date: Fri, 22 May 2026 14:53:47 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+HTTP/2 200 
+server: nginx
+date: Fri, 22 May 2026 14:53:48 GMT
+content-type: text/html; charset=utf-8
+content-length: 805
+vary: Accept-Encoding
+x-powered-by: Express
+vary: Origin
+access-control-allow-credentials: true
+x-clerk-auth-reason: dev-browser-missing
+x-clerk-auth-status: signed-out
+accept-ranges: bytes
+cache-control: public, max-age=0
+last-modified: Fri, 22 May 2026 14:06:19 GMT
+etag: W/"325-19e5002294e"
+x-frame-options: SAMEORIGIN
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+x-permitted-cross-domain-policies: master-only
+referrer-policy: same-origin
+alt-svc: h3=":443"; ma=86400
