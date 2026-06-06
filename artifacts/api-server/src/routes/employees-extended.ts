@@ -1,4 +1,5 @@
 import { Router } from "express";
+import ExcelJS from "exceljs";
 import { requireHrmsUser, requireRole } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { db } from "../lib/db";
@@ -27,7 +28,190 @@ const HR_ROLES = ["super_admin", "hr_manager", "hr_executive"] as const;
 const HR_READ_ROLES = ["super_admin", "hr_manager", "hr_executive", "hod", "payroll_admin"] as const;
 
 const MAX_IMPORT_ROWS = 1000;
-const tooManyRowsMessage = `Too many rows: limit is ${MAX_IMPORT_ROWS} per import. Split your file into smaller batches and try again.`;
+
+type RowMap = Record<string, string>;
+type SectionResult = { imported: number; errors: { row: number; error: string }[] };
+
+function createSheet(
+  wb: ExcelJS.Workbook,
+  name: string,
+  cols: { header: string; key: string; required: boolean; width: number; note?: string }[],
+  exampleRow: Record<string, string | number>
+) {
+  const ws = wb.addWorksheet(name, { views: [{ state: "frozen", ySplit: 1 }] });
+  ws.columns = cols.map(c => ({ header: c.header, key: c.key, width: c.width }));
+  const hRow = ws.getRow(1);
+  hRow.height = 22;
+  hRow.eachCell((cell, colNum) => {
+    const col = cols[colNum - 1];
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col?.required ? "FF1D4ED8" : "FF3B82F6" } };
+    cell.alignment = { vertical: "middle", horizontal: "left" };
+    cell.border = { bottom: { style: "thin", color: { argb: "FFBFDBFE" } } };
+    if (col?.note) {
+      cell.note = { texts: [{ text: col.note }] };
+    }
+  });
+  ws.addRow(exampleRow);
+  const eRow = ws.getRow(2);
+  eRow.eachCell((cell) => {
+    cell.font = { color: { argb: "FF64748B" }, italic: true, size: 10 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF7ED" } };
+  });
+  return ws;
+}
+
+router.get(
+  "/employees/bulk-import/template",
+  requireHrmsUser,
+  requireRole(...HR_ROLES),
+  async (_req, res) => {
+    try {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "MysticsHR";
+      wb.created = new Date();
+
+      createSheet(wb, "Employees", [
+        { header: "employeeId *", key: "employeeId", required: true, width: 16, note: "Unique employee code e.g. EMP001. Required." },
+        { header: "firstName *", key: "firstName", required: true, width: 16 },
+        { header: "lastName *", key: "lastName", required: true, width: 16 },
+        { header: "email *", key: "email", required: true, width: 28 },
+        { header: "phone", key: "phone", required: false, width: 16 },
+        { header: "dateOfBirth", key: "dateOfBirth", required: false, width: 20, note: "Format: YYYY-MM-DD" },
+        { header: "gender", key: "gender", required: false, width: 14, note: "Male / Female / Other" },
+        { header: "department", key: "department", required: false, width: 22, note: "Must match existing department name exactly" },
+        { header: "designation", key: "designation", required: false, width: 22, note: "Must match existing designation title exactly" },
+        { header: "employmentType", key: "employmentType", required: false, width: 18, note: "Permanent / Contract / Probation / Intern / Part-Time" },
+        { header: "status", key: "status", required: false, width: 20, note: "Pre-Joining / Active / On Leave of Absence / Suspended / Notice Period / Separated" },
+        { header: "dateOfJoining", key: "dateOfJoining", required: false, width: 20, note: "Format: YYYY-MM-DD" },
+        { header: "ctc", key: "ctc", required: false, width: 14, note: "Annual CTC in numbers" },
+        { header: "location", key: "location", required: false, width: 16 },
+        { header: "timezone", key: "timezone", required: false, width: 20, note: "e.g. Asia/Kolkata (default)" },
+        { header: "managerEmployeeId", key: "managerEmployeeId", required: false, width: 20, note: "Employee ID of the manager (must already exist)" },
+      ], {
+        employeeId: "EMP001", firstName: "Jane", lastName: "Doe", email: "jane.doe@automystics.com",
+        phone: "9876543210", dateOfBirth: "1995-04-12", gender: "Female",
+        department: "Engineering", designation: "Software Engineer",
+        employmentType: "Permanent", status: "Active", dateOfJoining: "2024-01-15",
+        ctc: "600000", location: "Chennai", timezone: "Asia/Kolkata", managerEmployeeId: "",
+      });
+
+      createSheet(wb, "Profiles", [
+        { header: "employeeId *", key: "employeeId", required: true, width: 16, note: "Must match employeeId from Employees sheet" },
+        { header: "nationalId", key: "nationalId", required: false, width: 18 },
+        { header: "pan", key: "pan", required: false, width: 14 },
+        { header: "aadhaar", key: "aadhaar", required: false, width: 16 },
+        { header: "pfNumber", key: "pfNumber", required: false, width: 16 },
+        { header: "esiNumber", key: "esiNumber", required: false, width: 16 },
+        { header: "uan", key: "uan", required: false, width: 14 },
+        { header: "maritalStatus", key: "maritalStatus", required: false, width: 16, note: "Single / Married / Divorced / Widowed" },
+        { header: "bloodGroup", key: "bloodGroup", required: false, width: 14, note: "A+ / A- / B+ / B- / AB+ / AB- / O+ / O-" },
+        { header: "nationality", key: "nationality", required: false, width: 16 },
+        { header: "permanentAddress", key: "permanentAddress", required: false, width: 30 },
+        { header: "currentAddress", key: "currentAddress", required: false, width: 30 },
+        { header: "personalEmail", key: "personalEmail", required: false, width: 28 },
+        { header: "linkedinUrl", key: "linkedinUrl", required: false, width: 30 },
+        { header: "emergencyContactName", key: "emergencyContactName", required: false, width: 22 },
+        { header: "emergencyContactPhone", key: "emergencyContactPhone", required: false, width: 22 },
+        { header: "emergencyContactRelation", key: "emergencyContactRelation", required: false, width: 24 },
+        { header: "bankAccountName", key: "bankAccountName", required: false, width: 22 },
+        { header: "bankAccountNumber", key: "bankAccountNumber", required: false, width: 22 },
+        { header: "ifscCode", key: "ifscCode", required: false, width: 14 },
+        { header: "bankName", key: "bankName", required: false, width: 20 },
+        { header: "bankBranch", key: "bankBranch", required: false, width: 20 },
+        { header: "probationEndDate", key: "probationEndDate", required: false, width: 20, note: "YYYY-MM-DD" },
+        { header: "confirmationDate", key: "confirmationDate", required: false, width: 20, note: "YYYY-MM-DD" },
+        { header: "noticePeriodDays", key: "noticePeriodDays", required: false, width: 18, note: "Number of days" },
+        { header: "workLocation", key: "workLocation", required: false, width: 18 },
+      ], {
+        employeeId: "EMP001", nationalId: "", pan: "ABCDE1234F", aadhaar: "1234-5678-9012",
+        pfNumber: "", esiNumber: "", uan: "", maritalStatus: "Single", bloodGroup: "O+",
+        nationality: "Indian", permanentAddress: "123 Main St, Chennai", currentAddress: "123 Main St, Chennai",
+        personalEmail: "jane.personal@gmail.com", linkedinUrl: "https://linkedin.com/in/janedoe",
+        emergencyContactName: "John Doe", emergencyContactPhone: "9876543211", emergencyContactRelation: "Father",
+        bankAccountName: "Jane Doe", bankAccountNumber: "123456789012", ifscCode: "HDFC0001234",
+        bankName: "HDFC Bank", bankBranch: "Anna Nagar", probationEndDate: "2024-07-15",
+        confirmationDate: "2024-07-15", noticePeriodDays: "90", workLocation: "Chennai HQ",
+      });
+
+      createSheet(wb, "Education", [
+        { header: "employeeId *", key: "employeeId", required: true, width: 16 },
+        { header: "degree *", key: "degree", required: true, width: 20, note: "e.g. B.Tech, M.Tech, MBA, B.Com" },
+        { header: "institution *", key: "institution", required: true, width: 30 },
+        { header: "fieldOfStudy", key: "fieldOfStudy", required: false, width: 24 },
+        { header: "startYear", key: "startYear", required: false, width: 12, note: "e.g. 2015" },
+        { header: "endYear", key: "endYear", required: false, width: 12, note: "e.g. 2019" },
+        { header: "grade", key: "grade", required: false, width: 14, note: "e.g. 8.5 CGPA or 85%" },
+      ], {
+        employeeId: "EMP001", degree: "B.Tech", institution: "Anna University",
+        fieldOfStudy: "Computer Science", startYear: "2015", endYear: "2019", grade: "8.5 CGPA",
+      });
+
+      createSheet(wb, "Work_Experience", [
+        { header: "employeeId *", key: "employeeId", required: true, width: 16 },
+        { header: "company *", key: "company", required: true, width: 24 },
+        { header: "designation *", key: "designation", required: true, width: 24 },
+        { header: "location", key: "location", required: false, width: 18 },
+        { header: "startDate", key: "startDate", required: false, width: 18, note: "YYYY-MM-DD" },
+        { header: "endDate", key: "endDate", required: false, width: 18, note: "YYYY-MM-DD. Leave blank if current." },
+        { header: "description", key: "description", required: false, width: 36 },
+        { header: "ctcDrawn", key: "ctcDrawn", required: false, width: 16 },
+      ], {
+        employeeId: "EMP001", company: "Tech Mahindra", designation: "Junior Developer",
+        location: "Bangalore", startDate: "2019-06-01", endDate: "2023-12-31",
+        description: "Enterprise Java applications", ctcDrawn: "480000",
+      });
+
+      createSheet(wb, "Skills", [
+        { header: "employeeId *", key: "employeeId", required: true, width: 16 },
+        { header: "name *", key: "name", required: true, width: 22, note: "e.g. JavaScript, Python, SQL" },
+        { header: "proficiency", key: "proficiency", required: false, width: 18, note: "Beginner / Intermediate / Advanced / Expert" },
+        { header: "yearsOfExperience", key: "yearsOfExperience", required: false, width: 20, note: "Number e.g. 3" },
+        { header: "lastUsedYear", key: "lastUsedYear", required: false, width: 16, note: "e.g. 2024" },
+      ], {
+        employeeId: "EMP001", name: "JavaScript", proficiency: "Advanced",
+        yearsOfExperience: "4", lastUsedYear: "2024",
+      });
+
+      createSheet(wb, "Certifications", [
+        { header: "employeeId *", key: "employeeId", required: true, width: 16 },
+        { header: "name *", key: "name", required: true, width: 28 },
+        { header: "issuingOrganization *", key: "issuingOrganization", required: true, width: 24 },
+        { header: "credentialId", key: "credentialId", required: false, width: 22 },
+        { header: "credentialUrl", key: "credentialUrl", required: false, width: 34 },
+        { header: "issueDate", key: "issueDate", required: false, width: 18, note: "YYYY-MM-DD" },
+        { header: "expiryDate", key: "expiryDate", required: false, width: 18, note: "YYYY-MM-DD" },
+      ], {
+        employeeId: "EMP001", name: "AWS Certified Developer", issuingOrganization: "Amazon Web Services",
+        credentialId: "ABC-12345", credentialUrl: "https://aws.amazon.com/verification",
+        issueDate: "2023-03-15", expiryDate: "2026-03-15",
+      });
+
+      createSheet(wb, "Family_Members", [
+        { header: "employeeId *", key: "employeeId", required: true, width: 16 },
+        { header: "name *", key: "name", required: true, width: 22 },
+        { header: "relation *", key: "relation", required: true, width: 16, note: "e.g. Father, Mother, Spouse, Child" },
+        { header: "dateOfBirth", key: "dateOfBirth", required: false, width: 18, note: "YYYY-MM-DD" },
+        { header: "gender", key: "gender", required: false, width: 12, note: "Male / Female / Other" },
+        { header: "phone", key: "phone", required: false, width: 16 },
+        { header: "occupation", key: "occupation", required: false, width: 20 },
+        { header: "isDependent", key: "isDependent", required: false, width: 14, note: "TRUE or FALSE" },
+      ], {
+        employeeId: "EMP001", name: "John Doe", relation: "Father",
+        dateOfBirth: "1965-06-20", gender: "Male", phone: "9876543211",
+        occupation: "Retired", isDependent: "TRUE",
+      });
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="employee_import_template.xlsx"');
+      await wb.xlsx.write(res);
+      res.end();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to generate template" });
+    }
+  }
+);
 
 router.post(
   "/employees/bulk-import",
@@ -35,63 +219,298 @@ router.post(
   requireRole(...HR_ROLES),
   async (req, res) => {
     try {
-      const { rows } = req.body as { rows: Record<string, string>[] };
-      if (!Array.isArray(rows)) {
-        res.status(400).json({ error: "rows must be an array" });
+      const body = req.body as {
+        employees?: RowMap[];
+        profiles?: RowMap[];
+        education?: RowMap[];
+        workExperience?: RowMap[];
+        skills?: RowMap[];
+        certifications?: RowMap[];
+        familyMembers?: RowMap[];
+      };
+
+      const employees: RowMap[] = Array.isArray(body.employees) ? body.employees : [];
+      const profiles: RowMap[] = Array.isArray(body.profiles) ? body.profiles : [];
+      const education: RowMap[] = Array.isArray(body.education) ? body.education : [];
+      const workExperience: RowMap[] = Array.isArray(body.workExperience) ? body.workExperience : [];
+      const skills: RowMap[] = Array.isArray(body.skills) ? body.skills : [];
+      const certifications: RowMap[] = Array.isArray(body.certifications) ? body.certifications : [];
+      const familyMembers: RowMap[] = Array.isArray(body.familyMembers) ? body.familyMembers : [];
+
+      if (employees.length === 0) {
+        res.status(400).json({ error: "employees sheet must have at least one data row" });
         return;
       }
-      if (rows.length > MAX_IMPORT_ROWS) {
-        res.status(400).json({ error: tooManyRowsMessage });
+      if (employees.length > MAX_IMPORT_ROWS) {
+        res.status(400).json({ error: `Too many employee rows: limit is ${MAX_IMPORT_ROWS} per import` });
         return;
       }
-      let imported = 0;
-      const errors: { row: number; error: string }[] = [];
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
+
+      const depts = await db.select({ id: departmentsTable.id, name: departmentsTable.name }).from(departmentsTable);
+      const desigs = await db.select({ id: designationsTable.id, title: designationsTable.title }).from(designationsTable);
+      const deptMap = new Map(depts.map(d => [d.name.toLowerCase(), d.id]));
+      const desigMap = new Map(desigs.map(d => [d.title.toLowerCase(), d.id]));
+
+      const empResult: SectionResult = { imported: 0, errors: [] };
+      const empIdMap = new Map<string, number>();
+
+      for (let i = 0; i < employees.length; i++) {
+        const r = employees[i];
+        if (!r.employeeId?.trim() && !r.firstName?.trim()) continue;
         try {
           if (!r.employeeId || !r.firstName || !r.lastName || !r.email) {
-            errors.push({ row: i + 1, error: "employeeId, firstName, lastName, email are required" });
+            empResult.errors.push({ row: i + 1, error: "employeeId, firstName, lastName, email are required" });
             continue;
           }
+          const departmentId = r.department ? (deptMap.get(r.department.toLowerCase()) ?? null) : null;
+          const designationId = r.designation ? (desigMap.get(r.designation.toLowerCase()) ?? null) : null;
+          let managerId: number | null = null;
+          if (r.managerEmployeeId?.trim()) {
+            const [mgr] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.employeeId, r.managerEmployeeId.trim())).limit(1);
+            managerId = mgr?.id ?? null;
+          }
           const [insertedEmp] = await db.insert(employeesTable).values({
-            employeeId: r.employeeId,
-            firstName: r.firstName,
-            lastName: r.lastName,
-            email: r.email,
-            phone: r.phone ?? null,
-            dateOfBirth: r.dateOfBirth ?? null,
-            gender: (r.gender as "Male" | "Female" | "Other") ?? null,
-            location: r.location ?? null,
-            employmentType: (r.employmentType as "Permanent" | "Contract" | "Probation" | "Intern" | "Part-Time") ?? "Permanent",
-            status: (r.status as "Pre-Joining" | "Active" | "On Leave of Absence" | "Suspended" | "Notice Period" | "Separated") ?? "Pre-Joining",
-            dateOfJoining: r.dateOfJoining ?? null,
+            employeeId: r.employeeId.trim(),
+            firstName: r.firstName.trim(),
+            lastName: r.lastName.trim(),
+            email: r.email.trim(),
+            phone: r.phone?.trim() || null,
+            dateOfBirth: r.dateOfBirth?.trim() || null,
+            gender: (r.gender?.trim() as "Male" | "Female" | "Other") || null,
+            departmentId,
+            designationId,
+            employmentType: (r.employmentType?.trim() as any) || "Permanent",
+            status: (r.status?.trim() as any) || "Pre-Joining",
+            dateOfJoining: r.dateOfJoining?.trim() || null,
+            ctc: r.ctc?.trim() || null,
+            managerId,
+            location: r.location?.trim() || null,
+            timezone: r.timezone?.trim() || "Asia/Kolkata",
           }).returning({ id: employeesTable.id });
-          imported++;
           if (insertedEmp) {
-            // Mirror POST /employees: seed notification preferences from the
-            // company-wide defaults so bulk-imported hires get the same
-            // starting toggles as singly-created ones.
-            try {
-              await seedNotificationPreferencesForEmployee(insertedEmp.id);
-            } catch (e) {
-              console.error(`Notification preference seeding for bulk row ${i + 1} failed (non-fatal):`, e);
-            }
-            if (r.dateOfJoining) {
-              try {
-                await autoCreateOnboardingChecklist(insertedEmp.id, r.dateOfJoining);
-              } catch (e) {
-                console.error(`Auto-checklist creation for bulk row ${i + 1} failed (non-fatal):`, e);
-              }
+            empIdMap.set(r.employeeId.trim(), insertedEmp.id);
+            empResult.imported++;
+            try { await seedNotificationPreferencesForEmployee(insertedEmp.id); } catch {}
+            if (r.dateOfJoining?.trim()) {
+              try { await autoCreateOnboardingChecklist(insertedEmp.id, r.dateOfJoining.trim()); } catch {}
             }
           }
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string };
           const msg = e?.code === "23505" ? "Duplicate employee ID or email" : (e?.message ?? "Unknown error");
-          errors.push({ row: i + 1, error: msg });
+          empResult.errors.push({ row: i + 1, error: msg });
         }
       }
-      await logAudit({ user: req.hrmsUser, action: "BULK_IMPORT", module: "Employees", recordId: 0, newValue: `${imported} imported`, ipAddress: req.ip });
-      res.json({ imported, skipped: errors.length, errors });
+
+      async function resolveDbId(empIdStr: string): Promise<number | null> {
+        const trimmed = empIdStr?.trim();
+        if (!trimmed) return null;
+        if (empIdMap.has(trimmed)) return empIdMap.get(trimmed)!;
+        const [existing] = await db.select({ id: employeesTable.id }).from(employeesTable).where(eq(employeesTable.employeeId, trimmed)).limit(1);
+        if (existing) empIdMap.set(trimmed, existing.id);
+        return existing?.id ?? null;
+      }
+
+      const profileResult: SectionResult = { imported: 0, errors: [] };
+      for (let i = 0; i < profiles.length; i++) {
+        const r = profiles[i];
+        if (!r.employeeId?.trim()) continue;
+        try {
+          const dbId = await resolveDbId(r.employeeId);
+          if (!dbId) { profileResult.errors.push({ row: i + 1, error: `Employee '${r.employeeId}' not found` }); continue; }
+          const data = {
+            nationalId: r.nationalId?.trim() || null,
+            pan: r.pan?.trim() || null,
+            aadhaar: r.aadhaar?.trim() || null,
+            pfNumber: r.pfNumber?.trim() || null,
+            esiNumber: r.esiNumber?.trim() || null,
+            uan: r.uan?.trim() || null,
+            maritalStatus: (r.maritalStatus?.trim() as any) || null,
+            bloodGroup: (r.bloodGroup?.trim() as any) || null,
+            nationality: r.nationality?.trim() || null,
+            permanentAddress: r.permanentAddress?.trim() || null,
+            currentAddress: r.currentAddress?.trim() || null,
+            personalEmail: r.personalEmail?.trim() || null,
+            linkedinUrl: r.linkedinUrl?.trim() || null,
+            emergencyContactName: r.emergencyContactName?.trim() || null,
+            emergencyContactPhone: r.emergencyContactPhone?.trim() || null,
+            emergencyContactRelation: r.emergencyContactRelation?.trim() || null,
+            bankAccountName: r.bankAccountName?.trim() || null,
+            bankAccountNumber: r.bankAccountNumber?.trim() || null,
+            ifscCode: r.ifscCode?.trim() || null,
+            bankName: r.bankName?.trim() || null,
+            bankBranch: r.bankBranch?.trim() || null,
+            probationEndDate: r.probationEndDate?.trim() || null,
+            confirmationDate: r.confirmationDate?.trim() || null,
+            noticePeriodDays: r.noticePeriodDays?.trim() ? parseInt(r.noticePeriodDays.trim(), 10) : null,
+            workLocation: r.workLocation?.trim() || null,
+          };
+          const [existing] = await db.select({ id: employeeProfilesTable.id }).from(employeeProfilesTable).where(eq(employeeProfilesTable.employeeId, dbId)).limit(1);
+          if (existing) {
+            await db.update(employeeProfilesTable).set(data).where(eq(employeeProfilesTable.employeeId, dbId));
+          } else {
+            await db.insert(employeeProfilesTable).values({ employeeId: dbId, ...data });
+          }
+          profileResult.imported++;
+        } catch (err: unknown) {
+          profileResult.errors.push({ row: i + 1, error: (err as any)?.message ?? "Unknown error" });
+        }
+      }
+
+      const eduResult: SectionResult = { imported: 0, errors: [] };
+      for (let i = 0; i < education.length; i++) {
+        const r = education[i];
+        if (!r.employeeId?.trim()) continue;
+        try {
+          if (!r.degree?.trim() || !r.institution?.trim()) {
+            eduResult.errors.push({ row: i + 1, error: "degree and institution are required" }); continue;
+          }
+          const dbId = await resolveDbId(r.employeeId);
+          if (!dbId) { eduResult.errors.push({ row: i + 1, error: `Employee '${r.employeeId}' not found` }); continue; }
+          await db.insert(employeeEducationTable).values({
+            employeeId: dbId,
+            degree: r.degree.trim(),
+            institution: r.institution.trim(),
+            fieldOfStudy: r.fieldOfStudy?.trim() || null,
+            startYear: r.startYear?.trim() ? parseInt(r.startYear.trim(), 10) : null,
+            endYear: r.endYear?.trim() ? parseInt(r.endYear.trim(), 10) : null,
+            grade: r.grade?.trim() || null,
+          });
+          eduResult.imported++;
+        } catch (err: unknown) {
+          eduResult.errors.push({ row: i + 1, error: (err as any)?.message ?? "Unknown error" });
+        }
+      }
+
+      const wxpResult: SectionResult = { imported: 0, errors: [] };
+      for (let i = 0; i < workExperience.length; i++) {
+        const r = workExperience[i];
+        if (!r.employeeId?.trim()) continue;
+        try {
+          if (!r.company?.trim() || !r.designation?.trim()) {
+            wxpResult.errors.push({ row: i + 1, error: "company and designation are required" }); continue;
+          }
+          const dbId = await resolveDbId(r.employeeId);
+          if (!dbId) { wxpResult.errors.push({ row: i + 1, error: `Employee '${r.employeeId}' not found` }); continue; }
+          await db.insert(employeeWorkExperienceTable).values({
+            employeeId: dbId,
+            company: r.company.trim(),
+            designation: r.designation.trim(),
+            location: r.location?.trim() || null,
+            startDate: r.startDate?.trim() || null,
+            endDate: r.endDate?.trim() || null,
+            description: r.description?.trim() || null,
+            ctcDrawn: r.ctcDrawn?.trim() || null,
+          });
+          wxpResult.imported++;
+        } catch (err: unknown) {
+          wxpResult.errors.push({ row: i + 1, error: (err as any)?.message ?? "Unknown error" });
+        }
+      }
+
+      const skillsResult: SectionResult = { imported: 0, errors: [] };
+      for (let i = 0; i < skills.length; i++) {
+        const r = skills[i];
+        if (!r.employeeId?.trim()) continue;
+        try {
+          if (!r.name?.trim()) { skillsResult.errors.push({ row: i + 1, error: "name is required" }); continue; }
+          const dbId = await resolveDbId(r.employeeId);
+          if (!dbId) { skillsResult.errors.push({ row: i + 1, error: `Employee '${r.employeeId}' not found` }); continue; }
+          await db.insert(employeeSkillsTable).values({
+            employeeId: dbId,
+            name: r.name.trim(),
+            proficiency: r.proficiency?.trim() || null,
+            yearsOfExperience: r.yearsOfExperience?.trim() ? parseInt(r.yearsOfExperience.trim(), 10) : null,
+            lastUsedYear: r.lastUsedYear?.trim() ? parseInt(r.lastUsedYear.trim(), 10) : null,
+          });
+          skillsResult.imported++;
+        } catch (err: unknown) {
+          skillsResult.errors.push({ row: i + 1, error: (err as any)?.message ?? "Unknown error" });
+        }
+      }
+
+      const certResult: SectionResult = { imported: 0, errors: [] };
+      for (let i = 0; i < certifications.length; i++) {
+        const r = certifications[i];
+        if (!r.employeeId?.trim()) continue;
+        try {
+          if (!r.name?.trim() || !r.issuingOrganization?.trim()) {
+            certResult.errors.push({ row: i + 1, error: "name and issuingOrganization are required" }); continue;
+          }
+          const dbId = await resolveDbId(r.employeeId);
+          if (!dbId) { certResult.errors.push({ row: i + 1, error: `Employee '${r.employeeId}' not found` }); continue; }
+          await db.insert(employeeCertificationsTable).values({
+            employeeId: dbId,
+            name: r.name.trim(),
+            issuingOrganization: r.issuingOrganization.trim(),
+            credentialId: r.credentialId?.trim() || null,
+            credentialUrl: r.credentialUrl?.trim() || null,
+            issueDate: r.issueDate?.trim() || null,
+            expiryDate: r.expiryDate?.trim() || null,
+          });
+          certResult.imported++;
+        } catch (err: unknown) {
+          certResult.errors.push({ row: i + 1, error: (err as any)?.message ?? "Unknown error" });
+        }
+      }
+
+      const famResult: SectionResult = { imported: 0, errors: [] };
+      for (let i = 0; i < familyMembers.length; i++) {
+        const r = familyMembers[i];
+        if (!r.employeeId?.trim()) continue;
+        try {
+          if (!r.name?.trim() || !r.relation?.trim()) {
+            famResult.errors.push({ row: i + 1, error: "name and relation are required" }); continue;
+          }
+          const dbId = await resolveDbId(r.employeeId);
+          if (!dbId) { famResult.errors.push({ row: i + 1, error: `Employee '${r.employeeId}' not found` }); continue; }
+          await db.insert(employeeFamilyMembersTable).values({
+            employeeId: dbId,
+            name: r.name.trim(),
+            relation: r.relation.trim(),
+            dateOfBirth: r.dateOfBirth?.trim() || null,
+            gender: r.gender?.trim() || null,
+            phone: r.phone?.trim() || null,
+            occupation: r.occupation?.trim() || null,
+            isDependent: ["true", "yes", "1"].includes((r.isDependent ?? "").toLowerCase()),
+          });
+          famResult.imported++;
+        } catch (err: unknown) {
+          famResult.errors.push({ row: i + 1, error: (err as any)?.message ?? "Unknown error" });
+        }
+      }
+
+      await logAudit({
+        user: req.hrmsUser,
+        action: "BULK_IMPORT",
+        module: "Employees",
+        recordId: 0,
+        newValue: [
+          `${empResult.imported} employees`,
+          profileResult.imported ? `${profileResult.imported} profiles` : "",
+          eduResult.imported ? `${eduResult.imported} education` : "",
+          wxpResult.imported ? `${wxpResult.imported} work experience` : "",
+          skillsResult.imported ? `${skillsResult.imported} skills` : "",
+          certResult.imported ? `${certResult.imported} certifications` : "",
+          famResult.imported ? `${famResult.imported} family members` : "",
+        ].filter(Boolean).join(", ") + " imported",
+        ipAddress: req.ip,
+      });
+
+      res.json({
+        imported: empResult.imported,
+        skipped: empResult.errors.length,
+        errors: empResult.errors,
+        details: {
+          employees: empResult,
+          profiles: profileResult,
+          education: eduResult,
+          workExperience: wxpResult,
+          skills: skillsResult,
+          certifications: certResult,
+          familyMembers: famResult,
+        },
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Internal server error" });
